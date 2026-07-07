@@ -4,6 +4,7 @@
 
 namespace alleyfist {
 
+// 稳定编号：View 和 ViewModel 用它指向同一个游戏对象。
 using ActorId = std::uint32_t;
 using EncounterId = std::uint32_t;
 
@@ -39,6 +40,7 @@ struct Rect {
     }
 };
 
+// 通用资源条：血量、精力、Boss 血条等都可以使用它。
 struct ResourceBar {
     int current = 0;
     int maximum = 0;
@@ -54,6 +56,8 @@ struct ResourceBar {
     }
 };
 
+// 横版格斗世界坐标：x 表示关卡推进，laneY 表示街道纵深，
+// z 表示离地高度，用于跳跃或击飞。
 struct WorldPosition {
     float x = 0.0f;
     float laneY = 0.0f;

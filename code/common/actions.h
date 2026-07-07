@@ -4,6 +4,8 @@
 
 namespace alleyfist {
 
+// Direction 是组合后的移动意图，不是键盘按键码。
+// ViewModel 可以根据当前按住的移动键推导出它。
 enum class Direction {
     None,
     Left,
@@ -16,6 +18,7 @@ enum class Direction {
     DownRight
 };
 
+// View 发出的逻辑动作。具体按键绑定留在 View，玩法含义放在这里。
 enum class InputAction {
     MoveLeft,
     MoveRight,
@@ -29,6 +32,7 @@ enum class InputAction {
     Pause
 };
 
+// Pressed/Released 用于持续按键；Triggered 用于单次触发动作。
 enum class ButtonState {
     Pressed,
     Released,
@@ -43,6 +47,7 @@ enum class CommandType {
     Resume
 };
 
+// 记录当前按住的移动键，方便表达斜向移动。
 struct MovementIntent {
     bool left = false;
     bool right = false;
@@ -89,11 +94,13 @@ struct InputCommand {
     ButtonState state = ButtonState::Triggered;
 };
 
+// Tick 驱动和时间有关的逻辑，例如动画、AI、精力恢复和跳跃。
 struct TickCommand {
     float deltaSeconds = 0.0f;
     std::uint64_t frameIndex = 0;
 };
 
+// View/App 传给 ViewModel 的统一命令包装。
 struct GameCommand {
     CommandType type = CommandType::Input;
     InputCommand input;

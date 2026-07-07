@@ -7,6 +7,7 @@
 
 namespace alleyfist {
 
+// ViewModel 用它说明哪里变了，同时不暴露内部对象。
 enum class ChangeReason {
     Snapshot,
     Player,
@@ -17,16 +18,19 @@ enum class ChangeReason {
     Result
 };
 
+// App 用这些函数类型把 View 和 ViewModel 绑定起来。
 using ChangeCallback = std::function<void(ChangeReason)>;
 using CommandHandler = std::function<void(const GameCommand&)>;
 using SnapshotProvider = std::function<const GameSnapshot&()>;
 
+// 能接收游戏命令的对象需要实现这个接口。
 class IGameCommandSink {
 public:
     virtual ~IGameCommandSink() = default;
     virtual void handle_command(const GameCommand& command) = 0;
 };
 
+// 能暴露当前绘制快照的对象需要实现这个接口。
 class IGameSnapshotSource {
 public:
     virtual ~IGameSnapshotSource() = default;

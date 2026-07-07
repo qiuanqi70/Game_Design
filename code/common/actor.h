@@ -8,6 +8,7 @@
 
 namespace alleyfist {
 
+// 玩家、敌人、Boss、道具、特效共用的显示和玩法分类。
 enum class Team {
     Neutral,
     Player,
@@ -67,6 +68,7 @@ enum class DamageType {
     Boss
 };
 
+// 精灵动画只暴露名字；这些名字如何映射到图片由 View 决定。
 struct SpriteViewData {
     std::string atlasId;
     std::string animationId;
@@ -76,6 +78,7 @@ struct SpriteViewData {
     bool loop = true;
 };
 
+// 当前帧生效的攻击盒，坐标相对于攻击发起者。
 struct CombatBoxViewData {
     Rect localBounds;
     AttackKind attack = AttackKind::None;
@@ -85,6 +88,7 @@ struct CombatBoxViewData {
     ActorId ownerId = kInvalidActorId;
 };
 
+// ViewModel 暴露给 View 的角色绘制状态。
 struct ActorViewData {
     ActorId id = kInvalidActorId;
     ActorKind kind = ActorKind::Prop;

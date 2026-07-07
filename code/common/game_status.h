@@ -6,6 +6,7 @@
 
 namespace alleyfist {
 
+// 游戏主流程状态。View 可以根据它切换界面或覆盖层。
 enum class GamePhase {
     Title,
     Playing,
@@ -40,6 +41,7 @@ enum class ScrollLockState {
     LevelFinished
 };
 
+// 默认规则参数。真正的逻辑由 ViewModel 控制，也可以覆盖这些值。
 struct GameRules {
     float levelLength = 3000.0f;
     float viewportWidth = 960.0f;
@@ -58,6 +60,7 @@ struct GameRules {
     int jumpEnergyCost = 12;
 };
 
+// 结算界面或 Game Over 界面需要展示的结果数据。
 struct GameResultViewData {
     GameOverReason gameOverReason = GameOverReason::None;
     WinReason winReason = WinReason::None;

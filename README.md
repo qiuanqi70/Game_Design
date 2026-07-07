@@ -1,3 +1,26 @@
+# 环境与构建
+
+本项目使用 CMake + vcpkg 管理构建和第三方依赖。当前 `vcpkg.json` 已声明 FLTK 依赖，后续如果增加音效库、图片库等，也统一加到 `vcpkg.json`。
+
+首次配置环境：
+
+```bash
+git clone https://github.com/microsoft/vcpkg.git ~/vcpkg
+~/vcpkg/bootstrap-vcpkg.sh
+export VCPKG_ROOT=~/vcpkg
+```
+
+Windows 下对应设置 `VCPKG_ROOT` 到自己的 vcpkg 目录，并运行 `bootstrap-vcpkg.bat`。
+
+配置和编译：
+
+```bash
+cmake --preset vcpkg
+cmake --build --preset vcpkg
+```
+
+如果 IDE 支持 CMake Presets，直接选择 `vcpkg` preset 即可。
+
 # 第一轮迭代：基础框架与界面设计
 第一轮首先完成Common 层的编写，随后并行开发 view 层和 ViewModel 层，最后在 app 层完成跑动与攻击动画的显示；
 - Common 层：存放数据结构。这里在 common 层中放置玩家、小怪、boss 以及背景地图四个类的声明以及定义。在 common 层完成编写后 view 层和 viewmodel 层的编写将根据common 层中定义的数据结构分别独立进行。

@@ -9,6 +9,7 @@
 
 namespace alleyfist {
 
+// 遭遇战锁屏时，敌人的出生位置。
 enum class SpawnSide {
     Left,
     Right,
@@ -16,6 +17,7 @@ enum class SpawnSide {
     BossGate
 };
 
+// 静态遭遇战配置：玩家走到 triggerX 时刷出什么敌人。
 struct SpawnSpec {
     ActorKind actorKind = ActorKind::Grunt;
     EnemyBehavior behavior = EnemyBehavior::Surround;
@@ -31,6 +33,7 @@ struct EncounterSpec {
     std::vector<SpawnSpec> spawns;
 };
 
+// 遭遇战运行时状态，用于界面、调试和 GO 提示判断。
 struct EncounterViewData {
     EncounterId id = kInvalidEncounterId;
     EncounterState state = EncounterState::Inactive;
@@ -42,6 +45,7 @@ struct EncounterViewData {
     bool bossEncounter = false;
 };
 
+// 地图镜头、街道边界、推图锁和可见遭遇战状态。
 struct MapViewData {
     float worldWidth = 0.0f;
     float viewportWidth = 0.0f;
@@ -56,6 +60,7 @@ struct MapViewData {
     std::vector<EncounterViewData> encounters;
 };
 
+// 简洁的关卡进度数据，可用于 HUD 或结算界面。
 struct LevelProgressViewData {
     std::uint32_t stageIndex = 0;
     EncounterId activeEncounterId = kInvalidEncounterId;

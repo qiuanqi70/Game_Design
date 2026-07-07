@@ -3,6 +3,8 @@ cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
 compile_commands.json
+CMakeUserPresets.json
+vcpkg_installed/
 *.o
 *.obj
 *.exe

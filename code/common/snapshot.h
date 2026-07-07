@@ -10,6 +10,7 @@
 
 namespace alleyfist {
 
+// HUD 专用状态，和角色数据分开，方便 View 统一绘制状态条。
 struct HudViewData {
     ResourceBar playerHealth;
     ResourceBar playerEnergy;
@@ -20,6 +21,7 @@ struct HudViewData {
     bool playerExhausted = false;
 };
 
+// 当前帧完整只读状态。View 理论上只靠它就能完成绘制。
 struct GameSnapshot {
     std::uint64_t frameIndex = 0;
     float elapsedSeconds = 0.0f;
