@@ -3,6 +3,6 @@
   "name": "alleyfist",
   "version-string": "0.1.0",
   "dependencies": [
-    "fltk"
+    "qtbase"
   ]
 }
