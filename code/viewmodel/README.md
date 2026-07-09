@@ -10,4 +10,4 @@ ViewModel 层负责游戏逻辑和数据暴露：
 - 处理遭遇战锁屏、清屏解锁、GO 提示和胜负判定。
 - 维护并暴露 `alleyfist::GameSnapshot`。
 
-ViewModel 不依赖 FLTK，也不直接绘制画面。
+ViewModel 不依赖 View，也不直接绘制画面。

@@ -20,7 +20,7 @@ class GameWidget : public QWidget {
 public:
     explicit GameWidget(QWidget* parent = nullptr);
 
-    /// 外部（ViewAdapter）调用，传入最新帧的快照并触发重绘。
+    /// 外部（App 层）调用，传入最新帧的快照并触发重绘。
     void updateSnapshot(const GameSnapshot& snapshot);
 
     /// 设置游戏循环是否运行。

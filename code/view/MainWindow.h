@@ -16,7 +16,7 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget* parent = nullptr);
 
-    /// 获取内部的 GameWidget，供 ViewAdapter 绑定使用。
+    /// 获取内部的 GameWidget，供 App 层绑定使用。
     GameWidget* gameWidget() const { return m_gameWidget; }
 
 private:

@@ -1,6 +1,6 @@
 # Common 层接口说明
 
-`common/` 是三层之间共用的“合同”。A、B、C 都可以包含这里的头文件，但这里不写界面、不写游戏逻辑，也不依赖 FLTK。
+`common/` 是三层之间共用的“合同”。A、B、C 都可以包含这里的头文件，但这里不写界面、不写游戏逻辑，也不依赖 Qt。
 
 
 ## 文件说明
@@ -145,5 +145,4 @@ App 绑定 View 和 ViewModel 用的接口。
 - 清屏后 GO 提示：`MapViewData::showGoIndicator`
 - Game Over / Win：`GamePhase::GameOver`、`GamePhase::Win`
 - 重新开始：`InputAction::Restart`、`CommandType::Restart`
-
 
