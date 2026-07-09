@@ -22,6 +22,7 @@ public:
     const GameSnapshot& snapshot() const noexcept { return m_snapshot; }
 
 private:
+    void reset_gameplay(GamePhase phase);
     void update_player(float dt);
     void update_enemies(float dt);
     void apply_attacks();
@@ -30,6 +31,14 @@ private:
     void apply_movement(float dt);
     void begin_jump();
     void begin_attack(AttackKind attackKind, bool fromAir);
+    void update_camera();
+    void update_progress();
+    void update_actor_body_box(ActorViewData& actor) const noexcept;
+    void spawn_grunt_encounter();
+    void spawn_boss_encounter();
+    void clear_active_encounter();
+    bool is_gameplay_active() const noexcept;
+    bool is_player_action_locked() const noexcept;
 
     // helpers
     static bool rects_intersect(const Rect& a, const Rect& b) noexcept;
@@ -58,7 +67,10 @@ private:
     bool m_pendingAirAttack = false;
     AttackKind m_pendingAttackKind = AttackKind::None;
     float m_jumpElapsed = 0.0f;
+    float m_playerActionTimer = 0.0f;
+    float m_energyRecoveryCarry = 0.0f;
     float m_comboWindowSeconds = 0.35f;
+    GamePhase m_phaseBeforePause = GamePhase::Playing;
 };
 
 } // namespace alleyfist

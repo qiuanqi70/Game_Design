@@ -110,6 +110,33 @@ static bool isMovementAction(InputAction action)
            action == InputAction::MoveDown;
 }
 
+static bool isHandledActionKey(int qtKey)
+{
+    switch (qtKey) {
+    case Qt::Key_Left:
+    case Qt::Key_A:
+    case Qt::Key_Right:
+    case Qt::Key_D:
+    case Qt::Key_Up:
+    case Qt::Key_W:
+    case Qt::Key_Down:
+    case Qt::Key_S:
+    case Qt::Key_J:
+    case Qt::Key_Z:
+    case Qt::Key_K:
+    case Qt::Key_X:
+    case Qt::Key_Space:
+    case Qt::Key_R:
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+    case Qt::Key_Escape:
+    case Qt::Key_P:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void GameWidget::keyPressEvent(QKeyEvent* event)
 {
     if (event->isAutoRepeat()) {
@@ -119,6 +146,11 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
     }
 
     const int key = event->key();
+    if (!isHandledActionKey(key)) {
+        QWidget::keyPressEvent(event);
+        return;
+    }
+
     m_pressedKeys.insert(key);
 
     const InputAction action = keyToAction(key, true);
@@ -150,6 +182,11 @@ void GameWidget::keyReleaseEvent(QKeyEvent* event)
     if (event->isAutoRepeat()) return;
 
     const int key = event->key();
+    if (!isHandledActionKey(key)) {
+        QWidget::keyReleaseEvent(event);
+        return;
+    }
+
     m_pressedKeys.remove(key);
     m_triggeredThisPress.remove(key);
 
