@@ -26,9 +26,8 @@ GameWidget::GameWidget(QWidget* parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     // 游戏循环定时器 ~60 FPS
-    m_timer = new QTimer(this);
-    m_timer->setTimerType(Qt::PreciseTimer);
-    connect(m_timer, &QTimer::timeout, this, [this]() {
+    m_timer.setTimerType(Qt::PreciseTimer);
+    connect(&m_timer, &QTimer::timeout, this, [this]() {
         if (!m_elapsed.isValid()) {
             m_elapsed.start();
         }
@@ -45,7 +44,7 @@ GameWidget::GameWidget(QWidget* parent)
 
     // 启动定时器
     m_elapsed.start();
-    m_timer->start(16); // ~60 FPS
+    m_timer.start(16); // ~60 FPS
 }
 
 void GameWidget::updateSnapshot(const GameSnapshot& snapshot)
@@ -57,12 +56,12 @@ void GameWidget::updateSnapshot(const GameSnapshot& snapshot)
 void GameWidget::setRunning(bool running)
 {
     if (running) {
-        if (!m_timer->isActive()) {
+        if (!m_timer.isActive()) {
             m_elapsed.start();
-            m_timer->start(16);
+            m_timer.start(16);
         }
     } else {
-        m_timer->stop();
+        m_timer.stop();
     }
 }
 
@@ -154,8 +153,6 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
         return;
     }
 
-    m_pressedKeys.insert(key);
-
     const InputAction action = keyToAction(key, true);
 
     if (action == InputAction::Confirm && !isMovementAction(action)) {
@@ -163,9 +160,8 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
     }
 
     if (isMovementAction(action)) {
-        // 移动键：发送一次 Pressed，然后通过 emitMoveCommands 维持方向
+        // 移动键：只把 Pressed/Released 状态交给 ViewModel，由 ViewModel 维护持续移动状态。
         emit commandGenerated(GameCommand::input_command(action, ButtonState::Pressed));
-        emitMoveCommands();
     } else if (action == InputAction::LightAttack ||
                action == InputAction::HeavyAttack ||
                action == InputAction::Jump         ||
@@ -190,26 +186,13 @@ void GameWidget::keyReleaseEvent(QKeyEvent* event)
         return;
     }
 
-    m_pressedKeys.remove(key);
     m_triggeredThisPress.remove(key);
 
     const InputAction action = keyToAction(key, false);
 
     if (isMovementAction(action)) {
         emit commandGenerated(GameCommand::input_command(action, ButtonState::Released));
-        emitMoveCommands();
     }
-}
-
-void GameWidget::emitMoveCommands()
-{
-    // 根据当前按住的移动键构造 MovementIntent。
-    // 注意：这里只发送方向信息，ViewModel 自己推导 Direction。
-    // 我们只需确保每个当前按住的键都处于 Pressed 状态。
-    // 实际上 ViewModel 通过 Pressed/Released 跟踪状态，
-    // 所以 keyPressEvent 发送 Pressed，keyReleaseEvent 发送 Released 即可。
-    // 此函数保留用于未来扩展（例如同时发送完整的 MovementIntent）。
-    Q_UNUSED(this);
 }
 
 // ============================================================================

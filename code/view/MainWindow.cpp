@@ -3,6 +3,7 @@
 
 #include <QApplication>
 #include <QScreen>
+#include <memory>
 
 namespace alleyfist {
 
@@ -33,7 +34,7 @@ public:
                         GameCommand::tick_command(deltaSeconds, frameIndex));
                 });
 
-        m_snapshotSource.set_change_callback([this](ChangeReason) {
+        m_changeCookie = m_snapshotSource.add_change_callback([this](ChangeReason) {
             m_widget->updateSnapshot(m_snapshotSource.snapshot());
         });
 
@@ -42,13 +43,16 @@ public:
 
     ~GameWidgetBinding() override
     {
-        m_snapshotSource.set_change_callback({});
+        if (m_changeCookie != 0) {
+            m_snapshotSource.remove_change_callback(m_changeCookie);
+        }
     }
 
 private:
     GameWidget* m_widget = nullptr;
     IGameCommandSink& m_commandSink;
     IGameSnapshotSource& m_snapshotSource;
+    BindingCookie m_changeCookie = 0;
 };
 
 } // namespace
@@ -71,16 +75,16 @@ MainWindow::MainWindow(QWidget* parent)
     // 最小窗口尺寸
     setMinimumSize(480, 270);
 
-    // 创建 GameWidget 作为中心控件
-    m_gameWidget = new GameWidget(this);
-    setCentralWidget(m_gameWidget);
+    // 创建 GameWidget 作为中心控件；setCentralWidget 会接管 QWidget 所有权。
+    auto gameWidget = std::make_unique<GameWidget>(this);
+    m_gameWidget = gameWidget.get();
+    setCentralWidget(gameWidget.release());
 }
 
 void MainWindow::bind(IGameCommandSink& commandSink,
                       IGameSnapshotSource& snapshotSource)
 {
-    delete m_binding;
-    m_binding = new GameWidgetBinding(m_gameWidget, commandSink, snapshotSource, this);
+    m_binding = std::make_unique<GameWidgetBinding>(m_gameWidget, commandSink, snapshotSource);
 }
 
 } // namespace alleyfist

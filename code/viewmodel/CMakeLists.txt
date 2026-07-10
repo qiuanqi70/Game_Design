@@ -6,12 +6,17 @@ add_library(alleyfist_viewmodel STATIC
     SimulationTypes.h
 )
 
+set_target_properties(alleyfist_viewmodel PROPERTIES
+    AUTOMOC OFF
+    AUTOUIC OFF
+    AUTORCC OFF
+)
+
 target_include_directories(alleyfist_viewmodel PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(alleyfist_viewmodel
     PUBLIC
         alleyfist_common
-        Qt6::Core
 )
 
 qt_standard_project_setup()

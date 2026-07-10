@@ -3,6 +3,7 @@
 #include "../common/contracts.h"
 
 #include <QMainWindow>
+#include <memory>
 
 namespace alleyfist {
 
@@ -25,7 +26,7 @@ public:
 
 private:
     GameWidget* m_gameWidget = nullptr;
-    QObject* m_binding = nullptr;
+    std::unique_ptr<QObject> m_binding;
 };
 
 } // namespace alleyfist

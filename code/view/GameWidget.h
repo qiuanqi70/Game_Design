@@ -42,7 +42,6 @@ protected:
 
 private:
     // ---- 输入处理 ----
-    void emitMoveCommands();
     InputAction keyToAction(int qtKey, bool pressed) const;
 
     // ---- 绘制子过程 ----
@@ -70,13 +69,12 @@ private:
 
     // ---- 状态 ----
     GameSnapshot m_snapshot;
-    QTimer* m_timer = nullptr;
+    QTimer m_timer;
     QElapsedTimer m_elapsed;
     std::uint64_t m_frameIndex = 0;
 
-    // 跟踪当前按住的键，用于持续移动和防止重复 Triggered。
-    QSet<int> m_pressedKeys;
-    QSet<int> m_triggeredThisPress; // 本轮 keyPress 已触发的单次动作
+    // 跟踪本轮按下已经触发过的单次动作，防止重复 Triggered。
+    QSet<int> m_triggeredThisPress;
 
     // GO 闪烁
     mutable float m_goBlinkTimer = 0.0f;

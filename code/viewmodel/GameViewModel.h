@@ -1,33 +1,42 @@
 #pragma once
 
 #include "../common/contracts.h"
-#include "GameSimulation.h"
-#include <QObject>
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace alleyfist {
+
+class GameSimulation;
 
 // GameViewModel 是 ViewModel 层对外的门面：
 // 对 View 暴露命令入口和只读快照源，对内部委托 GameSimulation 处理玩法逻辑。
 // 它不包含 QWidget/GameWidget，也不调用任何绘制代码。
-class GameViewModel : public QObject, public IGameCommandSink, public IGameSnapshotSource {
-    Q_OBJECT
+class GameViewModel final : public IGameCommandSink, public IGameSnapshotSource {
 public:
-    explicit GameViewModel(QObject* parent = nullptr);
+    GameViewModel();
+    ~GameViewModel() override;
+
+    GameViewModel(const GameViewModel&) = delete;
+    GameViewModel& operator=(const GameViewModel&) = delete;
 
     // IGameCommandSink
     void handle_command(const GameCommand& command) override;
 
     // IGameSnapshotSource
     const GameSnapshot& snapshot() const override;
-    void set_change_callback(ChangeCallback callback) override;
-
-signals:
-    void changed(ChangeReason reason);
+    BindingCookie add_change_callback(ChangeCallback callback) override;
+    void remove_change_callback(BindingCookie cookie) override;
 
 private:
+    void notify(ChangeReason reason);
+    void notify_changes(const GameSnapshot& before, const GameSnapshot& after);
+
     GameSnapshot m_snapshot;
-    ChangeCallback m_callback;
-    GameSimulation m_sim;
+    std::vector<std::pair<BindingCookie, ChangeCallback>> m_callbacks;
+    BindingCookie m_nextCallbackCookie = 1;
+    std::unique_ptr<GameSimulation> m_sim;
 };
 
 } // namespace alleyfist

@@ -154,17 +154,6 @@ void GameSimulation::handle_command(const GameCommand& command)
     if (command.type == CommandType::Tick) {
         return;
     }
-    if (command.type == CommandType::Restart) {
-        reset_gameplay(GamePhase::Playing);
-        return;
-    }
-    if (command.type == CommandType::Pause) {
-        process_input_command(GameCommand::input_command(InputAction::Pause, ButtonState::Triggered));
-        return;
-    }
-    if (command.type == CommandType::Resume && m_snapshot.phase == GamePhase::Paused) {
-        m_snapshot.phase = m_phaseBeforePause;
-    }
 }
 
 void GameSimulation::update_player(float dt)

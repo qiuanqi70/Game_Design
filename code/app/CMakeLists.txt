@@ -5,6 +5,12 @@ add_library(alleyfist_app STATIC
     GameApplication.cpp
 )
 
+set_target_properties(alleyfist_app PROPERTIES
+    AUTOMOC OFF
+    AUTOUIC OFF
+    AUTORCC OFF
+)
+
 target_include_directories(alleyfist_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(alleyfist_app

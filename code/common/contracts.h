@@ -3,6 +3,7 @@
 #include "actions.h"
 #include "snapshot.h"
 
+#include <cstdint>
 #include <functional>
 
 namespace alleyfist {
@@ -22,10 +23,9 @@ enum class ChangeReason {
     Result
 };
 
-// App 用这些函数类型把 View 和 ViewModel 绑定起来。
+// View 订阅 ViewModel 通知时拿到 cookie，解绑时用它归还绑定关系。
+using BindingCookie = std::uintptr_t;
 using ChangeCallback = std::function<void(ChangeReason)>;
-using CommandHandler = std::function<void(const GameCommand&)>;
-using SnapshotProvider = std::function<const GameSnapshot&()>;
 
 // 能接收游戏命令的对象需要实现这个接口。
 class IGameCommandSink {
@@ -39,7 +39,8 @@ class IGameSnapshotSource {
 public:
     virtual ~IGameSnapshotSource() = default;
     virtual const GameSnapshot& snapshot() const = 0;
-    virtual void set_change_callback(ChangeCallback callback) = 0;
+    virtual BindingCookie add_change_callback(ChangeCallback callback) = 0;
+    virtual void remove_change_callback(BindingCookie cookie) = 0;
 };
 
 } // namespace alleyfist

@@ -102,8 +102,7 @@ View 应该尽量只依赖 `GameSnapshot` 绘制画面。
 
 App 绑定 View 和 ViewModel 用的接口。
 
-- `CommandHandler`：View 把命令发出去。
-- `SnapshotProvider`：View 获取当前快照。
+- `BindingCookie`：通知绑定的句柄，用于解绑时归还借用关系。
 - `ChangeCallback`：ViewModel 通知外部“数据变了”。
 - `IGameCommandSink`：能接收命令的对象。
 - `IGameSnapshotSource`：能提供快照的对象。
@@ -127,7 +126,7 @@ App 绑定 View 和 ViewModel 用的接口。
 
 ## 目前已经覆盖的玩法需求
 
-- 八方向移动：`Direction`、`MovementIntent`
+- 八方向移动：`InputAction::MoveLeft` / `MoveRight` / `MoveUp` / `MoveDown`
 - 轻攻击/重攻击：`InputAction`、`ActorState::LightAttack`、`ActorState::HeavyAttack`
 - 连招：`comboStep`、`comboTimeLeftSeconds`、`ActorState::ComboFinisher`
 - 跳跃：`InputAction::Jump`、`WorldPosition::z`、`ActorState::Jump`
@@ -138,4 +137,4 @@ App 绑定 View 和 ViewModel 用的接口。
 - 遭遇战锁屏：`EncounterState`、`ScrollLockState`
 - 清屏后 GO 提示：`MapViewData::showGoIndicator`
 - Game Over / Win：`GamePhase::GameOver`、`GamePhase::Win`
-- 重新开始：`InputAction::Restart`、`CommandType::Restart`
+- 重新开始：`InputAction::Restart`
