@@ -32,7 +32,7 @@ bool same_rect(const Rect& a, const Rect& b) noexcept
            a.width == b.width && a.height == b.height;
 }
 
-bool same_actor(const ActorViewData& a, const ActorViewData& b)
+bool same_actor(const ActorSnapshot& a, const ActorSnapshot& b)
 {
     return a.id == b.id &&
            a.kind == b.kind &&
@@ -44,12 +44,12 @@ bool same_actor(const ActorViewData& a, const ActorViewData& b)
            same_resource(a.energy, b.energy) &&
            a.state == b.state &&
            a.facing == b.facing &&
-           a.sprite.atlasId == b.sprite.atlasId &&
-           a.sprite.animationId == b.sprite.animationId &&
-           a.sprite.frameIndex == b.sprite.frameIndex &&
-           a.sprite.secondsPerFrame == b.sprite.secondsPerFrame &&
-           a.sprite.flipX == b.sprite.flipX &&
-           a.sprite.loop == b.sprite.loop &&
+           a.animation.atlasId == b.animation.atlasId &&
+           a.animation.animationId == b.animation.animationId &&
+           a.animation.frameIndex == b.animation.frameIndex &&
+           a.animation.secondsPerFrame == b.animation.secondsPerFrame &&
+           a.animation.flipX == b.animation.flipX &&
+           a.animation.loop == b.animation.loop &&
            a.visible == b.visible &&
            a.targetable == b.targetable &&
            a.invincible == b.invincible &&
@@ -57,8 +57,8 @@ bool same_actor(const ActorViewData& a, const ActorViewData& b)
            a.depthSortY == b.depthSortY;
 }
 
-bool same_actor_list(const std::vector<ActorViewData>& a,
-                     const std::vector<ActorViewData>& b)
+bool same_actor_list(const std::vector<ActorSnapshot>& a,
+                     const std::vector<ActorSnapshot>& b)
 {
     if (a.size() != b.size()) return false;
     for (std::size_t i = 0; i < a.size(); ++i) {

@@ -7,7 +7,7 @@
 
 namespace alleyfist {
 
-// 这里只保留 View 绘制角色必须知道的公共显示数据。
+// 这里只保留单个场上对象在一帧快照中的公开状态。
 // AI 行为、攻击盒、伤害类型等玩法内部细节已经放到 ViewModel 层，避免 Common 变成“大杂烩”。
 
 // 玩家、敌人、Boss、道具、特效共用的显示和玩法分类。
@@ -45,8 +45,8 @@ enum class Facing {
     Right
 };
 
-// 精灵动画只暴露名字；这些名字如何映射到图片由 View 决定。
-struct SpriteViewData {
+// 动画状态只暴露标识和帧信息；这些标识如何映射到具体图片资源由渲染层决定。
+struct AnimationSnapshot {
     std::string atlasId;
     std::string animationId;
     std::uint16_t frameIndex = 0;
@@ -55,8 +55,8 @@ struct SpriteViewData {
     bool loop = true;
 };
 
-// ViewModel 暴露给 View 的角色绘制状态。
-struct ActorViewData {
+// 单个角色/对象在 GameSnapshot 中的快照数据。
+struct ActorSnapshot {
     ActorId id = kInvalidActorId;
     ActorKind kind = ActorKind::Prop;
     Team team = Team::Neutral;
@@ -67,7 +67,7 @@ struct ActorViewData {
     ResourceBar energy;
     ActorState state = ActorState::Idle;
     Facing facing = Facing::Right;
-    SpriteViewData sprite;
+    AnimationSnapshot animation;
     bool visible = true;
     bool targetable = true;
     bool invincible = false;

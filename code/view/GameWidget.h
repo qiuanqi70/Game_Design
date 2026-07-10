@@ -48,9 +48,9 @@ private:
     void drawBackground(QPainter& p);
     void drawStreet(QPainter& p);
     void drawBuildings(QPainter& p);
-    void drawActor(QPainter& p, const ActorViewData& actor);
-    void drawCharacterBody(QPainter& p, const ActorViewData& actor, QColor bodyColor);
-    void drawHealthBar(QPainter& p, const ActorViewData& actor);
+    void drawActor(QPainter& p, const ActorSnapshot& actor);
+    void drawCharacterBody(QPainter& p, const ActorSnapshot& actor, QColor bodyColor);
+    void drawHealthBar(QPainter& p, const ActorSnapshot& actor);
     void drawPlayerStatus(QPainter& p);
     void drawHUD(QPainter& p);
     void drawGOIndicator(QPainter& p);

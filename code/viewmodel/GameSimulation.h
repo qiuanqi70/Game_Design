@@ -36,7 +36,7 @@ private:
     void begin_attack(AttackKind attackKind, bool fromAir);
     void update_camera();
     void update_progress();
-    void update_actor_body_box(ActorViewData& actor) const noexcept;
+    void update_actor_body_box(ActorSnapshot& actor) const noexcept;
     void spawn_grunt_encounter();
     void spawn_boss_encounter();
     void clear_active_encounter();
@@ -45,7 +45,7 @@ private:
 
     // helpers
     static bool rects_intersect(const Rect& a, const Rect& b) noexcept;
-    Rect combat_box_world_rect(const ActorViewData& owner, const CombatBox& box) const noexcept;
+    Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept;
 
     // command queue for input buffering
     std::deque<GameCommand> m_commandQueue;

@@ -31,9 +31,9 @@ struct GameSnapshot {
     GamePhase phase = GamePhase::Title;
     MapViewData map;
     LevelProgressViewData progress;
-    ActorViewData player;
-    std::vector<ActorViewData> enemies;
-    std::vector<ActorViewData> effects;
+    ActorSnapshot player;
+    std::vector<ActorSnapshot> enemies;
+    std::vector<ActorSnapshot> effects;
     HudViewData hud;
     GameResultViewData result;
     std::string screenMessage;

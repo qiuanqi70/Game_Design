@@ -108,8 +108,8 @@ void GameSimulation::step(float deltaSeconds, std::uint64_t frameIndex)
     }
 
     if (!is_gameplay_active()) {
-        update_camera();
-        update_progress();
+        //update_camera();
+        //update_progress();
         return;
     }
 
@@ -324,8 +324,8 @@ void GameSimulation::apply_attacks()
 
 void GameSimulation::process_input_command(const GameCommand& command)
 {
-    const auto action = command.input.action;
-    const auto state = command.input.state;
+    const auto action = command.input.action;//比如InputAction::MoveLeft
+    const auto state = command.input.state;//比如ButtonState::Pressed
 
     if (action == InputAction::Restart && state == ButtonState::Triggered) {
         reset_gameplay(GamePhase::Playing);

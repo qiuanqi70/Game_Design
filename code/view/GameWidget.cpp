@@ -138,7 +138,7 @@ static bool isHandledActionKey(int qtKey)
         return false;
     }
 }
-
+//判断键盘的输入类型，转换之后发给viewmodel层去处理
 void GameWidget::keyPressEvent(QKeyEvent* event)
 {
     if (event->isAutoRepeat()) {
@@ -155,9 +155,6 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
 
     const InputAction action = keyToAction(key, true);
 
-    if (action == InputAction::Confirm && !isMovementAction(action)) {
-        // fallthrough — Confirm 是合法动作
-    }
 
     if (isMovementAction(action)) {
         // 移动键：只把 Pressed/Released 状态交给 ViewModel，由 ViewModel 维护持续移动状态。

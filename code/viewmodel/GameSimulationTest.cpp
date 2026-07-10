@@ -138,7 +138,7 @@ int main()
 
         const bool anyDamaged = std::any_of(sim.snapshot().enemies.begin(),
                                             sim.snapshot().enemies.end(),
-                                            [healthBefore](const ActorViewData& enemy) {
+                                            [healthBefore](const ActorSnapshot& enemy) {
                                                 return enemy.health.current < healthBefore;
                                             });
         test.expect(anyDamaged, "heavy attack damages a nearby enemy");
