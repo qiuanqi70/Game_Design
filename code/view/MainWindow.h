@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../common/contracts.h"
+
 #include <QMainWindow>
 
 namespace alleyfist {
@@ -16,11 +18,13 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget* parent = nullptr);
 
-    /// 获取内部的 GameWidget，供 App 层绑定使用。
-    GameWidget* gameWidget() const { return m_gameWidget; }
+    /// 将 View 暴露的输入和 ViewModel 暴露的状态源绑定起来。
+    void bind(IGameCommandSink& commandSink,
+              IGameSnapshotSource& snapshotSource);
 
 private:
     GameWidget* m_gameWidget = nullptr;
+    QObject* m_binding = nullptr;
 };
 
 } // namespace alleyfist

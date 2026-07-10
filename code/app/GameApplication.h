@@ -1,11 +1,6 @@
 #pragma once
 
-#include "ViewAdapter.h"
-
-#include "../view/MainWindow.h"
-#include "../viewmodel/GameViewModel.h"
-
-#include <QApplication>
+#include <memory>
 
 namespace alleyfist {
 
@@ -13,20 +8,16 @@ namespace alleyfist {
 class GameApplication final {
 public:
     GameApplication(int& argc, char** argv);
+    ~GameApplication();
+
+    GameApplication(const GameApplication&) = delete;
+    GameApplication& operator=(const GameApplication&) = delete;
 
     int run();
 
-    MainWindow& main_window() noexcept { return m_mainWindow; }
-    const MainWindow& main_window() const noexcept { return m_mainWindow; }
-
-    GameViewModel& view_model() noexcept { return m_viewModel; }
-    const GameViewModel& view_model() const noexcept { return m_viewModel; }
-
 private:
-    QApplication m_qtApp;
-    GameViewModel m_viewModel;
-    MainWindow m_mainWindow;
-    ViewAdapter m_adapter;
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
 };
 
 } // namespace alleyfist

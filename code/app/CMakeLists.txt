@@ -3,14 +3,12 @@ cmake_minimum_required(VERSION 3.20)
 add_library(alleyfist_app STATIC
     GameApplication.h
     GameApplication.cpp
-    ViewAdapter.h
-    ViewAdapter.cpp
 )
 
 target_include_directories(alleyfist_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(alleyfist_app
-    PUBLIC
+    PRIVATE
         alleyfist_common
         alleyfist_view
         alleyfist_viewmodel

@@ -271,7 +271,7 @@ void GameSimulation::apply_attacks()
 
         begin_attack(kind, fromAir);
 
-        CombatBoxViewData cb;
+        CombatBox cb;
         cb.ownerId = m_snapshot.player.id;
         if (kind == AttackKind::LightPunch) {
             cb.damage = 20;
@@ -578,7 +578,6 @@ void GameSimulation::spawn_grunt_encounter()
         enemy.id = static_cast<ActorId>(100 + i);
         enemy.kind = ActorKind::Grunt;
         enemy.team = Team::Enemy;
-        enemy.behavior = EnemyBehavior::Surround;
         enemy.position.x = m_snapshot.player.position.x + 105.0f + i * 55.0f;
         enemy.position.laneY = std::clamp(m_snapshot.player.position.laneY + ((i % 2 == 0) ? -22.0f : 22.0f),
                                           m_snapshot.map.streetTopY,
@@ -587,7 +586,6 @@ void GameSimulation::spawn_grunt_encounter()
         enemy.state = ActorState::Spawn;
         enemy.visible = true;
         enemy.drawSize = {48.0f, 72.0f};
-        enemy.debugName = "Grunt";
         update_actor_body_box(enemy);
         m_snapshot.enemies.push_back(enemy);
         m_enemyAttackTimers[enemy.id] = 0.8f + i * 0.2f;
@@ -619,14 +617,12 @@ void GameSimulation::spawn_boss_encounter()
     boss.id = 900;
     boss.kind = ActorKind::Boss;
     boss.team = Team::Enemy;
-    boss.behavior = EnemyBehavior::BossChase;
     boss.position.x = std::min(m_snapshot.map.worldWidth - 120.0f, m_snapshot.player.position.x + 220.0f);
     boss.position.laneY = m_snapshot.player.position.laneY;
     boss.health = {140, 140};
     boss.state = ActorState::Spawn;
     boss.visible = true;
     boss.drawSize = {82.0f, 124.0f};
-    boss.debugName = "Boss";
     update_actor_body_box(boss);
     m_snapshot.enemies.push_back(boss);
     m_enemyAttackTimers[boss.id] = 1.0f;
@@ -689,7 +685,7 @@ bool GameSimulation::rects_intersect(const Rect& a, const Rect& b) noexcept
     return !(a.x + a.width < b.x || b.x + b.width < a.x || a.y + a.height < b.y || b.y + b.height < a.y);
 }
 
-Rect GameSimulation::combat_box_world_rect(const ActorViewData& owner, const CombatBoxViewData& box) const noexcept
+Rect GameSimulation::combat_box_world_rect(const ActorViewData& owner, const CombatBox& box) const noexcept
 {
     Rect r;
     float worldX = owner.position.x + box.localBounds.x;

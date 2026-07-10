@@ -556,17 +556,6 @@ void GameWidget::drawActor(QPainter& p, const ActorViewData& actor)
         drawHealthBar(p, actor);
     }
 
-    // 攻击盒调试可视（半透明）
-    /*
-    for (const auto& box : actor.activeHitBoxes) {
-        const float bx = worldToScreenX(actor.position.x + box.localBounds.x);
-        const float by = worldToScreenY(actor.position.laneY + box.localBounds.y, 0);
-        p.fillRect(QRectF(bx, by - box.localBounds.height * m_scaleY,
-                          box.localBounds.width * m_scaleX,
-                          box.localBounds.height * m_scaleY),
-                   QColor(255, 255, 0, 60));
-    }
-    */
 }
 
 void GameWidget::drawCharacterBody(QPainter& p, const ActorViewData& actor,

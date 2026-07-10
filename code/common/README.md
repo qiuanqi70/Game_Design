@@ -38,12 +38,11 @@ z     : 离地高度，用于跳跃、飞踢、击飞
 
 ### `game_status.h`
 
-游戏主状态和规则参数。
+游戏主状态和结算显示数据。
 
 - `GamePhase`：标题、游戏中、遭遇战锁屏、清屏可前进、暂停、失败、胜利。
 - `EncounterState`：遭遇战是否触发、锁定、清完。
 - `ScrollLockState`：地图是否被遭遇战或 Boss 战锁住。
-- `GameRules`：默认规则参数。
 - `GameResultViewData`：结算界面要展示的数据。
 
 ### `actor.h`
@@ -55,7 +54,6 @@ z     : 离地高度，用于跳跃、飞踢、击飞
 - `ActorKind::Boss`：Boss。
 - `ActorState`：站立、行走、攻击、跳跃、受伤、倒地、死亡等状态。
 - `SpriteViewData`：动画名字和帧号。
-- `CombatBoxViewData`：当前帧生效的攻击盒。
 - `ActorViewData`：View 绘制一个角色所需的完整数据。
 
 注意：这里没有 `Player`、`SmallEnemy`、`Boss` 这三个逻辑类。Common 只提供它们的公共显示格式。
@@ -64,8 +62,6 @@ z     : 离地高度，用于跳跃、飞踢、击飞
 
 关卡、地图、遭遇战和推图锁。
 
-- `SpawnSpec`：一组刷怪配置。
-- `EncounterSpec`：玩家走到某个 `triggerX` 后触发的遭遇战。
 - `EncounterViewData`：遭遇战当前运行状态。
 - `MapViewData`：镜头、地图大小、街道范围、推图锁、GO 提示。
 - `LevelProgressViewData`：关卡进度、Boss 是否出现/击败。
@@ -132,17 +128,14 @@ App 绑定 View 和 ViewModel 用的接口。
 ## 目前已经覆盖的玩法需求
 
 - 八方向移动：`Direction`、`MovementIntent`
-- 轻攻击/重攻击：`InputAction`、`AttackKind`
+- 轻攻击/重攻击：`InputAction`、`ActorState::LightAttack`、`ActorState::HeavyAttack`
 - 连招：`comboStep`、`comboTimeLeftSeconds`、`ActorState::ComboFinisher`
 - 跳跃：`InputAction::Jump`、`WorldPosition::z`、`ActorState::Jump`
-- 空中攻击：`ActorState::AirAttack`、`AttackKind::JumpKick`
+- 空中攻击：`ActorState::AirAttack`
 - 血量：`ResourceBar health`、`hud.playerHealth`
 - 精力：`ResourceBar energy`、`hud.playerEnergy`
 - 疲劳：`hud.playerExhausted`
-- 小怪包抄：`EnemyBehavior::Surround`
-- Boss 追击：`EnemyBehavior::BossChase`
 - 遭遇战锁屏：`EncounterState`、`ScrollLockState`
 - 清屏后 GO 提示：`MapViewData::showGoIndicator`
 - Game Over / Win：`GamePhase::GameOver`、`GamePhase::Win`
 - 重新开始：`InputAction::Restart`、`CommandType::Restart`
-

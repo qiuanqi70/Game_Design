@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../common/snapshot.h"
 #include "../common/actions.h"
+#include "../common/snapshot.h"
+#include "SimulationTypes.h"
 
 #include <vector>
 #include <deque>
@@ -42,7 +43,7 @@ private:
 
     // helpers
     static bool rects_intersect(const Rect& a, const Rect& b) noexcept;
-    Rect combat_box_world_rect(const ActorViewData& owner, const CombatBoxViewData& box) const noexcept;
+    Rect combat_box_world_rect(const ActorViewData& owner, const CombatBox& box) const noexcept;
 
     // command queue for input buffering
     std::deque<GameCommand> m_commandQueue;

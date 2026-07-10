@@ -1,6 +1,5 @@
 #pragma once
 
-#include "actor.h"
 #include "game_status.h"
 #include "types.h"
 
@@ -8,30 +7,6 @@
 #include <vector>
 
 namespace alleyfist {
-
-// 遭遇战锁屏时，敌人的出生位置。
-enum class SpawnSide {
-    Left,
-    Right,
-    Both,
-    BossGate
-};
-
-// 静态遭遇战配置：玩家走到 triggerX 时刷出什么敌人。
-struct SpawnSpec {
-    ActorKind actorKind = ActorKind::Grunt;
-    EnemyBehavior behavior = EnemyBehavior::Surround;
-    SpawnSide side = SpawnSide::Both;
-    std::uint32_t count = 0;
-    int maxHealth = 1;
-};
-
-struct EncounterSpec {
-    EncounterId id = kInvalidEncounterId;
-    float triggerX = 0.0f;
-    bool bossEncounter = false;
-    std::vector<SpawnSpec> spawns;
-};
 
 // 遭遇战运行时状态，用于界面、调试和 GO 提示判断。
 struct EncounterViewData {

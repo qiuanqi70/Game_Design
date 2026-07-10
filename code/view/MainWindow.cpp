@@ -6,6 +6,50 @@
 
 namespace alleyfist {
 
+namespace {
+
+class GameWidgetBinding final : public QObject {
+public:
+    GameWidgetBinding(GameWidget* widget,
+                      IGameCommandSink& commandSink,
+                      IGameSnapshotSource& snapshotSource,
+                      QObject* parent = nullptr)
+        : QObject(parent)
+        , m_widget(widget)
+        , m_commandSink(commandSink)
+        , m_snapshotSource(snapshotSource)
+    {
+        connect(m_widget, &GameWidget::commandGenerated,
+                this, [this](const GameCommand& command) {
+                    m_commandSink.handle_command(command);
+                });
+
+        connect(m_widget, &GameWidget::tickRequested,
+                this, [this](float deltaSeconds, std::uint64_t frameIndex) {
+                    m_commandSink.handle_command(
+                        GameCommand::tick_command(deltaSeconds, frameIndex));
+                });
+
+        m_snapshotSource.set_change_callback([this](ChangeReason) {
+            m_widget->updateSnapshot(m_snapshotSource.snapshot());
+        });
+
+        m_widget->updateSnapshot(m_snapshotSource.snapshot());
+    }
+
+    ~GameWidgetBinding() override
+    {
+        m_snapshotSource.set_change_callback({});
+    }
+
+private:
+    GameWidget* m_widget = nullptr;
+    IGameCommandSink& m_commandSink;
+    IGameSnapshotSource& m_snapshotSource;
+};
+
+} // namespace
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
@@ -27,6 +71,13 @@ MainWindow::MainWindow(QWidget* parent)
     // 创建 GameWidget 作为中心控件
     m_gameWidget = new GameWidget(this);
     setCentralWidget(m_gameWidget);
+}
+
+void MainWindow::bind(IGameCommandSink& commandSink,
+                      IGameSnapshotSource& snapshotSource)
+{
+    delete m_binding;
+    m_binding = new GameWidgetBinding(m_gameWidget, commandSink, snapshotSource, this);
 }
 
 } // namespace alleyfist
