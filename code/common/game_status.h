@@ -4,6 +4,9 @@
 
 namespace alleyfist {
 
+// 这里的状态是 View 需要观察的“游戏处于哪个阶段”，不是驱动状态变化的规则实现。
+// 规则参数和判定逻辑属于 ViewModel 层，Common 只保留跨层展示契约。
+
 // 游戏主流程状态。View 可以根据它切换界面或覆盖层。
 enum class GamePhase {
     Title,

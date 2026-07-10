@@ -7,6 +7,9 @@
 
 namespace alleyfist {
 
+// 这里只保留 View 绘制角色必须知道的公共显示数据。
+// AI 行为、攻击盒、伤害类型等玩法内部细节已经放到 ViewModel 层，避免 Common 变成“大杂烩”。
+
 // 玩家、敌人、Boss、道具、特效共用的显示和玩法分类。
 enum class Team {
     Neutral,

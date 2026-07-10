@@ -8,6 +8,9 @@ namespace alleyfist {
 
 namespace {
 
+// View 层内部绑定器：它知道 GameWidget 的信号，但只通过 Common 接口认识 ViewModel。
+// 命令绑定：GameWidget -> IGameCommandSink。
+// 数据绑定/通知绑定：IGameSnapshotSource 的 change callback -> GameWidget::updateSnapshot。
 class GameWidgetBinding final : public QObject {
 public:
     GameWidgetBinding(GameWidget* widget,

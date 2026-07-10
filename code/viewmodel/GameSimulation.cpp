@@ -7,6 +7,9 @@
 
 namespace alleyfist {
 
+// 所有玩法规则集中在 Simulation：移动、攻击、敌人、遭遇战、胜负判定都在这里。
+// View 层只接收最终快照，因此规则变化不会反向污染绘制层。
+
 namespace {
 
 constexpr float kPi = 3.1415926535f;

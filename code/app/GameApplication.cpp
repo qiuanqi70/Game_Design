@@ -8,6 +8,8 @@
 
 namespace alleyfist {
 
+// App 层是组合根：它可以创建具体 View 和具体 ViewModel，
+// 但绑定细节交给 MainWindow::bind，不直接操作 GameWidget 或监听 VM 的具体信号。
 struct GameApplication::Impl {
     QApplication qtApp;
     GameViewModel viewModel;

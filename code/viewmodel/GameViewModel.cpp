@@ -4,6 +4,9 @@
 
 namespace alleyfist {
 
+// ViewModel 接收命令后推进内部模拟，再通过 callback/Qt signal 发出变化通知。
+// 这就是 MVVM 中 ViewModel -> View 的通知绑定，不需要 ViewModel 认识具体 View。
+
 GameViewModel::GameViewModel(QObject* parent)
     : QObject(parent)
     , m_sim()

@@ -8,6 +8,9 @@
 
 namespace alleyfist {
 
+// 关卡相关的 Common 类型只保留可展示状态。
+// 刷怪配置、遭遇战生成规则等由 ViewModel 拥有，View 只根据这些 ViewData 画进度和提示。
+
 // 遭遇战运行时状态，用于界面、调试和 GO 提示判断。
 struct EncounterViewData {
     EncounterId id = kInvalidEncounterId;

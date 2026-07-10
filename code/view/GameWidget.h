@@ -14,6 +14,7 @@ namespace alleyfist {
 ///
 /// GameWidget 只依赖 Common 层的 GameSnapshot 和 GameCommand，
 /// 不直接操作游戏数据。
+/// 它把 Qt 键盘事件翻译成逻辑命令，把只读快照翻译成像素绘制。
 class GameWidget : public QWidget {
     Q_OBJECT
 

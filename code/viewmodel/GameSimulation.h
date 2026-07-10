@@ -12,6 +12,8 @@
 
 namespace alleyfist {
 
+// GameSimulation 是 ViewModel 内部的游戏模拟核心。
+// 它可以拥有规则参数、AI、碰撞、攻击盒等内部类型，但只通过 GameSnapshot 向外暴露结果。
 class GameSimulation {
 public:
     GameSimulation();

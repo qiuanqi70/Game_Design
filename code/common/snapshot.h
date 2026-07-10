@@ -10,6 +10,9 @@
 
 namespace alleyfist {
 
+// GameSnapshot 是 ViewModel 给 View 的只读快照，也是数据绑定的主要载体。
+// View 可以按它绘制画面，但不能通过它反向修改游戏规则或内部对象。
+
 // HUD 专用状态，和角色数据分开，方便 View 统一绘制状态条。
 struct HudViewData {
     ResourceBar playerHealth;

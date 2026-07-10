@@ -7,6 +7,10 @@
 
 namespace alleyfist {
 
+// contracts.h 是 MVVM 绑定的公共边界：
+// View 只把命令交给 IGameCommandSink，只从 IGameSnapshotSource 拿只读快照。
+// 这样 View 不需要知道具体 GameViewModel，ViewModel 也不需要知道具体 GameWidget。
+
 // ViewModel 用它说明哪里变了，同时不暴露内部对象。
 enum class ChangeReason {
     Snapshot,

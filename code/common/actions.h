@@ -4,6 +4,9 @@
 
 namespace alleyfist {
 
+// Common 层的命令只表达“View 想让游戏做什么”，不包含键盘码、Qt 事件或具体规则。
+// View 负责把按键翻译成 InputAction，ViewModel 负责解释这些动作会产生什么游戏效果。
+
 // Direction 是组合后的移动意图，不是键盘按键码。
 // ViewModel 可以根据当前按住的移动键推导出它。
 enum class Direction {

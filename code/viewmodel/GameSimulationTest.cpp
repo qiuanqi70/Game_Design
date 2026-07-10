@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <iostream>
 
+// 测试直接覆盖 ViewModel 内部模拟规则，不经过 View。
+// 这样可以验证玩法逻辑，同时不要求 View 暴露内部控件或破坏 MVVM 绑定边界。
+
 namespace {
 
 using namespace alleyfist;

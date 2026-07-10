@@ -10,6 +10,7 @@ namespace alleyfist {
 
 // 这些类型只服务于 GameSimulation 的规则、AI 和战斗计算，
 // 不属于 View 与 ViewModel 之间的公共显示契约。
+// 老师检查 common 层时，可以看到这些内部类型已经留在 ViewModel 层内。
 
 enum class EnemyBehavior {
     None,

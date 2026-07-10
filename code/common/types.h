@@ -4,6 +4,9 @@
 
 namespace alleyfist {
 
+// 基础值类型放在 Common，是因为 View 绘制和 ViewModel 计算都会用到这些简单数据形状。
+// 这里不放带行为的游戏对象，避免基础类型层反过来依赖具体玩法。
+
 // 稳定编号：View 和 ViewModel 用它指向同一个游戏对象。
 using ActorId = std::uint32_t;
 using EncounterId = std::uint32_t;

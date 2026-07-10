@@ -12,6 +12,7 @@ class GameWidget;
 ///
 /// MainWindow 是 View 层对外的入口之一。
 /// App 层创建 MainWindow 后调用 show() 即可显示游戏窗口。
+/// App 层不能再直接拿内部 GameWidget，而是通过 bind() 传入公共接口完成 MVVM 绑定。
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
