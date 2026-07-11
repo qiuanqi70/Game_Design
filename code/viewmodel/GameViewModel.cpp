@@ -6,8 +6,10 @@
 
 namespace alleyfist {
 
-// ViewModel 接收命令后推进内部模拟，再通过通知列表发出变化通知。
-// 这就是 MVVM 中 ViewModel -> View 的通知绑定，不需要 ViewModel 认识具体 View。
+// Helper functions to compare snapshots for changes
+// These functions are used to determine if a specific part of the game snapshot has changed
+// and notify the registered callbacks accordingly.
+//避免不必要的UI更新
 
 namespace {
 
@@ -144,19 +146,21 @@ GameViewModel::GameViewModel()
 
 GameViewModel::~GameViewModel() = default;
 
+// ViewModel 接收命令后推进内部模拟，再通过通知列表发出变化通知。
+// 这就是 MVVM 中 ViewModel -> View 的通知绑定，不需要 ViewModel 认识具体 View。
 void GameViewModel::handle_command(const GameCommand& command)
 {
     const GameSnapshot before = m_snapshot;
 
     // forward command to simulation
-    if (command.type == CommandType::Tick) {
-        m_sim->step(command.tick.deltaSeconds, command.tick.frameIndex);
-        m_snapshot = m_sim->snapshot();
-        notify_changes(before, m_snapshot);
+    if (command.type == CommandType::Tick) { //如果是 Tick 命令（每帧更新），推进游戏模拟
+        m_sim->step(command.tick.deltaSeconds, command.tick.frameIndex); //通过 GameSimulation 处理 Tick 命令，推进游戏状态
+        m_snapshot = m_sim->snapshot(); //更新快照为模拟器的当前状态
+        notify_changes(before, m_snapshot); //比较快照的变化，如果有变化，通知所有注册的回调函数
         return;
     }
 
-    m_sim->handle_command(command);
+    m_sim->handle_command(command); //如果是 Input 命令（玩家输入），转发给 GameSimulation 处理
     m_snapshot = m_sim->snapshot();
     notify_changes(before, m_snapshot);
 }
@@ -166,12 +170,13 @@ const GameSnapshot& GameViewModel::snapshot() const
     return m_snapshot;
 }
 
+// 注册回调函数，当游戏快照发生变化时通知 View
 BindingCookie GameViewModel::add_change_callback(ChangeCallback callback)
 {
     if (!callback) return 0;
 
     const BindingCookie cookie = m_nextCallbackCookie++;
-    m_callbacks.emplace_back(cookie, std::move(callback));
+    m_callbacks.emplace_back(cookie, std::move(callback)); //将回调函数和唯一标识符存储在回调列表中
     return cookie;
 }
 
@@ -185,12 +190,13 @@ void GameViewModel::remove_change_callback(BindingCookie cookie)
         m_callbacks.end());
 }
 
+// 通知所有注册的回调函数，说明游戏快照发生了变化
 void GameViewModel::notify(ChangeReason reason)
 {
     const auto callbacks = m_callbacks;
     for (const auto& item : callbacks) {
         if (item.second) {
-            item.second(reason);
+            item.second(reason); //调用回调函数，传入变化原因
         }
     }
 }
@@ -199,36 +205,37 @@ void GameViewModel::notify_changes(const GameSnapshot& before,
                                    const GameSnapshot& after)
 {
     bool notified = false;
+    //通知一次的 lambda 函数，避免重复通知
     const auto notify_once = [this, &notified](ChangeReason reason) {
         notify(reason);
         notified = true;
     };
 
-    if (before.phase != after.phase) {
+    if (before.phase != after.phase) { //如果游戏阶段发生变化，通知 Phase 变化
         notify_once(ChangeReason::Phase);
     }
-    if (!same_actor(before.player, after.player)) {
+    if (!same_actor(before.player, after.player)) { //如果玩家状态发生变化，通知 Player 变化
         notify_once(ChangeReason::Player);
     }
     if (!same_actor_list(before.enemies, after.enemies) ||
-        !same_actor_list(before.effects, after.effects)) {
+        !same_actor_list(before.effects, after.effects)) { //如果敌人或特效状态发生变化，通知 Enemies 变化
         notify_once(ChangeReason::Enemies);
     }
     if (!same_map(before.map, after.map) ||
-        !same_progress(before.progress, after.progress)) {
+        !same_progress(before.progress, after.progress)) { //如果地图或进度状态发生变化，通知 Map 变化
         notify_once(ChangeReason::Map);
     }
-    if (!same_hud(before.hud, after.hud)) {
+    if (!same_hud(before.hud, after.hud)) { //如果 HUD 状态（即屏幕消息）发生变化，通知 Hud 变化
         notify_once(ChangeReason::Hud);
     }
-    if (!same_result(before.result, after.result)) {
+    if (!same_result(before.result, after.result)) { //如果游戏结果状态发生变化，通知 Result 变化
         notify_once(ChangeReason::Result);
     }
 
     if (!notified &&
         (before.frameIndex != after.frameIndex ||
          before.elapsedSeconds != after.elapsedSeconds ||
-         before.screenMessage != after.screenMessage)) {
+         before.screenMessage != after.screenMessage)) { //如果没有其他变化，但帧索引、经过时间或屏幕消息发生变化，通知 Snapshot 变化
         notify_once(ChangeReason::Snapshot);
     }
 }

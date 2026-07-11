@@ -19,12 +19,13 @@ public:
     GameSimulation();
 
     void reset();
-    void step(float deltaSeconds, std::uint64_t frameIndex);
-    void handle_command(const GameCommand& command);
+    void step(float deltaSeconds, std::uint64_t frameIndex); //推进游戏状态，处理 Tick 命令
+    void handle_command(const GameCommand& command); //处理input命令，处理玩家输入
 
     const GameSnapshot& snapshot() const noexcept { return m_snapshot; }
 
 private:
+    // gameplay logic
     void reset_gameplay(GamePhase phase);
     void update_player(float dt);
     void update_enemies(float dt);
@@ -44,23 +45,24 @@ private:
     bool is_player_action_locked() const noexcept;
 
     // helpers
-    static bool rects_intersect(const Rect& a, const Rect& b) noexcept;
-    Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept;
+    static bool rects_intersect(const Rect& a, const Rect& b) noexcept; //判断两个矩形是否相交，用于碰撞检测
+    Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept; //计算攻击盒在世界坐标系中的矩形，用于碰撞检测
 
-    // command queue for input buffering
+    //命令队列，用于输入缓冲，存储来自 View 的输入命令
     std::deque<GameCommand> m_commandQueue;
 
-    // tracking which actor was hit in current frame to avoid multi-hit per attack frame
+    //记录当前帧中哪些敌人已经被攻击过，避免同一攻击动作对同一敌人造成多次伤害
     std::unordered_set<ActorId> m_hitThisFrame;
 
-    // enemy cooldown timers (attack cooldown)
+    //每个敌人都有一个攻击冷却时间（意思是在这个时间内不能攻击），记录在这个unordered_map中，key是敌人的ActorId，value是剩余的冷却时间
     std::unordered_map<ActorId, float> m_enemyAttackTimers;
 
     GameRules m_rules;
     GameSnapshot m_snapshot;
-    float m_accumulated = 0.0f;
-    std::uint64_t m_frame = 0;
+    float m_accumulated = 0.0f; //累计时间，用于处理游戏逻辑的时间步长
+    std::uint64_t m_frame = 0; //当前帧索引，用于跟踪游戏的帧数
 
+    //玩家的移动状态，表示玩家是否正在向左、向右、向上、向下移动，以及是否正在跳跃
     bool m_moveLeft = false;
     bool m_moveRight = false;
     bool m_moveUp = false;
