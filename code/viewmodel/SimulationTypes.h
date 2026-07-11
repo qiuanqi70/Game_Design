@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../common/actor.h"
-#include "../common/types.h"
+#include "../common/snapshot.h"
 
 #include <cstdint>
 #include <vector>

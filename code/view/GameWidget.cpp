@@ -242,7 +242,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     drawStreet(p);
 
     // 按 depthSortY 排序绘制所有角色（远的先画）
-    std::vector<const ActorViewData*> drawList;
+    std::vector<const ActorSnapshot*> drawList;
 
     // 玩家
     if (m_snapshot.player.visible) {
@@ -265,7 +265,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // 按 depthSortY 排序（laneY + z 作为排序依据，远的先画）
     std::sort(drawList.begin(), drawList.end(),
-              [](const ActorViewData* a, const ActorViewData* b) {
+              [](const ActorSnapshot* a, const ActorSnapshot* b) {
                   const float ya = a->position.laneY + a->position.z;
                   const float yb = b->position.laneY + b->position.z;
                   return ya < yb;
@@ -495,7 +495,7 @@ void GameWidget::drawBar(QPainter& p, float x, float y, float w, float h,
     }
 }
 
-void GameWidget::drawActor(QPainter& p, const ActorViewData& actor)
+void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
@@ -541,7 +541,7 @@ void GameWidget::drawActor(QPainter& p, const ActorViewData& actor)
 
 }
 
-void GameWidget::drawCharacterBody(QPainter& p, const ActorViewData& actor,
+void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
                                     QColor bodyColor)
 {
     const float w = actor.drawSize.width * m_scaleX;
@@ -671,7 +671,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorViewData& actor,
     }
 }
 
-void GameWidget::drawHealthBar(QPainter& p, const ActorViewData& actor)
+void GameWidget::drawHealthBar(QPainter& p, const ActorSnapshot& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
