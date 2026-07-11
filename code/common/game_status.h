@@ -43,7 +43,7 @@ enum class ScrollLockState {
 };
 
 // 结算界面或 Game Over 界面需要展示的结果数据。
-struct GameResultViewData {
+struct GameResultSnapshot {
     GameOverReason gameOverReason = GameOverReason::None;
     WinReason winReason = WinReason::None;
     float elapsedSeconds = 0.0f;

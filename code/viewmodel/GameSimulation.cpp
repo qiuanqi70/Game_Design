@@ -555,7 +555,7 @@ void GameSimulation::spawn_grunt_encounter()
     m_snapshot.map.rightBoundaryX = std::min(m_snapshot.map.worldWidth, m_snapshot.player.position.x + kEncounterRightPadding);
     m_snapshot.screenMessage.clear();
 
-    EncounterViewData enc;
+    EncounterSnapshot enc;
     enc.id = 1;
     enc.state = EncounterState::Locked;
     enc.lockState = ScrollLockState::LockedByEncounter;
@@ -595,7 +595,7 @@ void GameSimulation::spawn_boss_encounter()
     m_snapshot.map.rightBoundaryX = std::min(m_snapshot.map.worldWidth, m_snapshot.player.position.x + kEncounterRightPadding);
     m_snapshot.screenMessage.clear();
 
-    EncounterViewData enc;
+    EncounterSnapshot enc;
     enc.id = 2;
     enc.state = EncounterState::Locked;
     enc.lockState = ScrollLockState::LockedByBoss;
@@ -626,7 +626,7 @@ void GameSimulation::clear_active_encounter()
     const EncounterId clearedId = m_snapshot.progress.activeEncounterId;
     const bool bossCleared = std::any_of(m_snapshot.map.encounters.begin(),
         m_snapshot.map.encounters.end(),
-        [clearedId](const EncounterViewData& enc) {
+        [clearedId](const EncounterSnapshot& enc) {
             return enc.id == clearedId && enc.bossEncounter;
         });
 

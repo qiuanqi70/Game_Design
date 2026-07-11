@@ -79,7 +79,7 @@ struct ActorSnapshot {
 };
 
 // HUD 专用状态，和角色数据分开，方便 View 统一绘制状态条。
-struct HudViewData {
+struct HudSnapshot {
     ResourceBar playerHealth;
     ResourceBar playerEnergy;
     ResourceBar bossHealth;
@@ -94,13 +94,13 @@ struct GameSnapshot {
     std::uint64_t frameIndex = 0;
     float elapsedSeconds = 0.0f;
     GamePhase phase = GamePhase::Title;
-    MapViewData map;
-    LevelProgressViewData progress;
+    MapSnapshot map;
+    LevelProgressSnapshot progress;
     ActorSnapshot player;
     std::vector<ActorSnapshot> enemies;
     std::vector<ActorSnapshot> effects;
-    HudViewData hud;
-    GameResultViewData result;
+    HudSnapshot hud;
+    GameResultSnapshot result;
     std::string screenMessage;
 };
 

@@ -30,8 +30,7 @@ public:
     void remove_change_callback(BindingCookie cookie) override;
 
 private:
-    void notify(ChangeReason reason);
-    void notify_changes(const GameSnapshot& before, const GameSnapshot& after);
+    void notify();
 
     GameSnapshot m_snapshot;
     std::vector<std::pair<BindingCookie, ChangeCallback>> m_callbacks;

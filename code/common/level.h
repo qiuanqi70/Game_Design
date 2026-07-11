@@ -9,10 +9,10 @@
 namespace alleyfist {
 
 // 关卡相关的 Common 类型只保留可展示状态。
-// 刷怪配置、遭遇战生成规则等由 ViewModel 拥有，View 只根据这些 ViewData 画进度和提示。
+// 刷怪配置、遭遇战生成规则等由 ViewModel 拥有，View 只根据这些快照画进度和提示。
 
 // 遭遇战运行时状态，用于界面、调试和 GO 提示判断。
-struct EncounterViewData {
+struct EncounterSnapshot {
     EncounterId id = kInvalidEncounterId;
     EncounterState state = EncounterState::Inactive;
     ScrollLockState lockState = ScrollLockState::Free;
@@ -24,7 +24,7 @@ struct EncounterViewData {
 };
 
 // 地图镜头、街道边界、推图锁和可见遭遇战状态。
-struct MapViewData {
+struct MapSnapshot {
     float worldWidth = 0.0f;
     float viewportWidth = 0.0f;
     float viewportHeight = 0.0f;
@@ -35,11 +35,11 @@ struct MapViewData {
     float rightBoundaryX = 0.0f;
     ScrollLockState scrollLock = ScrollLockState::Free;
     bool showGoIndicator = false;
-    std::vector<EncounterViewData> encounters;
+    std::vector<EncounterSnapshot> encounters;
 };
 
 // 简洁的关卡进度数据，可用于 HUD 或结算界面。
-struct LevelProgressViewData {
+struct LevelProgressSnapshot {
     std::uint32_t stageIndex = 0;
     EncounterId activeEncounterId = kInvalidEncounterId;
     float progressRatio = 0.0f;

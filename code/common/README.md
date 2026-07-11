@@ -220,7 +220,7 @@ Common 层的价值是让两边不用互相依赖具体实现：
 - ViewModel 层：在遭遇战和 Boss 战中限制玩家推进和镜头范围。
 - 配合方式：ViewModel 做规则限制，View 显示限制状态。
 
-### `GameResultViewData`
+### `GameResultSnapshot`
 
 - View 层：绘制 Game Over 或 Win 结算界面时读取用时、击败数量和胜负原因。
 - ViewModel 层：在游戏结束时写入结算结果。
@@ -230,19 +230,19 @@ Common 层的价值是让两边不用互相依赖具体实现：
 
 这些类型描述关卡宏观状态：镜头在哪里、街道范围是什么、当前是否锁屏、Boss 是否出现等。
 
-### `EncounterViewData`
+### `EncounterSnapshot`
 
 - View 层：可以用它展示遭遇战是否开始、剩余敌人数、是否 Boss 战等信息。
 - ViewModel 层：在刷怪、清怪、Boss 战过程中更新遭遇战 id、状态、剩余数量和锁定状态。
 - 配合方式：ViewModel 不暴露刷怪规则，只暴露遭遇战的可见运行状态。
 
-### `MapViewData`
+### `MapSnapshot`
 
 - View 层：根据地图宽度、视口大小、镜头位置、街道上下边界绘制背景、街道、角色位置和 GO 提示。
 - ViewModel 层：更新镜头、世界宽度、可移动边界、锁屏范围和遭遇战列表。
 - 配合方式：ViewModel 决定世界和镜头的当前状态，View 用这些数据把世界画到屏幕上。
 
-### `LevelProgressViewData`
+### `LevelProgressSnapshot`
 
 - View 层：绘制关卡进度条、Boss 出现状态、Boss 击败状态，或判断当前是否有激活遭遇战。
 - ViewModel 层：根据玩家推进距离、遭遇战清除情况、Boss 状态更新关卡进度。
@@ -252,7 +252,7 @@ Common 层的价值是让两边不用互相依赖具体实现：
 
 这些类型是状态通道的核心。View 理论上只依赖 `GameSnapshot` 就可以完成一帧绘制。
 
-### `HudViewData`
+### `HudSnapshot`
 
 - View 层：集中绘制玩家血量、精力、Boss 血条、连招数、疲劳状态等 HUD。
 - ViewModel 层：把玩家、Boss、连招、精力恢复等内部状态整理成 HUD 专用数据。
@@ -268,12 +268,6 @@ Common 层的价值是让两边不用互相依赖具体实现：
 
 这些类型让 View 和 ViewModel 通过接口连接，而不是直接依赖彼此具体类。
 
-### `ChangeReason`
-
-- View 层：收到变化通知后可以决定刷新画面。当前实现主要是收到通知就读取最新快照。
-- ViewModel 层：比较前后快照，判断是玩家、敌人、地图、HUD、阶段还是结果发生了变化。
-- 配合方式：ViewModel 告诉外部“哪里变了”，View 可以选择精细刷新或整体刷新。
-
 ### `BindingCookie`
 
 - View 层：注册变化回调后保存 cookie，销毁绑定时用它取消订阅。
@@ -284,7 +278,7 @@ Common 层的价值是让两边不用互相依赖具体实现：
 
 - View 层：传入一个回调函数，当 ViewModel 状态变化时更新快照并重绘。
 - ViewModel 层：保存回调列表，在快照变化后逐个通知。
-- 配合方式：这是 ViewModel 主动通知 View 的桥梁，但回调参数仍然只使用 common 类型。
+- 配合方式：这是 ViewModel 主动通知 View 的桥梁。当前设计不区分具体变化原因，View 收到通知后直接读取完整 `GameSnapshot`。
 
 ### `IGameCommandSink`
 
@@ -311,12 +305,12 @@ Common 层的价值是让两边不用互相依赖具体实现：
 Common 层不是新的业务层，而是 View 和 ViewModel 的边界协议。它里面的类型大多分为两类：
 
 - 命令类：`InputAction`、`ButtonState`、`GameCommand` 等，方向是 View 到 ViewModel。
-- 快照类：`GameSnapshot`、`ActorSnapshot`、`MapViewData`、`HudViewData` 等，方向是 ViewModel 到 View。
+- 快照类：`GameSnapshot`、`ActorSnapshot`、`MapSnapshot`、`HudSnapshot` 等，方向是 ViewModel 到 View。
 
 因此老师问“这些类是否真的被两层使用”时，可以这样回答：
 
 - 像 `GameCommand`、`InputAction`、`IGameCommandSink` 是输入链路的核心，View 生成，ViewModel 消费。
-- 像 `GameSnapshot`、`ActorSnapshot`、`GamePhase`、`MapViewData` 是显示链路的核心，ViewModel 生成，View 消费。
+- 像 `GameSnapshot`、`ActorSnapshot`、`GamePhase`、`MapSnapshot` 是显示链路的核心，ViewModel 生成，View 消费。
 - 像 `Size`、`Rect`、`ResourceBar`、`WorldPosition` 是嵌在快照里的基础值类型，View 和 ViewModel 可能不是都直接点名使用，但会通过快照结构参与跨层通信。
 - 像 `Vec2`、`Vec3` 当前属于预留基础类型，严格来说不是当前主链路必须类型；如果追求最小公共接口，可以删掉或等后续功能需要时再加入。
 

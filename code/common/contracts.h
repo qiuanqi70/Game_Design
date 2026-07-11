@@ -12,20 +12,9 @@ namespace alleyfist {
 // View 只把命令交给 IGameCommandSink，只从 IGameSnapshotSource 拿只读快照。
 // 这样 View 不需要知道具体 GameViewModel，ViewModel 也不需要知道具体 GameWidget。
 
-// ViewModel 用它说明哪里变了，同时不暴露内部对象。
-enum class ChangeReason {
-    Snapshot,
-    Player,
-    Enemies,
-    Map,
-    Hud,
-    Phase,
-    Result
-};
-
 // View 订阅 ViewModel 通知时拿到 cookie，解绑时用它归还绑定关系。
 using BindingCookie = std::uintptr_t;
-using ChangeCallback = std::function<void(ChangeReason)>;
+using ChangeCallback = std::function<void()>;
 
 // 能接收游戏命令的对象需要实现这个接口。
 class IGameCommandSink {
