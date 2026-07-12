@@ -4,10 +4,8 @@
 #include "../common/snapshot.h"
 #include "SimulationTypes.h"
 
-#include <vector>
 #include <deque>
-#include <unordered_map>
-#include <unordered_set>
+#include <vector>
 
 
 namespace alleyfist {
@@ -25,6 +23,13 @@ public:
     const GameSnapshot& snapshot() const noexcept { return m_snapshot; }
 
 private:
+    enum class ScrollLockState {
+        Free,
+        LockedByEncounter,
+        LockedByBoss,
+        LevelFinished
+    };
+
     void reset_gameplay(GamePhase phase);
     void update_player(float dt);
     void update_enemies(float dt);
@@ -36,7 +41,6 @@ private:
     void begin_attack(AttackKind attackKind, bool fromAir);
     void update_camera();
     void update_progress();
-    void update_actor_body_box(ActorSnapshot& actor) const noexcept;
     void spawn_grunt_encounter();
     void spawn_boss_encounter();
     void clear_active_encounter();
@@ -45,21 +49,24 @@ private:
 
     // helpers
     static bool rects_intersect(const Rect& a, const Rect& b) noexcept;
+    Rect actor_body_rect(const ActorSnapshot& actor) const noexcept;
     Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept;
 
     // command queue for input buffering
     std::deque<GameCommand> m_commandQueue;
 
-    // tracking which actor was hit in current frame to avoid multi-hit per attack frame
-    std::unordered_set<ActorId> m_hitThisFrame;
-
     // enemy cooldown timers (attack cooldown)
-    std::unordered_map<ActorId, float> m_enemyAttackTimers;
+    std::vector<float> m_enemyAttackTimers;
 
     GameRules m_rules;
     GameSnapshot m_snapshot;
     float m_accumulated = 0.0f;
     std::uint64_t m_frame = 0;
+    std::uint32_t m_stageIndex = 0;
+    EncounterId m_activeEncounterId = kInvalidEncounterId;
+    bool m_bossSpawned = false;
+    bool m_bossDefeated = false;
+    ScrollLockState m_scrollLock = ScrollLockState::Free;
 
     bool m_moveLeft = false;
     bool m_moveRight = false;

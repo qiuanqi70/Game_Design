@@ -11,6 +11,17 @@ namespace alleyfist {
 // 不属于 View 与 ViewModel 之间的公共显示契约。
 // 老师检查 common 层时，可以看到这些内部类型已经留在 ViewModel 层内。
 
+using EncounterId = std::uint32_t;
+
+constexpr EncounterId kInvalidEncounterId = 0;
+
+struct Rect {
+    float x = 0.0f;
+    float y = 0.0f;
+    float width = 0.0f;
+    float height = 0.0f;
+};
+
 enum class EnemyBehavior {
     None,
     Surround,
@@ -67,7 +78,6 @@ struct CombatBox {
     DamageType damageType = DamageType::Light;
     int damage = 0;
     float stunSeconds = 0.0f;
-    ActorId ownerId = kInvalidActorId;
 };
 
 struct SpawnSpec {

@@ -16,14 +16,14 @@ namespace alleyfist {
 using BindingCookie = std::uintptr_t;
 using ChangeCallback = std::function<void()>;
 
-// 能接收游戏命令的对象需要实现这个接口。
+// View → ViewModel
 class IGameCommandSink {
 public:
     virtual ~IGameCommandSink() = default;
     virtual void handle_command(const GameCommand& command) = 0;
 };
 
-// 能暴露当前绘制快照的对象需要实现这个接口。
+// ViewModel → View
 class IGameSnapshotSource {
 public:
     virtual ~IGameSnapshotSource() = default;

@@ -114,7 +114,6 @@ int main()
         trigger_grunt_encounter(sim, frame);
 
         test.expect(sim.snapshot().phase == GamePhase::EncounterLocked, "grunt encounter locks the game phase");
-        test.expect(sim.snapshot().progress.activeEncounterId == 1, "grunt encounter becomes active");
         test.expect(sim.snapshot().enemies.size() == 3, "grunt encounter spawns three enemies");
 
         const float rightBoundary = sim.snapshot().map.rightBoundaryX;
@@ -152,26 +151,23 @@ int main()
         start_game(sim, frame);
         trigger_grunt_encounter(sim, frame);
 
-        for (int i = 0; i < 12 && sim.snapshot().progress.activeEncounterId != kInvalidEncounterId; ++i) {
+        for (int i = 0; i < 12 && sim.snapshot().phase == GamePhase::EncounterLocked; ++i) {
             heavy_attack(sim, frame);
             step(sim, 20, frame);
         }
 
-        test.expect(sim.snapshot().progress.activeEncounterId == kInvalidEncounterId,
-                    "defeating all grunts clears the encounter");
         test.expect(sim.snapshot().phase == GamePhase::ClearToGo,
                     "cleared grunt encounter switches to clear-to-go phase");
         test.expect(sim.snapshot().map.showGoIndicator, "cleared encounter enables GO indicator");
         test.expect(sim.snapshot().result.defeatedEnemies >= 3, "defeated enemies are counted");
 
         input(sim, InputAction::MoveRight, ButtonState::Pressed);
-        for (int i = 0; i < 900 && !sim.snapshot().progress.bossSpawned; ++i) {
+        for (int i = 0; i < 900 && !sim.snapshot().hud.showBossHealth; ++i) {
             step(sim, 1, frame);
         }
         input(sim, InputAction::MoveRight, ButtonState::Released);
         step(sim, 1, frame);
 
-        test.expect(sim.snapshot().progress.bossSpawned, "boss encounter spawns near level end");
         test.expect(sim.snapshot().hud.showBossHealth, "boss health is exposed to HUD");
 
         for (int i = 0; i < 12 && sim.snapshot().phase != GamePhase::Win; ++i) {

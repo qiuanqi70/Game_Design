@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <algorithm>
-#include <unordered_set>
 #include <utility>
 
 namespace alleyfist {
@@ -13,6 +12,8 @@ namespace alleyfist {
 namespace {
 
 constexpr float kPi = 3.1415926535f;
+constexpr EncounterId kGruntEncounterId = 1;
+constexpr EncounterId kBossEncounterId = 2;
 constexpr float kGruntTriggerX = 400.0f;
 constexpr float kBossTriggerX = 2350.0f;
 constexpr float kEncounterLeftPadding = 240.0f;
@@ -49,7 +50,6 @@ void GameSimulation::reset_gameplay(GamePhase phase)
     m_snapshot.elapsedSeconds = 0.0f;
 
     // init player
-    m_snapshot.player.id = kPlayerActorId;
     m_snapshot.player.kind = ActorKind::Player;
     m_snapshot.player.team = Team::Player;
     m_snapshot.player.position.x = 50.0f;
@@ -59,7 +59,6 @@ void GameSimulation::reset_gameplay(GamePhase phase)
     m_snapshot.player.energy = {100, 100};
     m_snapshot.player.state = ActorState::Idle;
     m_snapshot.player.drawSize = {64.0f, 96.0f};
-    m_snapshot.player.bodyBox = {m_snapshot.player.position.x - 32.0f, m_snapshot.player.position.laneY - 96.0f, 64.0f, 96.0f};
     m_snapshot.hud.playerHealth = {100, 100};
     m_snapshot.hud.playerEnergy = {100, 100};
     m_snapshot.hud.playerExhausted = false;
@@ -78,8 +77,12 @@ void GameSimulation::reset_gameplay(GamePhase phase)
     m_snapshot.effects.clear();
     m_commandQueue.clear();
     m_enemyAttackTimers.clear();
-    m_hitThisFrame.clear();
     m_rules = GameRules();
+    m_stageIndex = 0;
+    m_activeEncounterId = kInvalidEncounterId;
+    m_bossSpawned = false;
+    m_bossDefeated = false;
+    m_scrollLock = ScrollLockState::Free;
     m_moveLeft = false;
     m_moveRight = false;
     m_moveUp = false;
@@ -114,7 +117,6 @@ void GameSimulation::step(float deltaSeconds, std::uint64_t frameIndex)
     }
 
     m_snapshot.elapsedSeconds += deltaSeconds;
-    m_hitThisFrame.clear();
     apply_movement(deltaSeconds);
     update_player(deltaSeconds);
     update_enemies(deltaSeconds);
@@ -168,7 +170,6 @@ void GameSimulation::update_player(float dt)
     if (m_snapshot.player.position.laneY > m_snapshot.map.streetBottomY)
         m_snapshot.player.position.laneY = m_snapshot.map.streetBottomY;
 
-    update_actor_body_box(m_snapshot.player);
     m_snapshot.hud.playerHealth = m_snapshot.player.health;
     m_snapshot.hud.playerEnergy = m_snapshot.player.energy;
 
@@ -202,13 +203,19 @@ void GameSimulation::update_player(float dt)
         }
     }
 
-    update_actor_body_box(m_snapshot.player);
 }
 
 void GameSimulation::update_enemies(float dt)
 {
     std::vector<ActorSnapshot> alive;
-    for (auto& e : m_snapshot.enemies) {
+    std::vector<float> aliveTimers;
+    alive.reserve(m_snapshot.enemies.size());
+    aliveTimers.reserve(m_snapshot.enemies.size());
+
+    for (std::size_t index = 0; index < m_snapshot.enemies.size(); ++index) {
+        auto e = m_snapshot.enemies[index];
+        float timer = index < m_enemyAttackTimers.size() ? m_enemyAttackTimers[index] : 1.0f;
+
         if (e.state == ActorState::Dead || !e.visible || e.health.current <= 0) {
             continue;
         }
@@ -218,16 +225,15 @@ void GameSimulation::update_enemies(float dt)
             e.position.x += dir * speed * dt;
             e.position.laneY += (m_snapshot.player.position.laneY > e.position.laneY) ? 45.0f * dt : -45.0f * dt;
         }
-        auto& t = m_enemyAttackTimers[e.id];
-        t -= dt;
-        if (t <= 0.0f) {
+        timer -= dt;
+        if (timer <= 0.0f) {
             float dx = std::abs(e.position.x - m_snapshot.player.position.x);
             float dy = std::abs(e.position.laneY - m_snapshot.player.position.laneY);
             if (dx < 48.0f && dy < 42.0f && m_snapshot.player.position.z < 35.0f) {
                 const int damage = (e.kind == ActorKind::Boss) ? 16 : 8;
                 m_snapshot.player.health.current = std::max(0, m_snapshot.player.health.current - damage);
                 m_snapshot.player.state = ActorState::Hurt;
-                t = 1.0f;
+                timer = 1.0f;
                 if (m_snapshot.player.health.current <= 0) {
                     m_snapshot.player.state = ActorState::Dead;
                     m_snapshot.phase = GamePhase::GameOver;
@@ -240,13 +246,14 @@ void GameSimulation::update_enemies(float dt)
         if (e.position.x > m_snapshot.map.worldWidth) e.position.x = m_snapshot.map.worldWidth;
         if (e.position.laneY < m_snapshot.map.streetTopY) e.position.laneY = m_snapshot.map.streetTopY;
         if (e.position.laneY > m_snapshot.map.streetBottomY) e.position.laneY = m_snapshot.map.streetBottomY;
-        update_actor_body_box(e);
         if (e.state == ActorState::Hurt || e.state == ActorState::Spawn) {
             e.state = ActorState::Idle;
         }
         alive.push_back(e);
+        aliveTimers.push_back(timer);
     }
     m_snapshot.enemies = std::move(alive);
+    m_enemyAttackTimers = std::move(aliveTimers);
 }
 
 void GameSimulation::apply_attacks()
@@ -264,7 +271,6 @@ void GameSimulation::apply_attacks()
         begin_attack(kind, fromAir);
 
         CombatBox cb;
-        cb.ownerId = m_snapshot.player.id;
         if (kind == AttackKind::LightPunch) {
             cb.damage = 20;
             cb.attack = AttackKind::LightPunch;
@@ -282,15 +288,8 @@ void GameSimulation::apply_attacks()
         Rect attackRect = combat_box_world_rect(m_snapshot.player, cb);
         for (auto& e : m_snapshot.enemies) {
             if (!e.visible) continue;
-            if (m_hitThisFrame.find(e.id) != m_hitThisFrame.end()) continue;
             if (e.team == m_snapshot.player.team) continue;
-            Rect body = e.bodyBox;
-            if (body.is_empty()) {
-                body.x = e.position.x - e.drawSize.width / 2.0f;
-                body.y = e.position.laneY - e.drawSize.height;
-                body.width = e.drawSize.width;
-                body.height = e.drawSize.height;
-            }
+            Rect body = actor_body_rect(e);
             if (rects_intersect(attackRect, body)) {
                 e.health.current = std::max(0, e.health.current - cb.damage);
                 if (e.health.current <= 0) {
@@ -299,12 +298,11 @@ void GameSimulation::apply_attacks()
                     e.targetable = false;
                     ++m_snapshot.result.defeatedEnemies;
                     if (e.kind == ActorKind::Boss) {
-                        m_snapshot.progress.bossDefeated = true;
+                        m_bossDefeated = true;
                     }
                 } else {
                     e.state = ActorState::Hurt;
                 }
-                m_hitThisFrame.insert(e.id);
                 m_snapshot.hud.comboStep = std::min(3u, m_snapshot.hud.comboStep + 1u);
                 m_snapshot.hud.comboTimeLeftSeconds = m_comboWindowSeconds;
             }
@@ -422,8 +420,8 @@ void GameSimulation::apply_movement(float dt)
 
     if (m_snapshot.player.position.x < 0.0f) m_snapshot.player.position.x = 0.0f;
     if (m_snapshot.player.position.x > m_snapshot.map.worldWidth) m_snapshot.player.position.x = m_snapshot.map.worldWidth;
-    if (m_snapshot.map.scrollLock == ScrollLockState::LockedByEncounter ||
-        m_snapshot.map.scrollLock == ScrollLockState::LockedByBoss) {
+    if (m_scrollLock == ScrollLockState::LockedByEncounter ||
+        m_scrollLock == ScrollLockState::LockedByBoss) {
         m_snapshot.player.position.x = std::clamp(m_snapshot.player.position.x,
                                                   m_snapshot.map.leftBoundaryX,
                                                   m_snapshot.map.rightBoundaryX);
@@ -467,7 +465,7 @@ void GameSimulation::check_encounters()
         return;
     }
 
-    if (m_snapshot.progress.activeEncounterId != kInvalidEncounterId) {
+    if (m_activeEncounterId != kInvalidEncounterId) {
         const bool anyAlive = std::any_of(m_snapshot.enemies.begin(), m_snapshot.enemies.end(),
             [](const ActorSnapshot& actor) {
                 return actor.team == Team::Enemy && actor.visible && actor.health.current > 0;
@@ -478,20 +476,20 @@ void GameSimulation::check_encounters()
         return;
     }
 
-    if (m_snapshot.progress.stageIndex == 0 && m_snapshot.player.position.x >= kGruntTriggerX) {
+    if (m_stageIndex == 0 && m_snapshot.player.position.x >= kGruntTriggerX) {
         spawn_grunt_encounter();
         return;
     }
 
-    if (!m_snapshot.progress.bossSpawned && m_snapshot.player.position.x >= kBossTriggerX) {
+    if (!m_bossSpawned && m_snapshot.player.position.x >= kBossTriggerX) {
         spawn_boss_encounter();
         return;
     }
 
-    if (m_snapshot.progress.bossDefeated &&
+    if (m_bossDefeated &&
         m_snapshot.player.position.x >= m_snapshot.map.worldWidth - 120.0f) {
         m_snapshot.phase = GamePhase::Win;
-        m_snapshot.map.scrollLock = ScrollLockState::LevelFinished;
+        m_scrollLock = ScrollLockState::LevelFinished;
         m_snapshot.result.winReason = WinReason::BossDefeated;
         m_snapshot.result.elapsedSeconds = m_snapshot.elapsedSeconds;
         m_snapshot.screenMessage.clear();
@@ -503,8 +501,8 @@ void GameSimulation::update_camera()
     const float maxCamera = std::max(0.0f, m_snapshot.map.worldWidth - m_snapshot.map.viewportWidth);
     float desired = m_snapshot.player.position.x - m_snapshot.map.viewportWidth * 0.42f;
 
-    if (m_snapshot.map.scrollLock == ScrollLockState::LockedByEncounter ||
-        m_snapshot.map.scrollLock == ScrollLockState::LockedByBoss) {
+    if (m_scrollLock == ScrollLockState::LockedByEncounter ||
+        m_scrollLock == ScrollLockState::LockedByBoss) {
         const float lockWidth = m_snapshot.map.rightBoundaryX - m_snapshot.map.leftBoundaryX;
         if (lockWidth >= m_snapshot.map.viewportWidth) {
             desired = std::clamp(desired,
@@ -519,9 +517,9 @@ void GameSimulation::update_camera()
 void GameSimulation::update_progress()
 {
     if (m_snapshot.map.worldWidth > 0.0f) {
-        m_snapshot.progress.progressRatio = std::clamp(m_snapshot.player.position.x / m_snapshot.map.worldWidth,
-                                                       0.0f,
-                                                       1.0f);
+        m_snapshot.progressRatio = std::clamp(m_snapshot.player.position.x / m_snapshot.map.worldWidth,
+                                              0.0f,
+                                              1.0f);
     }
 
     m_snapshot.hud.showBossHealth = false;
@@ -534,40 +532,18 @@ void GameSimulation::update_progress()
     }
 }
 
-void GameSimulation::update_actor_body_box(ActorSnapshot& actor) const noexcept
-{
-    actor.bodyBox = {
-        actor.position.x - actor.drawSize.width / 2.0f,
-        actor.position.laneY - actor.drawSize.height,
-        actor.drawSize.width,
-        actor.drawSize.height
-    };
-    actor.depthSortY = actor.position.laneY;
-}
-
 void GameSimulation::spawn_grunt_encounter()
 {
-    m_snapshot.progress.activeEncounterId = 1;
+    m_activeEncounterId = kGruntEncounterId;
     m_snapshot.phase = GamePhase::EncounterLocked;
-    m_snapshot.map.scrollLock = ScrollLockState::LockedByEncounter;
+    m_scrollLock = ScrollLockState::LockedByEncounter;
     m_snapshot.map.showGoIndicator = false;
     m_snapshot.map.leftBoundaryX = std::max(0.0f, m_snapshot.player.position.x - kEncounterLeftPadding);
     m_snapshot.map.rightBoundaryX = std::min(m_snapshot.map.worldWidth, m_snapshot.player.position.x + kEncounterRightPadding);
     m_snapshot.screenMessage.clear();
 
-    EncounterSnapshot enc;
-    enc.id = 1;
-    enc.state = EncounterState::Locked;
-    enc.lockState = ScrollLockState::LockedByEncounter;
-    enc.triggerX = kGruntTriggerX;
-    enc.bossEncounter = false;
-    enc.spawnedCount = 3;
-    enc.remainingCount = 3;
-    m_snapshot.map.encounters.push_back(enc);
-
     for (int i = 0; i < 3; ++i) {
         ActorSnapshot enemy;
-        enemy.id = static_cast<ActorId>(100 + i);
         enemy.kind = ActorKind::Grunt;
         enemy.team = Team::Enemy;
         enemy.position.x = m_snapshot.player.position.x + 105.0f + i * 55.0f;
@@ -578,35 +554,23 @@ void GameSimulation::spawn_grunt_encounter()
         enemy.state = ActorState::Spawn;
         enemy.visible = true;
         enemy.drawSize = {48.0f, 72.0f};
-        update_actor_body_box(enemy);
         m_snapshot.enemies.push_back(enemy);
-        m_enemyAttackTimers[enemy.id] = 0.8f + i * 0.2f;
+        m_enemyAttackTimers.push_back(0.8f + i * 0.2f);
     }
 }
 
 void GameSimulation::spawn_boss_encounter()
 {
-    m_snapshot.progress.activeEncounterId = 2;
-    m_snapshot.progress.bossSpawned = true;
+    m_activeEncounterId = kBossEncounterId;
+    m_bossSpawned = true;
     m_snapshot.phase = GamePhase::EncounterLocked;
-    m_snapshot.map.scrollLock = ScrollLockState::LockedByBoss;
+    m_scrollLock = ScrollLockState::LockedByBoss;
     m_snapshot.map.showGoIndicator = false;
     m_snapshot.map.leftBoundaryX = std::max(0.0f, m_snapshot.player.position.x - kEncounterLeftPadding);
     m_snapshot.map.rightBoundaryX = std::min(m_snapshot.map.worldWidth, m_snapshot.player.position.x + kEncounterRightPadding);
     m_snapshot.screenMessage.clear();
 
-    EncounterSnapshot enc;
-    enc.id = 2;
-    enc.state = EncounterState::Locked;
-    enc.lockState = ScrollLockState::LockedByBoss;
-    enc.triggerX = kBossTriggerX;
-    enc.bossEncounter = true;
-    enc.spawnedCount = 1;
-    enc.remainingCount = 1;
-    m_snapshot.map.encounters.push_back(enc);
-
     ActorSnapshot boss;
-    boss.id = 900;
     boss.kind = ActorKind::Boss;
     boss.team = Team::Enemy;
     boss.position.x = std::min(m_snapshot.map.worldWidth - 120.0f, m_snapshot.player.position.x + 220.0f);
@@ -615,46 +579,31 @@ void GameSimulation::spawn_boss_encounter()
     boss.state = ActorState::Spawn;
     boss.visible = true;
     boss.drawSize = {82.0f, 124.0f};
-    update_actor_body_box(boss);
     m_snapshot.enemies.push_back(boss);
-    m_enemyAttackTimers[boss.id] = 1.0f;
+    m_enemyAttackTimers.push_back(1.0f);
     update_progress();
 }
 
 void GameSimulation::clear_active_encounter()
 {
-    const EncounterId clearedId = m_snapshot.progress.activeEncounterId;
-    const bool bossCleared = std::any_of(m_snapshot.map.encounters.begin(),
-        m_snapshot.map.encounters.end(),
-        [clearedId](const EncounterSnapshot& enc) {
-            return enc.id == clearedId && enc.bossEncounter;
-        });
+    const bool bossCleared = m_activeEncounterId == kBossEncounterId;
 
-    for (auto& enc : m_snapshot.map.encounters) {
-        if (enc.id == clearedId) {
-            enc.state = EncounterState::Cleared;
-            enc.lockState = ScrollLockState::Free;
-            enc.defeatedCount = enc.spawnedCount;
-            enc.remainingCount = 0;
-        }
-    }
-
-    m_snapshot.progress.activeEncounterId = kInvalidEncounterId;
-    m_snapshot.map.scrollLock = ScrollLockState::Free;
+    m_activeEncounterId = kInvalidEncounterId;
+    m_scrollLock = ScrollLockState::Free;
     m_snapshot.map.leftBoundaryX = 0.0f;
     m_snapshot.map.rightBoundaryX = m_snapshot.map.worldWidth;
     m_snapshot.map.showGoIndicator = true;
 
     if (bossCleared) {
-        m_snapshot.progress.stageIndex = 2;
-        m_snapshot.progress.bossDefeated = true;
+        m_stageIndex = 2;
+        m_bossDefeated = true;
         m_snapshot.hud.showBossHealth = false;
         m_snapshot.phase = GamePhase::Win;
         m_snapshot.result.winReason = WinReason::BossDefeated;
         m_snapshot.result.elapsedSeconds = m_snapshot.elapsedSeconds;
         m_snapshot.screenMessage.clear();
     } else {
-        m_snapshot.progress.stageIndex = std::max<std::uint32_t>(m_snapshot.progress.stageIndex, 1);
+        m_stageIndex = std::max<std::uint32_t>(m_stageIndex, 1);
         m_snapshot.phase = GamePhase::ClearToGo;
         m_snapshot.screenMessage.clear();
     }
@@ -675,6 +624,16 @@ bool GameSimulation::is_player_action_locked() const noexcept
 bool GameSimulation::rects_intersect(const Rect& a, const Rect& b) noexcept
 {
     return !(a.x + a.width < b.x || b.x + b.width < a.x || a.y + a.height < b.y || b.y + b.height < a.y);
+}
+
+Rect GameSimulation::actor_body_rect(const ActorSnapshot& actor) const noexcept
+{
+    return {
+        actor.position.x - actor.drawSize.width / 2.0f,
+        actor.position.laneY - actor.drawSize.height,
+        actor.drawSize.width,
+        actor.drawSize.height
+    };
 }
 
 Rect GameSimulation::combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept

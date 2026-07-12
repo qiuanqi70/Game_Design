@@ -1,46 +1,13 @@
 #pragma once
 
-#include <cstdint>
-
 namespace alleyfist {
 
-// 基础值类型放在 Common，是因为 View 绘制和 ViewModel 计算都会用到这些简单数据形状。
-// 这里不放带行为的游戏对象，避免基础类型层反过来依赖具体玩法。
-
-// 稳定编号：View 和 ViewModel 用它指向同一个游戏对象。
-using ActorId = std::uint32_t;
-using EncounterId = std::uint32_t;
-
-constexpr ActorId kInvalidActorId = 0;
-constexpr ActorId kPlayerActorId = 1;
-constexpr EncounterId kInvalidEncounterId = 0;
-
-struct Vec2 {
-    float x = 0.0f;
-    float y = 0.0f;
-};
-
-struct Vec3 {
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-};
+// 基础值类型放在 Common，是因为 View 绘制和 ViewModel 输出快照都会用到这些简单数据形状。
+// 这里不放内部编号、碰撞矩形或规则状态，避免 Common 层暴露 View 不需要知道的模拟细节。
 
 struct Size {
     float width = 0.0f;
     float height = 0.0f;
-};
-
-struct Rect {
-    float x = 0.0f;
-    float y = 0.0f;
-    float width = 0.0f;
-    float height = 0.0f;
-
-    bool is_empty() const noexcept
-    {
-        return width <= 0.0f || height <= 0.0f;
-    }
 };
 
 // 通用资源条：血量、精力、Boss 血条等都可以使用它。
