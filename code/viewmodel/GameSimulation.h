@@ -17,10 +17,8 @@ public:
     GameSimulation();
 
     void reset();
-    // 每帧推进游戏模拟，通常由 View 的 tick 命令触发。
-    void step(float deltaSeconds, std::uint64_t frameIndex);
-    // 接收输入命令并缓存，实际处理发生在下一次 step 中。
-    void handle_command(const GameCommand& command);
+    void step(float deltaSeconds, std::uint64_t frameIndex); //推进游戏状态，处理 Tick 命令
+    void handle_command(const GameCommand& command); //处理input命令，处理玩家输入
 
     const GameSnapshot& snapshot() const noexcept { return m_snapshot; }
 
@@ -33,6 +31,7 @@ private:
         LevelFinished
     };
 
+    // gameplay logic
     void reset_gameplay(GamePhase phase);
     void update_player(float dt);
     void update_enemies(float dt);
@@ -51,11 +50,11 @@ private:
     bool is_player_action_locked() const noexcept;
 
     // helpers
-    static bool rects_intersect(const Rect& a, const Rect& b) noexcept;
+    static bool rects_intersect(const Rect& a, const Rect& b) noexcept; //判断两个矩形是否相交，用于碰撞检测
     Rect actor_body_rect(const ActorSnapshot& actor) const noexcept;
-    Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept;
+    Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept; //计算攻击盒在世界坐标系中的矩形，用于碰撞检测
 
-    // 输入命令队列，用于把 Qt 事件和固定帧模拟解耦。
+    //命令队列，用于输入缓冲，存储来自 View 的输入命令
     std::deque<GameCommand> m_commandQueue;
 
     // 敌人攻击冷却，与 m_snapshot.enemies 保持同序。
@@ -63,8 +62,8 @@ private:
 
     GameRules m_rules;
     GameSnapshot m_snapshot;
-    float m_accumulated = 0.0f;
-    std::uint64_t m_frame = 0;
+    float m_accumulated = 0.0f; //累计时间，用于处理游戏逻辑的时间步长
+    std::uint64_t m_frame = 0; //当前帧索引，用于跟踪游戏的帧数
 
     // 关卡流程控制字段留在 ViewModel 内部，不暴露给 View。
     std::uint32_t m_stageIndex = 0;
@@ -73,7 +72,7 @@ private:
     bool m_bossDefeated = false;
     ScrollLockState m_scrollLock = ScrollLockState::Free;
 
-    // 玩家输入和动作状态缓存。
+    //玩家的移动状态，表示玩家是否正在向左、向右、向上、向下移动，以及是否正在跳跃
     bool m_moveLeft = false;
     bool m_moveRight = false;
     bool m_moveUp = false;

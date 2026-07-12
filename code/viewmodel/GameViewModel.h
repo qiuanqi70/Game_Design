@@ -22,24 +22,22 @@ public:
     GameViewModel& operator=(const GameViewModel&) = delete;
 
     // IGameCommandSink
-    // 接收来自 View 的命令，转发给内部 GameSimulation。
-    void handle_command(const GameCommand& command) override;
+    void handle_command(const GameCommand& command) override; //接收来自 View 的命令，转发给 GameSimulation 处理
 
     // IGameSnapshotSource
     const GameSnapshot& snapshot() const override;
-    // 注册快照变化回调，返回 cookie 用于解绑。
-    BindingCookie add_change_callback(ChangeCallback callback) override;
-    void remove_change_callback(BindingCookie cookie) override;
+    BindingCookie add_change_callback(ChangeCallback callback) override; //注册回调函数，回调函数用于当游戏快照发生变化时通知 View
+    void remove_change_callback(BindingCookie cookie) override; //注销回调函数，因为 View 不再需要接收通知
 
 private:
-    // 通知所有已注册的 View 侧回调重新读取快照。
-    void notify();
+    void notify(); //通知所有注册的回调函数，说明游戏快照发生了变化
 
-    // 当前对外快照和回调列表。
-    GameSnapshot m_snapshot;
+    GameSnapshot m_snapshot; //当前游戏快照，供 View 读取
+    //注册的回调函数列表，用于通知的发送，事件通知的实现是通过std::function
+    //ChangeCallback是一个函数对象类型，表示回调函数的签名
     std::vector<std::pair<BindingCookie, ChangeCallback>> m_callbacks;
-    BindingCookie m_nextCallbackCookie = 1;
-    std::unique_ptr<GameSimulation> m_sim;
+    BindingCookie m_nextCallbackCookie = 1; //下一个回调函数的唯一标识符，用于生成新的 BindingCookie
+    std::unique_ptr<GameSimulation> m_sim; //内部的游戏模拟器，处理游戏逻辑和状态更新
 };
 
 } // namespace alleyfist
