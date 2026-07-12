@@ -11,6 +11,7 @@ namespace alleyfist {
 
 namespace {
 
+// 游戏规则常量：触发点、遭遇战边界和攻击动作持续时间。
 constexpr float kPi = 3.1415926535f;
 constexpr EncounterId kGruntEncounterId = 1;
 constexpr EncounterId kBossEncounterId = 2;
@@ -102,6 +103,7 @@ void GameSimulation::step(float deltaSeconds, std::uint64_t frameIndex)
     m_frame = frameIndex;
     m_snapshot.frameIndex = frameIndex;
 
+    // 先消费 View 发来的输入命令，再推进本帧模拟。
     while (!m_commandQueue.empty()) {
         auto cmd = m_commandQueue.front();
         m_commandQueue.pop_front();
@@ -116,6 +118,7 @@ void GameSimulation::step(float deltaSeconds, std::uint64_t frameIndex)
         return;
     }
 
+    // 每帧依次处理移动、角色状态、敌人 AI、攻击判定和遭遇战推进。
     m_snapshot.elapsedSeconds += deltaSeconds;
     apply_movement(deltaSeconds);
     update_player(deltaSeconds);
@@ -123,6 +126,7 @@ void GameSimulation::step(float deltaSeconds, std::uint64_t frameIndex)
     apply_attacks();
     check_encounters();
 
+    // 精力按时间恢复；恢复到可轻攻击时退出疲劳状态。
     if (m_snapshot.player.energy.maximum > 0 &&
         m_snapshot.player.energy.current < m_snapshot.player.energy.maximum) {
         m_energyRecoveryCarry += m_rules.energyRecoveryPerSecond * deltaSeconds;
@@ -140,6 +144,7 @@ void GameSimulation::step(float deltaSeconds, std::uint64_t frameIndex)
         m_snapshot.hud.playerExhausted = false;
     }
 
+    // HUD 显示值跟随玩家当前资源。
     m_snapshot.hud.playerHealth = m_snapshot.player.health;
     m_snapshot.hud.playerEnergy = m_snapshot.player.energy;
 
@@ -160,6 +165,7 @@ void GameSimulation::handle_command(const GameCommand& command)
 
 void GameSimulation::update_player(float dt)
 {
+    // 玩家位置限制在世界和街道范围内。
     if (m_snapshot.player.position.x < 0.0f)
         m_snapshot.player.position.x = 0.0f;
     if (m_snapshot.player.position.x > m_snapshot.map.worldWidth)
@@ -173,6 +179,7 @@ void GameSimulation::update_player(float dt)
     m_snapshot.hud.playerHealth = m_snapshot.player.health;
     m_snapshot.hud.playerEnergy = m_snapshot.player.energy;
 
+    // 连击窗口耗尽后重置连击步数。
     if (m_snapshot.hud.comboTimeLeftSeconds > 0.0f) {
         m_snapshot.hud.comboTimeLeftSeconds = std::max(0.0f, m_snapshot.hud.comboTimeLeftSeconds - dt);
         if (m_snapshot.hud.comboTimeLeftSeconds <= 0.0f) {
@@ -180,6 +187,7 @@ void GameSimulation::update_player(float dt)
         }
     }
 
+    // 跳跃高度用正弦曲线表现上升和落地。
     if (m_jumpActive) {
         m_jumpElapsed += dt;
         const float progress = std::min(1.0f, m_jumpElapsed / m_rules.jumpSeconds);
@@ -196,6 +204,7 @@ void GameSimulation::update_player(float dt)
         }
     }
 
+    // 攻击动作到时后回到空中/待机状态。
     if (m_playerActionTimer > 0.0f) {
         m_playerActionTimer = std::max(0.0f, m_playerActionTimer - dt);
         if (m_playerActionTimer <= 0.0f && is_attack_state(m_snapshot.player.state)) {
@@ -214,6 +223,7 @@ void GameSimulation::update_enemies(float dt)
 
     for (std::size_t index = 0; index < m_snapshot.enemies.size(); ++index) {
         auto e = m_snapshot.enemies[index];
+        // 冷却数组和敌人列表保持同序；敌人死亡被过滤时也同步过滤冷却值。
         float timer = index < m_enemyAttackTimers.size() ? m_enemyAttackTimers[index] : 1.0f;
 
         if (e.state == ActorState::Dead || !e.visible || e.health.current <= 0) {
@@ -226,6 +236,7 @@ void GameSimulation::update_enemies(float dt)
             e.position.laneY += (m_snapshot.player.position.laneY > e.position.laneY) ? 45.0f * dt : -45.0f * dt;
         }
         timer -= dt;
+        // 冷却结束且距离足够近时，敌人对玩家造成一次接触伤害。
         if (timer <= 0.0f) {
             float dx = std::abs(e.position.x - m_snapshot.player.position.x);
             float dy = std::abs(e.position.laneY - m_snapshot.player.position.laneY);
@@ -271,6 +282,7 @@ void GameSimulation::apply_attacks()
         begin_attack(kind, fromAir);
 
         CombatBox cb;
+        // 根据攻击类型设置攻击盒和伤害。
         if (kind == AttackKind::LightPunch) {
             cb.damage = 20;
             cb.attack = AttackKind::LightPunch;
@@ -285,6 +297,7 @@ void GameSimulation::apply_attacks()
             cb.localBounds = { (m_snapshot.player.facing == Facing::Right) ? 20.0f : -120.0f, -56.0f, 100.0f, 64.0f };
         }
 
+        // 用攻击盒和敌人的即时身体矩形做命中判定。
         Rect attackRect = combat_box_world_rect(m_snapshot.player, cb);
         for (auto& e : m_snapshot.enemies) {
             if (!e.visible) continue;
@@ -308,6 +321,7 @@ void GameSimulation::apply_attacks()
             }
         }
 
+        // 攻击消耗精力，精力见底时进入疲劳状态。
         int cost = (kind == AttackKind::HeavyStrike) ? m_rules.heavyAttackEnergyCost : m_rules.lightAttackEnergyCost;
         if (m_snapshot.player.energy.current > 0) {
             m_snapshot.player.energy.current = std::max(0, m_snapshot.player.energy.current - cost);
@@ -330,6 +344,7 @@ void GameSimulation::process_input_command(const GameCommand& command)
         return;
     }
 
+    // 确认键在标题、胜负和暂停阶段承担不同的流程控制职责。
     if (action == InputAction::Confirm && state == ButtonState::Triggered) {
         if (m_snapshot.phase == GamePhase::Title ||
             m_snapshot.phase == GamePhase::GameOver ||
@@ -358,6 +373,7 @@ void GameSimulation::process_input_command(const GameCommand& command)
         return;
     }
 
+    // 移动键记录持续状态；攻击和跳跃记录为待处理动作，由后续帧统一执行。
     if (action == InputAction::MoveLeft) {
         m_moveLeft = (state == ButtonState::Pressed);
     } else if (action == InputAction::MoveRight) {
@@ -396,6 +412,7 @@ void GameSimulation::apply_movement(float dt)
 
     float vx = 0.0f;
     float vy = 0.0f;
+    // 根据当前按键状态计算本帧位移；攻击锁定时禁止地面移动。
     if (!is_player_action_locked() || m_jumpActive) {
         if (m_moveLeft) vx -= m_rules.playerMoveSpeed * dt;
         if (m_moveRight) vx += m_rules.playerMoveSpeed * dt;
@@ -403,6 +420,7 @@ void GameSimulation::apply_movement(float dt)
         if (m_moveDown) vy += m_rules.playerMoveSpeed * 0.6f * dt;
     }
 
+    // 有位移时更新位置、状态和朝向；否则在非动作锁定时回到待机。
     if (std::abs(vx) > 0.0f || std::abs(vy) > 0.0f) {
         m_snapshot.player.position.x += vx;
         m_snapshot.player.position.laneY += vy;
@@ -418,6 +436,7 @@ void GameSimulation::apply_movement(float dt)
         m_snapshot.player.state = ActorState::Idle;
     }
 
+    // 遭遇战/Boss 战期间限制玩家离开锁屏范围。
     if (m_snapshot.player.position.x < 0.0f) m_snapshot.player.position.x = 0.0f;
     if (m_snapshot.player.position.x > m_snapshot.map.worldWidth) m_snapshot.player.position.x = m_snapshot.map.worldWidth;
     if (m_scrollLock == ScrollLockState::LockedByEncounter ||
@@ -432,6 +451,7 @@ void GameSimulation::apply_movement(float dt)
 
 void GameSimulation::begin_jump()
 {
+    // 初始化跳跃状态，并立即扣除跳跃精力。
     m_jumpActive = true;
     m_snapshot.player.position.z = 0.1f;
     m_snapshot.player.state = ActorState::Jump;
@@ -444,6 +464,7 @@ void GameSimulation::begin_jump()
 
 void GameSimulation::begin_attack(AttackKind attackKind, bool fromAir)
 {
+    // 根据攻击类型设置对外可绘制的角色状态和动作锁定时长。
     if (fromAir || attackKind == AttackKind::JumpKick) {
         m_snapshot.player.state = ActorState::AirAttack;
         if (!m_jumpActive) {
@@ -465,6 +486,7 @@ void GameSimulation::check_encounters()
         return;
     }
 
+    // 若处于遭遇战，等待场上敌人清空后解除锁屏。
     if (m_activeEncounterId != kInvalidEncounterId) {
         const bool anyAlive = std::any_of(m_snapshot.enemies.begin(), m_snapshot.enemies.end(),
             [](const ActorSnapshot& actor) {
@@ -476,6 +498,7 @@ void GameSimulation::check_encounters()
         return;
     }
 
+    // 根据玩家推进位置触发第一波小怪和 Boss 战。
     if (m_stageIndex == 0 && m_snapshot.player.position.x >= kGruntTriggerX) {
         spawn_grunt_encounter();
         return;
@@ -486,6 +509,7 @@ void GameSimulation::check_encounters()
         return;
     }
 
+    // Boss 已击败且玩家推进到关底时判定胜利。
     if (m_bossDefeated &&
         m_snapshot.player.position.x >= m_snapshot.map.worldWidth - 120.0f) {
         m_snapshot.phase = GamePhase::Win;
@@ -498,6 +522,7 @@ void GameSimulation::check_encounters()
 
 void GameSimulation::update_camera()
 {
+    // 默认让镜头略微跟在玩家身后，锁屏时限制在遭遇战边界内。
     const float maxCamera = std::max(0.0f, m_snapshot.map.worldWidth - m_snapshot.map.viewportWidth);
     float desired = m_snapshot.player.position.x - m_snapshot.map.viewportWidth * 0.42f;
 
@@ -516,6 +541,7 @@ void GameSimulation::update_camera()
 
 void GameSimulation::update_progress()
 {
+    // 进度条只暴露给 View 一个比例；Boss 血条则根据可见 Boss 自动同步。
     if (m_snapshot.map.worldWidth > 0.0f) {
         m_snapshot.progressRatio = std::clamp(m_snapshot.player.position.x / m_snapshot.map.worldWidth,
                                               0.0f,
@@ -534,6 +560,7 @@ void GameSimulation::update_progress()
 
 void GameSimulation::spawn_grunt_encounter()
 {
+    // 进入小怪遭遇战：锁住推进范围，并刷出三名普通敌人。
     m_activeEncounterId = kGruntEncounterId;
     m_snapshot.phase = GamePhase::EncounterLocked;
     m_scrollLock = ScrollLockState::LockedByEncounter;
@@ -561,6 +588,7 @@ void GameSimulation::spawn_grunt_encounter()
 
 void GameSimulation::spawn_boss_encounter()
 {
+    // 进入 Boss 遭遇战：记录 Boss 已刷出，避免重复触发。
     m_activeEncounterId = kBossEncounterId;
     m_bossSpawned = true;
     m_snapshot.phase = GamePhase::EncounterLocked;
@@ -586,6 +614,7 @@ void GameSimulation::spawn_boss_encounter()
 
 void GameSimulation::clear_active_encounter()
 {
+    // 清除当前遭遇战；若清除的是 Boss 战则直接进入胜利流程。
     const bool bossCleared = m_activeEncounterId == kBossEncounterId;
 
     m_activeEncounterId = kInvalidEncounterId;
@@ -621,11 +650,13 @@ bool GameSimulation::is_player_action_locked() const noexcept
     return m_playerActionTimer > 0.0f && is_attack_state(m_snapshot.player.state);
 }
 
+// 矩形相交判定，用于攻击盒和身体盒的碰撞检测。
 bool GameSimulation::rects_intersect(const Rect& a, const Rect& b) noexcept
 {
     return !(a.x + a.width < b.x || b.x + b.width < a.x || a.y + a.height < b.y || b.y + b.height < a.y);
 }
 
+// 身体盒不放进公开快照，模拟层按当前位置和绘制尺寸即时计算。
 Rect GameSimulation::actor_body_rect(const ActorSnapshot& actor) const noexcept
 {
     return {
@@ -636,6 +667,7 @@ Rect GameSimulation::actor_body_rect(const ActorSnapshot& actor) const noexcept
     };
 }
 
+// 将攻击盒从角色局部坐标转换到世界坐标。
 Rect GameSimulation::combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept
 {
     Rect r;

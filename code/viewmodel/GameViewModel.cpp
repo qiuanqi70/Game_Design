@@ -20,12 +20,14 @@ GameViewModel::~GameViewModel() = default;
 void GameViewModel::handle_command(const GameCommand& command)
 {
     if (command.type == CommandType::Tick) {
+        // Tick 命令推进模拟并刷新快照，随后通知 View 重读完整状态。
         m_sim->step(command.tick.deltaSeconds, command.tick.frameIndex);
         m_snapshot = m_sim->snapshot();
         notify();
         return;
     }
 
+    // 输入命令交给 Simulation 缓存，真正的玩法处理会在 step 中统一执行。
     m_sim->handle_command(command);
 }
 
@@ -38,6 +40,7 @@ BindingCookie GameViewModel::add_change_callback(ChangeCallback callback)
 {
     if (!callback) return 0;
 
+    // cookie 用于之后精确解绑回调，避免 View 生命周期结束后仍被通知。
     const BindingCookie cookie = m_nextCallbackCookie++;
     m_callbacks.emplace_back(cookie, std::move(callback));
     return cookie;
@@ -55,6 +58,7 @@ void GameViewModel::remove_change_callback(BindingCookie cookie)
 
 void GameViewModel::notify()
 {
+    // 拷贝一份回调列表，避免回调过程中增删绑定影响本轮遍历。
     const auto callbacks = m_callbacks;
     for (const auto& item : callbacks) {
         if (item.second) {

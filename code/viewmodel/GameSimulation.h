@@ -17,12 +17,15 @@ public:
     GameSimulation();
 
     void reset();
+    // 每帧推进游戏模拟，通常由 View 的 tick 命令触发。
     void step(float deltaSeconds, std::uint64_t frameIndex);
+    // 接收输入命令并缓存，实际处理发生在下一次 step 中。
     void handle_command(const GameCommand& command);
 
     const GameSnapshot& snapshot() const noexcept { return m_snapshot; }
 
 private:
+    // 推图锁是模拟内部状态，View 只看到边界、镜头和 GO 提示。
     enum class ScrollLockState {
         Free,
         LockedByEncounter,
@@ -52,22 +55,25 @@ private:
     Rect actor_body_rect(const ActorSnapshot& actor) const noexcept;
     Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept;
 
-    // command queue for input buffering
+    // 输入命令队列，用于把 Qt 事件和固定帧模拟解耦。
     std::deque<GameCommand> m_commandQueue;
 
-    // enemy cooldown timers (attack cooldown)
+    // 敌人攻击冷却，与 m_snapshot.enemies 保持同序。
     std::vector<float> m_enemyAttackTimers;
 
     GameRules m_rules;
     GameSnapshot m_snapshot;
     float m_accumulated = 0.0f;
     std::uint64_t m_frame = 0;
+
+    // 关卡流程控制字段留在 ViewModel 内部，不暴露给 View。
     std::uint32_t m_stageIndex = 0;
     EncounterId m_activeEncounterId = kInvalidEncounterId;
     bool m_bossSpawned = false;
     bool m_bossDefeated = false;
     ScrollLockState m_scrollLock = ScrollLockState::Free;
 
+    // 玩家输入和动作状态缓存。
     bool m_moveLeft = false;
     bool m_moveRight = false;
     bool m_moveUp = false;
