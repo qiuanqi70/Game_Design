@@ -1,12 +1,14 @@
 #pragma once
 
+#include <cassert>
 #include <cstdint>
+#include <functional>
+#include <utility>
+#include <vector>
 
 namespace alleyfist {
 
-// Event notification is intentionally a plain callback pair:
-// a function pointer plus a context pointer to the receiver instance.
-using EventNotification = void (*)(std::uint32_t eventId, void* context);
+using EventNotification = std::function<void(std::uint32_t eventId)>;
 
 class EventTrigger {
 public:
@@ -16,29 +18,44 @@ public:
 
     EventTrigger& operator=(const EventTrigger&) = delete;
 
-    void set_notification(EventNotification notification, void* context) noexcept
+    void clear_notifications() noexcept
     {
-        m_notification = notification;
-        m_context = context;
+        m_notifications.clear();
     }
 
-    void clear_notification() noexcept
+    std::uintptr_t add_notification(EventNotification&& notification)
     {
-        m_notification = nullptr;
-        m_context = nullptr;
+        std::uintptr_t index = 0;
+        for (auto& item : m_notifications) {
+            if (item == nullptr) {
+                item = std::move(notification);
+                return index + 1;
+            }
+            ++index;
+        }
+
+        m_notifications.push_back(std::move(notification));
+        return index + 1;
+    }
+
+    void remove_notification(std::uintptr_t cookie) noexcept
+    {
+        assert(cookie > 0 && cookie <= m_notifications.size());
+        m_notifications[cookie - 1] = nullptr;
     }
 
 protected:
-    void fire(std::uint32_t eventId) const
+    void fire(std::uint32_t eventId)
     {
-        if (m_notification != nullptr) {
-            m_notification(eventId, m_context);
+        for (auto& notification : m_notifications) {
+            if (notification != nullptr) {
+                notification(eventId);
+            }
         }
     }
 
 private:
-    EventNotification m_notification = nullptr;
-    void* m_context = nullptr;
+    std::vector<EventNotification> m_notifications;
 };
 
 } // namespace alleyfist
