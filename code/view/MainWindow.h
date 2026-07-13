@@ -1,7 +1,7 @@
 #pragma once
 
+#include "../common/game_state.h"
 #include "../common/notification.h"
-#include "../viewmodel/SimulationTypes.h"
 
 #include <QMainWindow>
 

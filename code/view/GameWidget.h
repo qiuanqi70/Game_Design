@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../viewmodel/SimulationTypes.h"
+#include "../common/game_state.h"
 
 #include "InputDefs.h"
 

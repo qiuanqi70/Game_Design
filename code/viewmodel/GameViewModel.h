@@ -1,8 +1,9 @@
 #pragma once
 
-#include "SimulationTypes.h"
-#include "GameSimulation.h"
+#include "../common/game_state.h"
 #include "../common/notification.h"
+#include "GameSimulation.h"
+#include "SimulationTypes.h"
 
 #include <cstdint>
 #include <memory>

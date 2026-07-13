@@ -1,10 +1,12 @@
 #pragma once
 
+#include "../common/game_state.h"
 #include "SimulationTypes.h"
-#include <vector>
-#include <memory>
-#include <functional>
+
 #include <cstdint>
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace alleyfist::viewmodel {
 
