@@ -1,67 +1,50 @@
 #include "GameViewModel.h"
 
-#include "GameSimulation.h"
-
-#include <algorithm>
-
-namespace alleyfist {
+namespace alleyfist::viewmodel {
 
 GameViewModel::GameViewModel()
     : m_sim(std::make_unique<GameSimulation>())
 {
-    m_snapshot = m_sim->snapshot();
+    bind_commands();
 }
 
 GameViewModel::~GameViewModel() = default;
 
-// ViewModel 接收命令后推进内部模拟，再通过通知列表发出变化通知。
-// 这就是 MVVM 中 ViewModel -> View 的通知绑定，不需要 ViewModel 认识具体 View。
-void GameViewModel::handle_command(const GameCommand& command)
+void GameViewModel::bind_commands()
 {
-    if (command.type == CommandType::Tick) { //如果是 Tick 命令（每帧更新），推进游戏模拟
-        m_sim->step(command.tick.deltaSeconds, command.tick.frameIndex); //通过 GameSimulation 处理 Tick 命令，推进游戏状态
-        m_snapshot = m_sim->snapshot(); //更新快照为模拟器的当前状态
-        notify();
-        return;
-    }
-
-    m_sim->handle_command(command); //如果是 Input 命令（玩家输入），转发给 GameSimulation 处理
+    moveLeft = [this]() { if (m_sim) m_sim->player_move(-10.0f, 0.0f); };
+    moveRight = [this]() { if (m_sim) m_sim->player_move(10.0f, 0.0f); };
+    moveUp = [this]() { if (m_sim) m_sim->player_move(0.0f, -10.0f); };
+    moveDown = [this]() { if (m_sim) m_sim->player_move(0.0f, 10.0f); };
+    attack = [this]() { if (m_sim) m_sim->player_attack(); };
+    restart = [this]() { if (m_sim) m_sim->reset(); };
 }
 
-const GameSnapshot& GameViewModel::snapshot() const
+void GameViewModel::start()
 {
-    return m_snapshot;
+    if (!m_sim) return;
+    m_sim->start();
+    // 注册时钟回调，视图层可以驱动仿真步进也可以由内部定时器驱动
+    m_tickCookie = m_sim->add_tick_listener([this](float dt) { on_tick(dt); });
 }
 
-// 注册回调函数，当游戏快照发生变化时通知 View
-BindingCookie GameViewModel::add_change_callback(ChangeCallback callback)
+void GameViewModel::stop()
 {
-    if (!callback) return 0;
-
-    const BindingCookie cookie = m_nextCallbackCookie++;
-    m_callbacks.emplace_back(cookie, std::move(callback)); //将回调函数和唯一标识符存储在回调列表中
-    return cookie;
+    if (!m_sim) return;
+    m_sim->remove_tick_listener(m_tickCookie);
+    m_sim->stop();
+    m_tickCookie = 0;
 }
 
-void GameViewModel::remove_change_callback(BindingCookie cookie)
+const EntityList& GameViewModel::entities() const noexcept
 {
-    m_callbacks.erase(
-        std::remove_if(m_callbacks.begin(), m_callbacks.end(),
-                       [cookie](const auto& item) {
-                           return item.first == cookie;
-                       }),
-        m_callbacks.end());
+    return m_sim->entities();
 }
 
-// 通知所有注册的回调函数，说明游戏快照发生了变化
-void GameViewModel::notify()
+void GameViewModel::on_tick(float dt)
 {
-    const auto callbacks = m_callbacks;
-    for (const auto& item : callbacks) {
-        if (item.second) {
-            item.second();
-        }
-    }
+    // 当前版本仅在仿真内部处理状态，View 可通过轮询 `entities()` 获取快照并重绘。
+    (void)dt; // 占位：未来可在这里进行事件聚合或属性通知
 }
 
-} // namespace alleyfist
+} // namespace alleyfist::viewmodel
