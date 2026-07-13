@@ -67,8 +67,9 @@ void GameSimulation::populate_initial_state()
     EntityState player;
     player.id = m_nextId++;
     player.hp = 100;
-    player.pos.x = 0.0f;
-    player.pos.laneY = 0.0f;
+    player.maxHp = 100;
+    player.pos.x = 80.0f;
+    player.pos.laneY = 400.0f;
     player.alive = true;
     m_entities.push_back(player);
 
@@ -77,8 +78,9 @@ void GameSimulation::populate_initial_state()
         EntityState e;
         e.id = m_nextId++;
         e.hp = 20;
-        e.pos.x = 200.0f + i * 80.0f; // 在玩家右侧
-        e.pos.laneY = (i % 2 == 0) ? -10.0f : 10.0f;
+        e.maxHp = 20;
+        e.pos.x = 320.0f + i * 80.0f; // 在玩家右侧
+        e.pos.laneY = (i % 2 == 0) ? 380.0f : 420.0f;
         e.alive = true;
         m_entities.push_back(e);
     }
@@ -119,8 +121,8 @@ void GameSimulation::player_move(float dx, float dy) noexcept
 {
     if (m_entities.empty()) return;
     auto& p = m_entities[0];
-    p.pos.x += dx;
-    p.pos.laneY += dy;
+    p.pos.x = std::clamp(p.pos.x + dx, 0.0f, 3000.0f);
+    p.pos.laneY = std::clamp(p.pos.laneY + dy, 300.0f, 500.0f);
 }
 
 void GameSimulation::player_attack() noexcept

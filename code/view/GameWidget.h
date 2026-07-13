@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../common/snapshot.h"
-#include "../common/actions.h"
+#include "../viewmodel/SimulationTypes.h"
 
 #include "InputDefs.h"
 
@@ -10,15 +9,17 @@
 #include <QTimer>
 #include <QWidget>
 
+#include <cstdint>
 #include <functional>
+#include <utility>
 
 namespace alleyfist {
 
 /// @brief 游戏渲染画布，负责键盘输入、定时器驱动和所有画面绘制。
 ///
-/// GameWidget 只依赖 Common 层的 GameSnapshot 和 GameCommand，
+/// GameWidget 只保存 ViewModel 暴露出来的只读显示属性指针，
 /// 不直接操作游戏数据。
-/// 它把 Qt 键盘事件翻译成逻辑命令，把只读快照翻译成像素绘制。
+/// 它把 Qt 键盘事件翻译成已绑定命令，把只读属性翻译成像素绘制。
 ///
 /// 键盘映射和 MovementIntent 聚合属于 View 层内部实现，
 /// 换输入设备（手柄 / 触屏）只需改本文件的按键处理。
@@ -28,36 +29,28 @@ class GameWidget : public QWidget {
 public:
     explicit GameWidget(QWidget* parent = nullptr);
 
-    /// 外部（App 层）调用，传入最新帧的快照并触发重绘。
-    void updateSnapshot(const GameSnapshot& snapshot);
+    /// 外部（App 层）调用，传入 ViewModel 持有的只读显示属性。
+    void set_game_state(const viewmodel::GameViewState* state) noexcept;
 
     /// 设置游戏循环是否运行。
     void setRunning(bool running);
 
-    /// 命令回调：按键事件通过此回调直接发给绑定器，不经过 Qt signal。
-    void setCommandCallback(std::function<void(const GameCommand&)> callback)
-    {
-        m_commandCallback = std::move(callback);
-    }
-
     /// Tick 回调：定时器通过此回调直接发给绑定器，不经过 Qt signal。
-    void setTickCallback(std::function<void(float, std::uint64_t)> callback)
+    void set_tick_command(std::function<void(float, std::uint64_t)> command)
     {
-        m_tickCallback = std::move(callback);
+        m_tickCommand = std::move(command);
     }
 
-    // ---- 属性设置器（每个私有属性都有对应的 public setter） ----
-
-    void setFrameIndex(std::uint64_t index) { m_frameIndex = index; }
-
-    void setMovement(const view::MovementIntent& intent) { m_movement = intent; }
-
-    void setTriggeredKeys(const QSet<int>& keys) { m_triggeredThisPress = keys; }
-
-    void setGoBlinkTimer(float seconds) { m_goBlinkTimer = seconds; }
-
-    void setScaleX(float sx) { m_scaleX = sx; }
-    void setScaleY(float sy) { m_scaleY = sy; }
+    void set_move_left_command(std::function<void(bool)> command) { m_moveLeftCommand = std::move(command); }
+    void set_move_right_command(std::function<void(bool)> command) { m_moveRightCommand = std::move(command); }
+    void set_move_up_command(std::function<void(bool)> command) { m_moveUpCommand = std::move(command); }
+    void set_move_down_command(std::function<void(bool)> command) { m_moveDownCommand = std::move(command); }
+    void set_light_attack_command(std::function<void()> command) { m_lightAttackCommand = std::move(command); }
+    void set_heavy_attack_command(std::function<void()> command) { m_heavyAttackCommand = std::move(command); }
+    void set_jump_command(std::function<void()> command) { m_jumpCommand = std::move(command); }
+    void set_restart_command(std::function<void()> command) { m_restartCommand = std::move(command); }
+    void set_confirm_command(std::function<void()> command) { m_confirmCommand = std::move(command); }
+    void set_pause_command(std::function<void()> command) { m_pauseCommand = std::move(command); }
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -68,7 +61,7 @@ protected:
 private:
     // ---- 输入处理 ----
 
-    /// 根据当前按住的移动键发送 GameCommand。
+    /// 根据当前按住的移动键触发移动命令。
     void emitMovement();
 
     /// 判断某个 Qt 按键是否被 View 处理（而非交给基类）。
@@ -78,10 +71,11 @@ private:
     void drawBackground(QPainter& p);
     void drawStreet(QPainter& p);
     void drawBuildings(QPainter& p);
-    void drawActor(QPainter& p, const ActorSnapshot& actor);
-    void drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
+    void drawActor(QPainter& p, const viewmodel::ActorViewState& actor);
+    void drawCharacterBody(QPainter& p, const viewmodel::ActorViewState& actor,
                            QColor bodyColor);
-    void drawHealthBar(QPainter& p, const ActorSnapshot& actor);
+    void drawHealthBar(QPainter& p, const viewmodel::ActorViewState& actor);
+    void drawPlayerStatus(QPainter& p);
     void drawHUD(QPainter& p);
     void drawGOIndicator(QPainter& p);
     void drawOverlay(QPainter& p);
@@ -89,20 +83,31 @@ private:
     // ---- 坐标转换 ----
     float worldToScreenX(float worldX) const;
     float worldToScreenY(float laneY, float z) const;
+    const viewmodel::GameViewState& game_state() const noexcept;
 
     // ---- 辅助绘制 ----
-    static QColor actorBodyColor(Team team, ActorKind kind);
+    static QColor actorBodyColor(viewmodel::Team team, viewmodel::ActorKind kind);
     static QColor healthBarColor(float ratio);
     static QColor energyBarColor(float ratio);
     void drawBar(QPainter& p, float x, float y, float w, float h,
                  float ratio, QColor fillColor, const QString& label);
 
-    // ---- 回调（由 MainWindow::bind 注入） ----
-    std::function<void(const GameCommand&)> m_commandCallback;
-    std::function<void(float, std::uint64_t)> m_tickCallback;
+    // ---- 命令（由 App 经 MainWindow 注入） ----
+    std::function<void(float, std::uint64_t)> m_tickCommand;
+    std::function<void(bool)> m_moveLeftCommand;
+    std::function<void(bool)> m_moveRightCommand;
+    std::function<void(bool)> m_moveUpCommand;
+    std::function<void(bool)> m_moveDownCommand;
+    std::function<void()> m_lightAttackCommand;
+    std::function<void()> m_heavyAttackCommand;
+    std::function<void()> m_jumpCommand;
+    std::function<void()> m_restartCommand;
+    std::function<void()> m_confirmCommand;
+    std::function<void()> m_pauseCommand;
 
     // ---- 状态 ----
-    GameSnapshot m_snapshot;
+    const viewmodel::GameViewState* m_gameState = nullptr;
+    viewmodel::GameViewState m_emptyState;
     QTimer m_timer;
     QElapsedTimer m_elapsed;
     std::uint64_t m_frameIndex = 0;

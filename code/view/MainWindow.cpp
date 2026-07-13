@@ -4,20 +4,9 @@
 #include <QApplication>
 #include <QScreen>
 
+#include <utility>
+
 namespace alleyfist {
-
-// 绑定清理句柄：MainWindow 析构时自动解绑 ViewModel 通知。
-struct BindHandle {
-    IGameSnapshotSource* source = nullptr;
-    BindingCookie cookie = 0;
-
-    ~BindHandle()
-    {
-        if (source && cookie != 0) {
-            source->remove_change_callback(cookie);
-        }
-    }
-};
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -37,31 +26,78 @@ MainWindow::MainWindow(QWidget* parent)
     setCentralWidget(widget);
 }
 
-void MainWindow::bind(IGameCommandSink& commandSink,
-                      IGameSnapshotSource& snapshotSource)
+void MainWindow::set_game_state(const viewmodel::GameViewState* state) noexcept
 {
-    auto* widget = m_gameWidget;
+    m_gameWidget->set_game_state(state);
+}
 
-    // ---- 数据绑定：推初始快照 ----
-    widget->updateSnapshot(snapshotSource.snapshot());
+void MainWindow::set_tick_command(std::function<void(float, std::uint64_t)> command)
+{
+    m_gameWidget->set_tick_command(std::move(command));
+}
 
-    // ---- 通知绑定：ViewModel 变化 → View 刷新 ----
-    auto handle = std::make_unique<BindHandle>();
-    handle->source = &snapshotSource;
-    handle->cookie = snapshotSource.add_change_callback([widget]() {
-        widget->update();
-    });
+void MainWindow::set_move_left_command(std::function<void(bool)> command)
+{
+    m_gameWidget->set_move_left_command(std::move(command));
+}
 
-    // ---- 命令绑定：按键 / 定时器 → ViewModel（直接回调，不走 Qt signal） ----
-    widget->setCommandCallback([&commandSink](const GameCommand& cmd) {
-        commandSink.handle_command(cmd);
-    });
+void MainWindow::set_move_right_command(std::function<void(bool)> command)
+{
+    m_gameWidget->set_move_right_command(std::move(command));
+}
 
-    widget->setTickCallback([&commandSink](float dt, std::uint64_t frame) {
-        commandSink.handle_command(GameCommand::tick_command(dt, frame));
-    });
+void MainWindow::set_move_up_command(std::function<void(bool)> command)
+{
+    m_gameWidget->set_move_up_command(std::move(command));
+}
 
-    m_bindHandle = std::move(handle);
+void MainWindow::set_move_down_command(std::function<void(bool)> command)
+{
+    m_gameWidget->set_move_down_command(std::move(command));
+}
+
+void MainWindow::set_light_attack_command(std::function<void()> command)
+{
+    m_gameWidget->set_light_attack_command(std::move(command));
+}
+
+void MainWindow::set_heavy_attack_command(std::function<void()> command)
+{
+    m_gameWidget->set_heavy_attack_command(std::move(command));
+}
+
+void MainWindow::set_jump_command(std::function<void()> command)
+{
+    m_gameWidget->set_jump_command(std::move(command));
+}
+
+void MainWindow::set_restart_command(std::function<void()> command)
+{
+    m_gameWidget->set_restart_command(std::move(command));
+}
+
+void MainWindow::set_confirm_command(std::function<void()> command)
+{
+    m_gameWidget->set_confirm_command(std::move(command));
+}
+
+void MainWindow::set_pause_command(std::function<void()> command)
+{
+    m_gameWidget->set_pause_command(std::move(command));
+}
+
+EventNotification MainWindow::get_notification()
+{
+    return [this](std::uint32_t) {
+        if (m_gameWidget != nullptr) {
+            m_gameWidget->update();
+        }
+    };
+}
+
+GameWidget& MainWindow::get_game_widget() noexcept
+{
+    return *m_gameWidget;
 }
 
 } // namespace alleyfist

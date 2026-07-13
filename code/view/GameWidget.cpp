@@ -11,7 +11,19 @@
 namespace alleyfist {
 
 // GameWidget 是纯 View：这里可以出现 Qt 事件、QPainter、颜色和布局，
-// 但不写 AI、碰撞、伤害、刷怪等规则；这些规则通过快照从 ViewModel 单向流入。
+// 但不写 AI、碰撞、伤害、刷怪等规则；这些规则通过只读显示属性从 ViewModel 单向流入。
+
+namespace {
+
+using ActorKind = viewmodel::ActorKind;
+using ActorState = viewmodel::ActorState;
+using ActorViewState = viewmodel::ActorViewState;
+using Facing = viewmodel::Facing;
+using GamePhase = viewmodel::GamePhase;
+using GameViewState = viewmodel::GameViewState;
+using Team = viewmodel::Team;
+
+} // namespace
 
 // ============================================================================
 // 构造与生命周期
@@ -39,7 +51,7 @@ GameWidget::GameWidget(QWidget* parent)
         // GO 闪烁计时
         m_goBlinkTimer += clampedDt;
 
-        if (m_tickCallback) m_tickCallback(clampedDt, m_frameIndex);
+        if (m_tickCommand) m_tickCommand(clampedDt, m_frameIndex);
     });
 
     // 启动定时器
@@ -47,10 +59,15 @@ GameWidget::GameWidget(QWidget* parent)
     m_timer.start(16); // ~60 FPS
 }
 
-void GameWidget::updateSnapshot(const GameSnapshot& snapshot)
+void GameWidget::set_game_state(const GameViewState* state) noexcept
 {
-    m_snapshot = snapshot;
+    m_gameState = state;
     update(); // 触发 paintEvent
+}
+
+const GameViewState& GameWidget::game_state() const noexcept
+{
+    return m_gameState != nullptr ? *m_gameState : m_emptyState;
 }
 
 void GameWidget::setRunning(bool running)
@@ -71,7 +88,7 @@ void GameWidget::setRunning(bool running)
 
 float GameWidget::worldToScreenX(float worldX) const
 {
-    return (worldX - m_snapshot.map.cameraX) * m_scaleX;
+    return (worldX - game_state().map.cameraX) * m_scaleX;
 }
 
 float GameWidget::worldToScreenY(float laneY, float z) const
@@ -84,8 +101,7 @@ float GameWidget::worldToScreenY(float laneY, float z) const
 // 键盘输入处理
 //
 // 按键映射全部集中在这里，换手柄 / 触屏只需改这两个函数。
-// MovementIntent 聚合移动键状态，在 Common 接口升级后可以直接
-// 替换为 if (m_commandCallback) m_commandCallback(GameCommand::move(direction))。
+// MovementIntent 聚合移动键状态，具体命令由 App 从 ViewModel 注入。
 // ============================================================================
 
 bool GameWidget::isHandledKey(int qtKey)
@@ -109,9 +125,7 @@ bool GameWidget::isHandledKey(int qtKey)
 
 void GameWidget::emitMovement()
 {
-    // 当前兼容方案：按单个方向键发送 Pressed/Released。
-    // Common 接口升级后改为 if (m_commandCallback) m_commandCallback(GameCommand::move(direction))。
-    // 这里只负责"有没有移动键按住"的聚合，不负责方向推导（那是 MovementIntent 的职责）。
+    // 预留给后续把四方向聚合成一个移动命令。
 }
 
 void GameWidget::keyPressEvent(QKeyEvent* event)
@@ -129,25 +143,25 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
     case Qt::Key_Left:  case Qt::Key_A:
         if (!m_movement.left) {
             m_movement.left = true;
-            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Pressed));
+            if (m_moveLeftCommand) m_moveLeftCommand(true);
         }
         return;
     case Qt::Key_Right: case Qt::Key_D:
         if (!m_movement.right) {
             m_movement.right = true;
-            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveRight, ButtonState::Pressed));
+            if (m_moveRightCommand) m_moveRightCommand(true);
         }
         return;
     case Qt::Key_Up:    case Qt::Key_W:
         if (!m_movement.up) {
             m_movement.up = true;
-            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveUp, ButtonState::Pressed));
+            if (m_moveUpCommand) m_moveUpCommand(true);
         }
         return;
     case Qt::Key_Down:  case Qt::Key_S:
         if (!m_movement.down) {
             m_movement.down = true;
-            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveDown, ButtonState::Pressed));
+            if (m_moveDownCommand) m_moveDownCommand(true);
         }
         return;
     default: break;
@@ -159,22 +173,22 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
 
     switch (key) {
     case Qt::Key_J: case Qt::Key_Z:
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::LightAttack, ButtonState::Triggered));
+        if (m_lightAttackCommand) m_lightAttackCommand();
         break;
     case Qt::Key_K: case Qt::Key_X:
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::HeavyAttack, ButtonState::Triggered));
+        if (m_heavyAttackCommand) m_heavyAttackCommand();
         break;
     case Qt::Key_Space:
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Jump, ButtonState::Triggered));
+        if (m_jumpCommand) m_jumpCommand();
         break;
     case Qt::Key_R:
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Restart, ButtonState::Triggered));
+        if (m_restartCommand) m_restartCommand();
         break;
     case Qt::Key_Return: case Qt::Key_Enter:
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Confirm, ButtonState::Triggered));
+        if (m_confirmCommand) m_confirmCommand();
         break;
     case Qt::Key_Escape: case Qt::Key_P:
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Pause, ButtonState::Triggered));
+        if (m_pauseCommand) m_pauseCommand();
         break;
     default: break;
     }
@@ -196,19 +210,19 @@ void GameWidget::keyReleaseEvent(QKeyEvent* event)
     switch (key) {
     case Qt::Key_Left:  case Qt::Key_A:
         m_movement.left = false;
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Released));
+        if (m_moveLeftCommand) m_moveLeftCommand(false);
         break;
     case Qt::Key_Right: case Qt::Key_D:
         m_movement.right = false;
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveRight, ButtonState::Released));
+        if (m_moveRightCommand) m_moveRightCommand(false);
         break;
     case Qt::Key_Up:    case Qt::Key_W:
         m_movement.up = false;
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveUp, ButtonState::Released));
+        if (m_moveUpCommand) m_moveUpCommand(false);
         break;
     case Qt::Key_Down:  case Qt::Key_S:
         m_movement.down = false;
-        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveDown, ButtonState::Released));
+        if (m_moveDownCommand) m_moveDownCommand(false);
         break;
     default: break;
     }
@@ -222,10 +236,10 @@ void GameWidget::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
 
-    const float vpW = m_snapshot.map.viewportWidth > 0.0f
-                          ? m_snapshot.map.viewportWidth : 960.0f;
-    const float vpH = m_snapshot.map.viewportHeight > 0.0f
-                          ? m_snapshot.map.viewportHeight : 540.0f;
+    const float vpW = game_state().map.viewportWidth > 0.0f
+                          ? game_state().map.viewportWidth : 960.0f;
+    const float vpH = game_state().map.viewportHeight > 0.0f
+                          ? game_state().map.viewportHeight : 540.0f;
 
     m_scaleX = static_cast<float>(width()) / vpW;
     m_scaleY = static_cast<float>(height()) / vpH;
@@ -244,14 +258,14 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     p.fillRect(rect(), QColor(0, 0, 0));
 
     // 更新缩放
-    const float vpW = m_snapshot.map.viewportWidth > 0.0f
-                          ? m_snapshot.map.viewportWidth : 960.0f;
-    const float vpH = m_snapshot.map.viewportHeight > 0.0f
-                          ? m_snapshot.map.viewportHeight : 540.0f;
+    const float vpW = game_state().map.viewportWidth > 0.0f
+                          ? game_state().map.viewportWidth : 960.0f;
+    const float vpH = game_state().map.viewportHeight > 0.0f
+                          ? game_state().map.viewportHeight : 540.0f;
     m_scaleX = static_cast<float>(width()) / vpW;
     m_scaleY = static_cast<float>(height()) / vpH;
 
-    const GamePhase phase = m_snapshot.phase;
+    const GamePhase phase = game_state().phase;
 
     // ---- 标题画面 ----
     if (phase == GamePhase::Title) {
@@ -264,22 +278,22 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     drawStreet(p);
 
     // 按 depthSortY 排序绘制所有角色（远的先画）
-    std::vector<const ActorViewData*> drawList;
+    std::vector<const ActorViewState*> drawList;
 
     // 玩家
-    if (m_snapshot.player.visible) {
-        drawList.push_back(&m_snapshot.player);
+    if (game_state().player.visible) {
+        drawList.push_back(&game_state().player);
     }
 
     // 敌人
-    for (const auto& enemy : m_snapshot.enemies) {
+    for (const auto& enemy : game_state().enemies) {
         if (enemy.visible) {
             drawList.push_back(&enemy);
         }
     }
 
     // 特效
-    for (const auto& effect : m_snapshot.effects) {
+    for (const auto& effect : game_state().effects) {
         if (effect.visible) {
             drawList.push_back(&effect);
         }
@@ -287,7 +301,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // 按 laneY + z 排序，远的先画。
     std::sort(drawList.begin(), drawList.end(),
-              [](const ActorSnapshot* a, const ActorSnapshot* b) {
+              [](const ActorViewState* a, const ActorViewState* b) {
                   const float ya = a->position.laneY + a->position.z;
                   const float yb = b->position.laneY + b->position.z;
                   return ya < yb;
@@ -301,7 +315,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     drawHUD(p);
 
     // ---- GO 指示器 ----
-    if (m_snapshot.map.showGoIndicator) {
+    if (game_state().map.showGoIndicator) {
         drawGOIndicator(p);
     }
 
@@ -319,12 +333,12 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
 void GameWidget::drawBackground(QPainter& p)
 {
-    const float vpW = m_snapshot.map.viewportWidth > 0.0f
-                          ? m_snapshot.map.viewportWidth : 960.0f;
-    const float vpH = m_snapshot.map.viewportHeight > 0.0f
-                          ? m_snapshot.map.viewportHeight : 540.0f;
-    const float streetTop = m_snapshot.map.streetTopY > 0.0f
-                                ? m_snapshot.map.streetTopY : 300.0f;
+    const float vpW = game_state().map.viewportWidth > 0.0f
+                          ? game_state().map.viewportWidth : 960.0f;
+    const float vpH = game_state().map.viewportHeight > 0.0f
+                          ? game_state().map.viewportHeight : 540.0f;
+    const float streetTop = game_state().map.streetTopY > 0.0f
+                                ? game_state().map.streetTopY : 300.0f;
 
     // 天空渐变
     QLinearGradient skyGrad(0, 0, 0, streetTop * m_scaleY);
@@ -339,9 +353,9 @@ void GameWidget::drawBackground(QPainter& p)
 
 void GameWidget::drawBuildings(QPainter& p)
 {
-    const float streetTop = m_snapshot.map.streetTopY > 0.0f
-                                ? m_snapshot.map.streetTopY : 300.0f;
-    const float camX = m_snapshot.map.cameraX;
+    const float streetTop = game_state().map.streetTopY > 0.0f
+                                ? game_state().map.streetTopY : 300.0f;
+    const float camX = game_state().map.cameraX;
 
     // 视差滚动：远景移动速度为镜头的 0.3 倍
     const float parallaxFactor = 0.3f;
@@ -411,15 +425,15 @@ void GameWidget::drawBuildings(QPainter& p)
 
 void GameWidget::drawStreet(QPainter& p)
 {
-    const float vpW = m_snapshot.map.viewportWidth > 0.0f
-                          ? m_snapshot.map.viewportWidth : 960.0f;
-    const float vpH = m_snapshot.map.viewportHeight > 0.0f
-                          ? m_snapshot.map.viewportHeight : 540.0f;
-    const float streetTop = m_snapshot.map.streetTopY > 0.0f
-                                ? m_snapshot.map.streetTopY : 300.0f;
-    const float streetBottom = m_snapshot.map.streetBottomY > 0.0f
-                                   ? m_snapshot.map.streetBottomY : 500.0f;
-    const float camX = m_snapshot.map.cameraX;
+    const float vpW = game_state().map.viewportWidth > 0.0f
+                          ? game_state().map.viewportWidth : 960.0f;
+    const float vpH = game_state().map.viewportHeight > 0.0f
+                          ? game_state().map.viewportHeight : 540.0f;
+    const float streetTop = game_state().map.streetTopY > 0.0f
+                                ? game_state().map.streetTopY : 300.0f;
+    const float streetBottom = game_state().map.streetBottomY > 0.0f
+                                   ? game_state().map.streetBottomY : 500.0f;
+    const float camX = game_state().map.cameraX;
 
     const float sy0 = streetTop * m_scaleY;
     const float sy1 = streetBottom * m_scaleY;
@@ -517,7 +531,7 @@ void GameWidget::drawBar(QPainter& p, float x, float y, float w, float h,
     }
 }
 
-void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
+void GameWidget::drawActor(QPainter& p, const ActorViewState& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
@@ -537,7 +551,7 @@ void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
 
     // 无敌闪烁（每 0.1 秒切换可见性）
     if (actor.invincible) {
-        const int tick = static_cast<int>(m_snapshot.elapsedSeconds * 10.0f);
+        const int tick = static_cast<int>(game_state().elapsedSeconds * 10.0f);
         if (tick % 2 == 0) return;
     }
 
@@ -563,7 +577,7 @@ void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
 
 }
 
-void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
+void GameWidget::drawCharacterBody(QPainter& p, const ActorViewState& actor,
                                     QColor bodyColor)
 {
     const float w = actor.drawSize.width * m_scaleX;
@@ -601,7 +615,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
         p.fillRect(QRectF(legW * 0.3f, legTop, legW, legH * 0.5f), pantsColor);
     } else if (state == ActorState::Walk || state == ActorState::Run) {
         // 行走时前后腿
-        const float stride = std::sin(m_snapshot.elapsedSeconds * 10.0f) * 6.0f * m_scaleX;
+        const float stride = std::sin(game_state().elapsedSeconds * 10.0f) * 6.0f * m_scaleX;
         p.fillRect(QRectF(-legW - stride, legTop, legW, legH), pantsColor);
         p.fillRect(QRectF(stride, legTop, legW, legH), pantsColor);
         // 鞋子
@@ -693,7 +707,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
     }
 }
 
-void GameWidget::drawHealthBar(QPainter& p, const ActorSnapshot& actor)
+void GameWidget::drawHealthBar(QPainter& p, const ActorViewState& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
@@ -726,7 +740,7 @@ void GameWidget::drawPlayerStatus(QPainter& p)
 
 void GameWidget::drawHUD(QPainter& p)
 {
-    const auto& hud = m_snapshot.hud;
+    const auto& hud = game_state().hud;
     const float margin = 12.0f;
     const float barW = 200.0f * m_scaleX;
     const float barH = 16.0f * m_scaleY;
@@ -767,7 +781,7 @@ void GameWidget::drawHUD(QPainter& p)
 
     // ---- 连招计数 ----
     if (hud.comboStep > 0) {
-        const float comboX = (m_snapshot.map.viewportWidth * m_scaleX) / 2.0f;
+        const float comboX = (game_state().map.viewportWidth * m_scaleX) / 2.0f;
         const float comboY = margin * m_scaleY + 30.0f * m_scaleY;
 
         QFont comboFont("Arial", 16, QFont::Bold);
@@ -792,7 +806,7 @@ void GameWidget::drawHUD(QPainter& p)
     // ---- Boss 血条 (上方居中偏右) ----
     if (hud.showBossHealth) {
         const float bossBarW = 250.0f * m_scaleX;
-        const float bossX = (m_snapshot.map.viewportWidth * m_scaleX) / 2.0f - bossBarW / 2;
+        const float bossX = (game_state().map.viewportWidth * m_scaleX) / 2.0f - bossBarW / 2;
         const float bossY = margin * m_scaleY;
 
         p.setPen(QColor(255, 200, 100));
@@ -807,28 +821,28 @@ void GameWidget::drawHUD(QPainter& p)
     }
 
     // ---- 屏幕消息 ----
-    if (!m_snapshot.screenMessage.empty()) {
-        const float msgY = m_snapshot.map.viewportHeight * m_scaleY * 0.5f;
-        const float msgX = m_snapshot.map.viewportWidth * m_scaleX * 0.5f;
+    if (!game_state().screenMessage.empty()) {
+        const float msgY = game_state().map.viewportHeight * m_scaleY * 0.5f;
+        const float msgX = game_state().map.viewportWidth * m_scaleX * 0.5f;
 
         QFont msgFont("Arial", 18, QFont::Bold);
         p.setFont(msgFont);
         p.setPen(QColor(255, 255, 100));
         p.drawText(QRectF(msgX - 150.0f * m_scaleX, msgY - 20.0f * m_scaleY,
                           300.0f * m_scaleX, 40.0f * m_scaleY),
-                   Qt::AlignCenter, QString::fromStdString(m_snapshot.screenMessage));
+                   Qt::AlignCenter, QString::fromStdString(game_state().screenMessage));
     }
 
     // ---- 关卡进度条 (底部) ----
-    if (m_snapshot.map.worldWidth > 0.0f) {
+    if (game_state().map.worldWidth > 0.0f) {
         const float progBarW = width() * 0.6f;
         const float progBarH = 6.0f * m_scaleY;
         const float progX = (width() - progBarW) / 2.0f;
         const float progY = height() - progBarH - 8.0f * m_scaleY;
 
-        const float progress = m_snapshot.progressRatio > 0.0f
-                                   ? m_snapshot.progressRatio
-                                   : m_snapshot.player.position.x / m_snapshot.map.worldWidth;
+        const float progress = game_state().progressRatio > 0.0f
+                                   ? game_state().progressRatio
+                                   : game_state().player.position.x / game_state().map.worldWidth;
 
         p.fillRect(QRectF(progX, progY, progBarW, progBarH), QColor(30, 30, 30, 180));
         p.fillRect(QRectF(progX, progY, progBarW * progress, progBarH),
@@ -849,8 +863,8 @@ void GameWidget::drawGOIndicator(QPainter& p)
     const float blinkCycle = std::fmod(m_goBlinkTimer, 1.0f);
     if (blinkCycle > 0.5f) return;
 
-    const float centerX = m_snapshot.map.viewportWidth * m_scaleX * 0.75f;
-    const float centerY = m_snapshot.map.viewportHeight * m_scaleY * 0.4f;
+    const float centerX = game_state().map.viewportWidth * m_scaleX * 0.75f;
+    const float centerY = game_state().map.viewportHeight * m_scaleY * 0.4f;
 
     QFont goFont("Arial", 24, QFont::Bold);
     p.setFont(goFont);
@@ -881,10 +895,10 @@ void GameWidget::drawGOIndicator(QPainter& p)
 
 void GameWidget::drawOverlay(QPainter& p)
 {
-    const float vpW = m_snapshot.map.viewportWidth > 0.0f
-                          ? m_snapshot.map.viewportWidth : 960.0f;
-    const float vpH = m_snapshot.map.viewportHeight > 0.0f
-                          ? m_snapshot.map.viewportHeight : 540.0f;
+    const float vpW = game_state().map.viewportWidth > 0.0f
+                          ? game_state().map.viewportWidth : 960.0f;
+    const float vpH = game_state().map.viewportHeight > 0.0f
+                          ? game_state().map.viewportHeight : 540.0f;
 
     // 半透明黑色遮罩
     p.fillRect(QRectF(0, 0, vpW * m_scaleX, vpH * m_scaleY),
@@ -893,7 +907,7 @@ void GameWidget::drawOverlay(QPainter& p)
     const float cx = vpW * m_scaleX / 2.0f;
     const float cy = vpH * m_scaleY / 2.0f;
 
-    const GamePhase phase = m_snapshot.phase;
+    const GamePhase phase = game_state().phase;
 
     if (phase == GamePhase::Title) {
         // ---- 标题画面 ----
@@ -999,7 +1013,7 @@ void GameWidget::drawOverlay(QPainter& p)
                    Qt::AlignCenter, "GAME OVER");
 
         // 统计信息
-        const auto& result = m_snapshot.result;
+        const auto& result = game_state().result;
         QFont statFont("Arial", 13);
         p.setFont(statFont);
         p.setPen(QColor(220, 220, 220));
@@ -1036,7 +1050,7 @@ void GameWidget::drawOverlay(QPainter& p)
                    Qt::AlignCenter, "YOU WIN!");
 
         // 统计信息
-        const auto& result = m_snapshot.result;
+        const auto& result = game_state().result;
         QFont statFont("Arial", 13);
         p.setFont(statFont);
         p.setPen(QColor(220, 220, 220));

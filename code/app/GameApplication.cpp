@@ -9,10 +9,10 @@
 namespace alleyfist {
 
 // App 层是组合根：它可以创建具体 View 和具体 ViewModel，
-// 但绑定细节交给 MainWindow::bind，不直接操作 GameWidget 或监听 VM 的具体信号。
+// 并像老师 Plane 示例一样集中完成 properties / commands / notification 绑定。
 struct GameApplication::Impl {
     QApplication qtApp;
-    GameViewModel viewModel;
+    viewmodel::GameViewModel viewModel;
     MainWindow mainWindow;
 
     Impl(int& argc, char** argv)
@@ -24,7 +24,26 @@ struct GameApplication::Impl {
         QCoreApplication::setApplicationVersion("0.1.0");
         QCoreApplication::setOrganizationName("AlleyFist");
 
-        mainWindow.bind(viewModel, viewModel);
+        // binding
+
+        // properties
+        mainWindow.set_game_state(viewModel.get_game_state());
+
+        // commands
+        mainWindow.set_tick_command(viewModel.get_tick_command());
+        mainWindow.set_move_left_command(viewModel.get_move_left_command());
+        mainWindow.set_move_right_command(viewModel.get_move_right_command());
+        mainWindow.set_move_up_command(viewModel.get_move_up_command());
+        mainWindow.set_move_down_command(viewModel.get_move_down_command());
+        mainWindow.set_light_attack_command(viewModel.get_light_attack_command());
+        mainWindow.set_heavy_attack_command(viewModel.get_heavy_attack_command());
+        mainWindow.set_jump_command(viewModel.get_jump_command());
+        mainWindow.set_restart_command(viewModel.get_restart_command());
+        mainWindow.set_confirm_command(viewModel.get_confirm_command());
+        mainWindow.set_pause_command(viewModel.get_pause_command());
+
+        // notification
+        viewModel.add_notification(mainWindow.get_notification());
     }
 
     int run()

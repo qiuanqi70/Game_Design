@@ -1,9 +1,12 @@
 #pragma once
 
-#include "../common/contracts.h"
+#include "../common/notification.h"
+#include "../viewmodel/SimulationTypes.h"
 
 #include <QMainWindow>
-#include <memory>
+
+#include <cstdint>
+#include <functional>
 
 namespace alleyfist {
 
@@ -13,23 +16,37 @@ class GameWidget;
 ///
 /// MainWindow 是 View 层对外的入口之一。
 /// App 层创建 MainWindow 后调用 show() 即可显示游戏窗口。
-/// App 层不能再直接拿内部 GameWidget，而是通过 bind() 传入公共接口完成 MVVM 绑定。
+/// App 层负责把 ViewModel 暴露的属性、命令和通知绑定到这里。
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
     explicit MainWindow(QWidget* parent = nullptr);
 
-    /// 将 View 暴露的输入和 ViewModel 暴露的状态源绑定起来。
-    void bind(IGameCommandSink& commandSink,
-              IGameSnapshotSource& snapshotSource);
+    // properties
+    void set_game_state(const viewmodel::GameViewState* state) noexcept;
+
+    // commands
+    void set_tick_command(std::function<void(float, std::uint64_t)> command);
+    void set_move_left_command(std::function<void(bool)> command);
+    void set_move_right_command(std::function<void(bool)> command);
+    void set_move_up_command(std::function<void(bool)> command);
+    void set_move_down_command(std::function<void(bool)> command);
+    void set_light_attack_command(std::function<void()> command);
+    void set_heavy_attack_command(std::function<void()> command);
+    void set_jump_command(std::function<void()> command);
+    void set_restart_command(std::function<void()> command);
+    void set_confirm_command(std::function<void()> command);
+    void set_pause_command(std::function<void()> command);
+
+    // notification
+    EventNotification get_notification();
+
+    // methods
+    GameWidget& get_game_widget() noexcept;
 
 private:
     GameWidget* m_gameWidget = nullptr;
-
-    // 绑定清理句柄（前向声明在 .cpp 中定义，避免头文件暴露细节）
-    struct BindHandle;
-    std::unique_ptr<BindHandle> m_bindHandle;
 };
 
 } // namespace alleyfist

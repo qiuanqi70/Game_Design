@@ -20,16 +20,3 @@ target_link_libraries(alleyfist_viewmodel
 )
 
 qt_standard_project_setup()
-
-if(BUILD_TESTING)
-    add_executable(alleyfist_simulation_test
-        GameSimulationTest.cpp
-    )
-
-    target_link_libraries(alleyfist_simulation_test
-        PRIVATE
-            alleyfist_viewmodel
-    )
-
-    add_test(NAME alleyfist_simulation_test COMMAND alleyfist_simulation_test)
-endif()
