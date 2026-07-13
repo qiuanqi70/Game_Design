@@ -10,6 +10,8 @@
 #include <QTimer>
 #include <QWidget>
 
+#include <functional>
+
 namespace alleyfist {
 
 /// @brief 游戏渲染画布，负责键盘输入、定时器驱动和所有画面绘制。
@@ -32,12 +34,17 @@ public:
     /// 设置游戏循环是否运行。
     void setRunning(bool running);
 
-signals:
-    /// 键盘输入转换为 GameCommand 后发出。
-    void commandGenerated(const GameCommand& command);
+    /// 命令回调：按键事件通过此回调直接发给绑定器，不经过 Qt signal。
+    void setCommandCallback(std::function<void(const GameCommand&)> callback)
+    {
+        m_commandCallback = std::move(callback);
+    }
 
-    /// 每帧定时器触发时发出，携带 delta 时间和帧序号。
-    void tickRequested(float deltaSeconds, std::uint64_t frameIndex);
+    /// Tick 回调：定时器通过此回调直接发给绑定器，不经过 Qt signal。
+    void setTickCallback(std::function<void(float, std::uint64_t)> callback)
+    {
+        m_tickCallback = std::move(callback);
+    }
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -76,6 +83,10 @@ private:
     static QColor energyBarColor(float ratio);
     void drawBar(QPainter& p, float x, float y, float w, float h,
                  float ratio, QColor fillColor, const QString& label);
+
+    // ---- 回调（由 MainWindow::bind 注入） ----
+    std::function<void(const GameCommand&)> m_commandCallback;
+    std::function<void(float, std::uint64_t)> m_tickCallback;
 
     // ---- 状态 ----
     GameSnapshot m_snapshot;

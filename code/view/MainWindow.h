@@ -26,7 +26,10 @@ public:
 
 private:
     GameWidget* m_gameWidget = nullptr;
-    std::unique_ptr<QObject> m_binding;
+
+    // 绑定清理句柄（前向声明在 .cpp 中定义，避免头文件暴露细节）
+    struct BindHandle;
+    std::unique_ptr<BindHandle> m_bindHandle;
 };
 
 } // namespace alleyfist

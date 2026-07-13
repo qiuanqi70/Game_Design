@@ -39,7 +39,7 @@ GameWidget::GameWidget(QWidget* parent)
         // GO 闪烁计时
         m_goBlinkTimer += clampedDt;
 
-        emit tickRequested(clampedDt, m_frameIndex);
+        if (m_tickCallback) m_tickCallback(clampedDt, m_frameIndex);
     });
 
     // 启动定时器
@@ -85,7 +85,7 @@ float GameWidget::worldToScreenY(float laneY, float z) const
 //
 // 按键映射全部集中在这里，换手柄 / 触屏只需改这两个函数。
 // MovementIntent 聚合移动键状态，在 Common 接口升级后可以直接
-// 替换为 emit commandGenerated(GameCommand::move(direction))。
+// 替换为 if (m_commandCallback) m_commandCallback(GameCommand::move(direction))。
 // ============================================================================
 
 bool GameWidget::isHandledKey(int qtKey)
@@ -110,7 +110,7 @@ bool GameWidget::isHandledKey(int qtKey)
 void GameWidget::emitMovement()
 {
     // 当前兼容方案：按单个方向键发送 Pressed/Released。
-    // Common 接口升级后改为 emit commandGenerated(GameCommand::move(direction))。
+    // Common 接口升级后改为 if (m_commandCallback) m_commandCallback(GameCommand::move(direction))。
     // 这里只负责"有没有移动键按住"的聚合，不负责方向推导（那是 MovementIntent 的职责）。
 }
 
@@ -129,25 +129,25 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
     case Qt::Key_Left:  case Qt::Key_A:
         if (!m_movement.left) {
             m_movement.left = true;
-            emit commandGenerated(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Pressed));
+            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Pressed));
         }
         return;
     case Qt::Key_Right: case Qt::Key_D:
         if (!m_movement.right) {
             m_movement.right = true;
-            emit commandGenerated(GameCommand::input_command(InputAction::MoveRight, ButtonState::Pressed));
+            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveRight, ButtonState::Pressed));
         }
         return;
     case Qt::Key_Up:    case Qt::Key_W:
         if (!m_movement.up) {
             m_movement.up = true;
-            emit commandGenerated(GameCommand::input_command(InputAction::MoveUp, ButtonState::Pressed));
+            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveUp, ButtonState::Pressed));
         }
         return;
     case Qt::Key_Down:  case Qt::Key_S:
         if (!m_movement.down) {
             m_movement.down = true;
-            emit commandGenerated(GameCommand::input_command(InputAction::MoveDown, ButtonState::Pressed));
+            if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveDown, ButtonState::Pressed));
         }
         return;
     default: break;
@@ -159,22 +159,22 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
 
     switch (key) {
     case Qt::Key_J: case Qt::Key_Z:
-        emit commandGenerated(GameCommand::input_command(InputAction::LightAttack, ButtonState::Triggered));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::LightAttack, ButtonState::Triggered));
         break;
     case Qt::Key_K: case Qt::Key_X:
-        emit commandGenerated(GameCommand::input_command(InputAction::HeavyAttack, ButtonState::Triggered));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::HeavyAttack, ButtonState::Triggered));
         break;
     case Qt::Key_Space:
-        emit commandGenerated(GameCommand::input_command(InputAction::Jump, ButtonState::Triggered));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Jump, ButtonState::Triggered));
         break;
     case Qt::Key_R:
-        emit commandGenerated(GameCommand::input_command(InputAction::Restart, ButtonState::Triggered));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Restart, ButtonState::Triggered));
         break;
     case Qt::Key_Return: case Qt::Key_Enter:
-        emit commandGenerated(GameCommand::input_command(InputAction::Confirm, ButtonState::Triggered));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Confirm, ButtonState::Triggered));
         break;
     case Qt::Key_Escape: case Qt::Key_P:
-        emit commandGenerated(GameCommand::input_command(InputAction::Pause, ButtonState::Triggered));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::Pause, ButtonState::Triggered));
         break;
     default: break;
     }
@@ -196,19 +196,19 @@ void GameWidget::keyReleaseEvent(QKeyEvent* event)
     switch (key) {
     case Qt::Key_Left:  case Qt::Key_A:
         m_movement.left = false;
-        emit commandGenerated(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Released));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Released));
         break;
     case Qt::Key_Right: case Qt::Key_D:
         m_movement.right = false;
-        emit commandGenerated(GameCommand::input_command(InputAction::MoveRight, ButtonState::Released));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveRight, ButtonState::Released));
         break;
     case Qt::Key_Up:    case Qt::Key_W:
         m_movement.up = false;
-        emit commandGenerated(GameCommand::input_command(InputAction::MoveUp, ButtonState::Released));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveUp, ButtonState::Released));
         break;
     case Qt::Key_Down:  case Qt::Key_S:
         m_movement.down = false;
-        emit commandGenerated(GameCommand::input_command(InputAction::MoveDown, ButtonState::Released));
+        if (m_commandCallback) m_commandCallback(GameCommand::input_command(InputAction::MoveDown, ButtonState::Released));
         break;
     default: break;
     }
