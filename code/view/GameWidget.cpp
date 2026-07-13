@@ -82,94 +82,101 @@ float GameWidget::worldToScreenY(float laneY, float z) const
 
 // ============================================================================
 // 键盘输入处理
+//
+// 按键映射全部集中在这里，换手柄 / 触屏只需改这两个函数。
+// MovementIntent 聚合移动键状态，在 Common 接口升级后可以直接
+// 替换为 emit commandGenerated(GameCommand::move(direction))。
 // ============================================================================
 
-InputAction GameWidget::keyToAction(int qtKey, bool pressed) const
-{
-    Q_UNUSED(pressed);
-    switch (qtKey) {
-    case Qt::Key_Left:  case Qt::Key_A: return InputAction::MoveLeft;
-    case Qt::Key_Right: case Qt::Key_D: return InputAction::MoveRight;
-    case Qt::Key_Up:    case Qt::Key_W: return InputAction::MoveUp;
-    case Qt::Key_Down:  case Qt::Key_S: return InputAction::MoveDown;
-    case Qt::Key_J: case Qt::Key_Z:     return InputAction::LightAttack;
-    case Qt::Key_K: case Qt::Key_X:     return InputAction::HeavyAttack;
-    case Qt::Key_Space:                 return InputAction::Jump;
-    case Qt::Key_R:                     return InputAction::Restart;
-    case Qt::Key_Return: case Qt::Key_Enter: return InputAction::Confirm;
-    case Qt::Key_Escape: case Qt::Key_P:     return InputAction::Pause;
-    default: break;
-    }
-    // 返回一个不会被识别的动作，调用方应忽略。
-    return InputAction::Confirm;
-}
-
-static bool isMovementAction(InputAction action)
-{
-    return action == InputAction::MoveLeft  ||
-           action == InputAction::MoveRight ||
-           action == InputAction::MoveUp    ||
-           action == InputAction::MoveDown;
-}
-
-static bool isHandledActionKey(int qtKey)
+bool GameWidget::isHandledKey(int qtKey)
 {
     switch (qtKey) {
-    case Qt::Key_Left:
-    case Qt::Key_A:
-    case Qt::Key_Right:
-    case Qt::Key_D:
-    case Qt::Key_Up:
-    case Qt::Key_W:
-    case Qt::Key_Down:
-    case Qt::Key_S:
-    case Qt::Key_J:
-    case Qt::Key_Z:
-    case Qt::Key_K:
-    case Qt::Key_X:
+    case Qt::Key_Left:  case Qt::Key_A:
+    case Qt::Key_Right: case Qt::Key_D:
+    case Qt::Key_Up:    case Qt::Key_W:
+    case Qt::Key_Down:  case Qt::Key_S:
+    case Qt::Key_J:     case Qt::Key_Z:
+    case Qt::Key_K:     case Qt::Key_X:
     case Qt::Key_Space:
     case Qt::Key_R:
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
-    case Qt::Key_Escape:
-    case Qt::Key_P:
+    case Qt::Key_Return: case Qt::Key_Enter:
+    case Qt::Key_Escape: case Qt::Key_P:
         return true;
     default:
         return false;
     }
 }
-//判断键盘的输入类型，转换之后发给viewmodel层去处理
+
+void GameWidget::emitMovement()
+{
+    // 当前兼容方案：按单个方向键发送 Pressed/Released。
+    // Common 接口升级后改为 emit commandGenerated(GameCommand::move(direction))。
+    // 这里只负责"有没有移动键按住"的聚合，不负责方向推导（那是 MovementIntent 的职责）。
+}
+
 void GameWidget::keyPressEvent(QKeyEvent* event)
 {
-    if (event->isAutoRepeat()) {
-        // 自动重复不产生新的 Triggered，只维持 Pressed。
-        // 但 Qt 对非文本键通常不发送 autoRepeat，这里做安全处理。
-        return;
-    }
+    if (event->isAutoRepeat()) return;
 
     const int key = event->key();
-    if (!isHandledActionKey(key)) {
+    if (!isHandledKey(key)) {
         QWidget::keyPressEvent(event);
         return;
     }
 
-    const InputAction action = keyToAction(key, true);
-
-
-    if (isMovementAction(action)) {
-        // 移动键：只把 Pressed/Released 状态交给 ViewModel，由 ViewModel 维护持续移动状态。
-        emit commandGenerated(GameCommand::input_command(action, ButtonState::Pressed));
-    } else if (action == InputAction::LightAttack ||
-               action == InputAction::HeavyAttack ||
-               action == InputAction::Jump         ||
-               action == InputAction::Restart      ||
-               action == InputAction::Confirm      ||
-               action == InputAction::Pause) {
-        // 单次触发动作
-        if (!m_triggeredThisPress.contains(key)) {
-            m_triggeredThisPress.insert(key);
-            emit commandGenerated(GameCommand::input_command(action, ButtonState::Triggered));
+    // ---- 移动键：更新 MovementIntent 并维持 Pressed 状态 ----
+    switch (key) {
+    case Qt::Key_Left:  case Qt::Key_A:
+        if (!m_movement.left) {
+            m_movement.left = true;
+            emit commandGenerated(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Pressed));
         }
+        return;
+    case Qt::Key_Right: case Qt::Key_D:
+        if (!m_movement.right) {
+            m_movement.right = true;
+            emit commandGenerated(GameCommand::input_command(InputAction::MoveRight, ButtonState::Pressed));
+        }
+        return;
+    case Qt::Key_Up:    case Qt::Key_W:
+        if (!m_movement.up) {
+            m_movement.up = true;
+            emit commandGenerated(GameCommand::input_command(InputAction::MoveUp, ButtonState::Pressed));
+        }
+        return;
+    case Qt::Key_Down:  case Qt::Key_S:
+        if (!m_movement.down) {
+            m_movement.down = true;
+            emit commandGenerated(GameCommand::input_command(InputAction::MoveDown, ButtonState::Pressed));
+        }
+        return;
+    default: break;
+    }
+
+    // ---- 单次触发动作 ----
+    if (m_triggeredThisPress.contains(key)) return;
+    m_triggeredThisPress.insert(key);
+
+    switch (key) {
+    case Qt::Key_J: case Qt::Key_Z:
+        emit commandGenerated(GameCommand::input_command(InputAction::LightAttack, ButtonState::Triggered));
+        break;
+    case Qt::Key_K: case Qt::Key_X:
+        emit commandGenerated(GameCommand::input_command(InputAction::HeavyAttack, ButtonState::Triggered));
+        break;
+    case Qt::Key_Space:
+        emit commandGenerated(GameCommand::input_command(InputAction::Jump, ButtonState::Triggered));
+        break;
+    case Qt::Key_R:
+        emit commandGenerated(GameCommand::input_command(InputAction::Restart, ButtonState::Triggered));
+        break;
+    case Qt::Key_Return: case Qt::Key_Enter:
+        emit commandGenerated(GameCommand::input_command(InputAction::Confirm, ButtonState::Triggered));
+        break;
+    case Qt::Key_Escape: case Qt::Key_P:
+        emit commandGenerated(GameCommand::input_command(InputAction::Pause, ButtonState::Triggered));
+        break;
+    default: break;
     }
 }
 
@@ -178,17 +185,32 @@ void GameWidget::keyReleaseEvent(QKeyEvent* event)
     if (event->isAutoRepeat()) return;
 
     const int key = event->key();
-    if (!isHandledActionKey(key)) {
+    if (!isHandledKey(key)) {
         QWidget::keyReleaseEvent(event);
         return;
     }
 
     m_triggeredThisPress.remove(key);
 
-    const InputAction action = keyToAction(key, false);
-
-    if (isMovementAction(action)) {
-        emit commandGenerated(GameCommand::input_command(action, ButtonState::Released));
+    // ---- 移动键释放：更新 MovementIntent ----
+    switch (key) {
+    case Qt::Key_Left:  case Qt::Key_A:
+        m_movement.left = false;
+        emit commandGenerated(GameCommand::input_command(InputAction::MoveLeft, ButtonState::Released));
+        break;
+    case Qt::Key_Right: case Qt::Key_D:
+        m_movement.right = false;
+        emit commandGenerated(GameCommand::input_command(InputAction::MoveRight, ButtonState::Released));
+        break;
+    case Qt::Key_Up:    case Qt::Key_W:
+        m_movement.up = false;
+        emit commandGenerated(GameCommand::input_command(InputAction::MoveUp, ButtonState::Released));
+        break;
+    case Qt::Key_Down:  case Qt::Key_S:
+        m_movement.down = false;
+        emit commandGenerated(GameCommand::input_command(InputAction::MoveDown, ButtonState::Released));
+        break;
+    default: break;
     }
 }
 
@@ -242,7 +264,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     drawStreet(p);
 
     // 按 depthSortY 排序绘制所有角色（远的先画）
-    std::vector<const ActorViewData*> drawList;
+    std::vector<const ActorSnapshot*> drawList;
 
     // 玩家
     if (m_snapshot.player.visible) {
@@ -265,7 +287,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // 按 depthSortY 排序（laneY + z 作为排序依据，远的先画）
     std::sort(drawList.begin(), drawList.end(),
-              [](const ActorViewData* a, const ActorViewData* b) {
+              [](const ActorSnapshot* a, const ActorSnapshot* b) {
                   const float ya = a->position.laneY + a->position.z;
                   const float yb = b->position.laneY + b->position.z;
                   return ya < yb;
@@ -495,7 +517,7 @@ void GameWidget::drawBar(QPainter& p, float x, float y, float w, float h,
     }
 }
 
-void GameWidget::drawActor(QPainter& p, const ActorViewData& actor)
+void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
@@ -541,7 +563,7 @@ void GameWidget::drawActor(QPainter& p, const ActorViewData& actor)
 
 }
 
-void GameWidget::drawCharacterBody(QPainter& p, const ActorViewData& actor,
+void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
                                     QColor bodyColor)
 {
     const float w = actor.drawSize.width * m_scaleX;
@@ -671,7 +693,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorViewData& actor,
     }
 }
 
-void GameWidget::drawHealthBar(QPainter& p, const ActorViewData& actor)
+void GameWidget::drawHealthBar(QPainter& p, const ActorSnapshot& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
