@@ -26,6 +26,8 @@ public:
 
     // 访问当前实体快照
     const EntityList& entities() const noexcept { return m_entities; }
+    bool boss_spawned() const noexcept { return m_bossSpawned; }
+    bool boss_defeated() const noexcept { return m_bossDefeated; }
 
     // 控制接口（由 ViewModel 的命令绑定）
     void player_move(float dx, float dy) noexcept;
@@ -36,11 +38,15 @@ private:
     std::vector<std::function<void(float)>> m_tickListeners;
     EntityList m_entities;
     bool m_running = false;
+    bool m_bossSpawned = false;
+    bool m_bossDefeated = false;
     int m_nextId = 1;
 
     void notify_tick(float dt);
     void populate_initial_state();
     void simulate_ai(float dt);
+    void spawn_boss_if_needed();
+    void update_boss_state() noexcept;
 };
 
 } // namespace alleyfist::viewmodel

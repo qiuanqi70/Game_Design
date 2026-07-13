@@ -52,11 +52,22 @@ private:
     bool m_moveUp = false;
     bool m_moveDown = false;
     bool m_paused = false;
+    bool m_jumpActive = false;
+    float m_jumpElapsed = 0.0f;
+    float m_attackTimer = 0.0f;
+    float m_playerEnergy = 100.0f;
+    float m_exhaustedWarningTimer = 0.0f;
+    ActorState m_attackState = ActorState::Idle;
     std::uint64_t m_frameIndex = 0;
 
     void tick(float dt, std::uint64_t frameIndex);
     void sync_state_from_simulation();
     std::function<void(bool)> make_move_command(bool& flag);
+    void begin_attack(ActorState state, float seconds, float energyCost);
+    void reset_actions() noexcept;
+    void update_action_timers(float dt);
+    bool try_spend_energy(float cost) noexcept;
+    bool is_gameplay_active() const noexcept;
     void notify_state_changed();
 };
 
