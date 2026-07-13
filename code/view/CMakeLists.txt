@@ -10,7 +10,6 @@ target_include_directories(alleyfist_view PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(alleyfist_view
     PUBLIC
         alleyfist_common
-        alleyfist_viewmodel
         Qt6::Widgets
         Qt6::Gui
 )

@@ -1,6 +1,6 @@
 # Common 层接口说明
 
-`common/` 只保存真正跨层通用的基础值类型，以及不依赖具体框架的轻量通知工具。它不放 Qt 类型，不放具体按键动作，不放游戏规则命令，也不预先定义完整快照。
+`common/` 保存 View 与 ViewModel 都需要理解的公共契约，包括基础值类型、轻量通知工具，以及本游戏用于属性绑定的只读状态对象。它不放 Qt 类型，不放具体按键动作，也不放游戏规则命令。
 
 ## 当前文件
 
@@ -8,6 +8,7 @@
 | --- | --- |
 | `types.h` | 跨层共享的基础值类型，例如尺寸、世界坐标和资源条。 |
 | `notification.h` | `std::function` 形式的事件通知工具。 |
+| `game_state.h` | 本游戏的公共状态接口，例如 `GameState`、`ActorState` 和 `MapState`。 |
 | `common.h` | 便捷入口，统一包含上述 common 头文件。 |
 
 ## 命令模式
@@ -48,14 +49,12 @@ trigger.add_notification([this](std::uint32_t eventId) {
 
 老师示例里没有一个通用 `snapshot.h`。Plane 里 View 绑定的是 `const AirMap*`，Book 里 View 绑定的是 `serial/name/summary/price` 指针，Meitu 里 View 绑定的是图片指针。属性变化时只通过通知 id 告诉 View 哪个属性变了。
 
-所以本项目 common 不定义 `GameSnapshot`、`FrameSnapshot` 或 `ObjectSnapshot` 这种大而全的快照。V 和 VM 传数据时仍然需要共同数据类型，只是这些类型应该更薄：
-
 - `types.h` 放最基础的值类型，例如 `Size`、`WorldPosition`、`ResourceBar`。
-- 具体属性容器由负责 ViewModel 或对应业务模块的代码定义，例如类似老师 Plane 的 `AirMap`。
-- 如果某个具体属性容器确实要同时被 View 和 ViewModel 直接包含，可以再放到 common，但它应该像 `AirMap` 那样小而明确，不要把流程状态机、胜负原因、输入命令都塞进去。
+- `game_state.h` 放本游戏当前需要跨层共享的具体属性容器，例如 `GameState`、`ActorState`、`HudState`。
+- 这些类型不带 `View` 前缀，因为它们属于 Common 公共状态契约，不是 View 层私有结构。
 
 ## 保留在 Common 的内容
 
-`types.h` 保留 V/VM 传递属性数据会共用的基础值类型。`notification.h` 保留通知机制。
+`types.h` 保留 V/VM 传递属性数据会共用的基础值类型。`game_state.h` 保留本游戏的只读状态对象。`notification.h` 保留通知机制。
 
-`actions.h` 已移出 common。`contracts.h` 已删除。`snapshot.h` 也已删除，因为这些内容都应该由更具体的 ViewModel/View 绑定代码定义。
+`actions.h` 已移出 common。`contracts.h` 已删除。这里保留的是具体的 `game_state.h`，而不是试图适配所有模块的通用 `snapshot.h`。
