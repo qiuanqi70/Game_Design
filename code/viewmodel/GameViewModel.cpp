@@ -30,34 +30,34 @@ const GameViewState* GameViewModel::get_game_state() const noexcept
     return &m_state;
 }
 
-FrameCommand GameViewModel::get_tick_command()
+std::function<void(float, std::uint64_t)> GameViewModel::get_tick_command()
 {
     return [this](float dt, std::uint64_t frameIndex) {
         tick(dt, frameIndex);
     };
 }
 
-ButtonCommand GameViewModel::get_move_left_command()
+std::function<void(bool)> GameViewModel::get_move_left_command()
 {
     return make_move_command(m_moveLeft);
 }
 
-ButtonCommand GameViewModel::get_move_right_command()
+std::function<void(bool)> GameViewModel::get_move_right_command()
 {
     return make_move_command(m_moveRight);
 }
 
-ButtonCommand GameViewModel::get_move_up_command()
+std::function<void(bool)> GameViewModel::get_move_up_command()
 {
     return make_move_command(m_moveUp);
 }
 
-ButtonCommand GameViewModel::get_move_down_command()
+std::function<void(bool)> GameViewModel::get_move_down_command()
 {
     return make_move_command(m_moveDown);
 }
 
-Command GameViewModel::get_light_attack_command()
+std::function<void()> GameViewModel::get_light_attack_command()
 {
     return [this]() {
         if (m_sim && !m_paused) {
@@ -68,12 +68,12 @@ Command GameViewModel::get_light_attack_command()
     };
 }
 
-Command GameViewModel::get_heavy_attack_command()
+std::function<void()> GameViewModel::get_heavy_attack_command()
 {
     return get_light_attack_command();
 }
 
-Command GameViewModel::get_jump_command()
+std::function<void()> GameViewModel::get_jump_command()
 {
     return [this]() {
         m_state.player.state = ActorState::Jump;
@@ -81,7 +81,7 @@ Command GameViewModel::get_jump_command()
     };
 }
 
-Command GameViewModel::get_restart_command()
+std::function<void()> GameViewModel::get_restart_command()
 {
     return [this]() {
         if (m_sim) {
@@ -96,7 +96,7 @@ Command GameViewModel::get_restart_command()
     };
 }
 
-Command GameViewModel::get_confirm_command()
+std::function<void()> GameViewModel::get_confirm_command()
 {
     return [this]() {
         if (m_state.phase == GamePhase::Title || m_state.phase == GamePhase::GameOver || m_state.phase == GamePhase::Win) {
@@ -117,7 +117,7 @@ Command GameViewModel::get_confirm_command()
     };
 }
 
-Command GameViewModel::get_pause_command()
+std::function<void()> GameViewModel::get_pause_command()
 {
     return [this]() {
         m_paused = !m_paused;
@@ -242,7 +242,7 @@ void GameViewModel::sync_state_from_simulation()
     }
 }
 
-ButtonCommand GameViewModel::make_move_command(bool& flag)
+std::function<void(bool)> GameViewModel::make_move_command(bool& flag)
 {
     return [this, &flag](bool pressed) {
         flag = pressed;

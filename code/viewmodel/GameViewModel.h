@@ -6,6 +6,7 @@
 #include "SimulationTypes.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 namespace alleyfist::viewmodel {
@@ -24,17 +25,17 @@ public:
     const GameViewState* get_game_state() const noexcept;
 
     // commands
-    FrameCommand get_tick_command();
-    ButtonCommand get_move_left_command();
-    ButtonCommand get_move_right_command();
-    ButtonCommand get_move_up_command();
-    ButtonCommand get_move_down_command();
-    Command get_light_attack_command();
-    Command get_heavy_attack_command();
-    Command get_jump_command();
-    Command get_restart_command();
-    Command get_confirm_command();
-    Command get_pause_command();
+    std::function<void(float, std::uint64_t)> get_tick_command();
+    std::function<void(bool)> get_move_left_command();
+    std::function<void(bool)> get_move_right_command();
+    std::function<void(bool)> get_move_up_command();
+    std::function<void(bool)> get_move_down_command();
+    std::function<void()> get_light_attack_command();
+    std::function<void()> get_heavy_attack_command();
+    std::function<void()> get_jump_command();
+    std::function<void()> get_restart_command();
+    std::function<void()> get_confirm_command();
+    std::function<void()> get_pause_command();
 
     // 启动/停止视图模型（一般由 App 层控制）
     void start();
@@ -55,7 +56,7 @@ private:
 
     void tick(float dt, std::uint64_t frameIndex);
     void sync_state_from_simulation();
-    ButtonCommand make_move_command(bool& flag);
+    std::function<void(bool)> make_move_command(bool& flag);
     void notify_state_changed();
 };
 

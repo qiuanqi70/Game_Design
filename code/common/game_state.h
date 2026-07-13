@@ -8,6 +8,33 @@
 
 namespace alleyfist::viewmodel {
 
+enum class GamePhase {
+    Title,
+    Playing,
+    EncounterLocked,
+    ClearToGo,
+    Paused,
+    GameOver,
+    Win
+};
+
+enum class GameOverReason {
+    None,
+    PlayerDefeated
+};
+
+enum class WinReason {
+    None,
+    BossDefeated
+};
+
+struct GameResultViewState {
+    GameOverReason gameOverReason = GameOverReason::None;
+    WinReason winReason = WinReason::None;
+    float elapsedSeconds = 0.0f;
+    std::uint32_t defeatedEnemies = 0;
+};
+
 struct MapViewState {
     float worldWidth = 3000.0f;
     float viewportWidth = 960.0f;
@@ -89,6 +116,7 @@ struct GameViewState {
     std::vector<ActorViewState> enemies;
     std::vector<ActorViewState> effects;
     HudViewState hud;
+    GameResultViewState result;
     std::string screenMessage;
 };
 

@@ -16,7 +16,7 @@ public:
     ~GameSimulation();
 
     // 注册/移除时钟监听器（返回 cookie）
-    std::uintptr_t add_tick_listener(TickCallback&& cb);
+    std::uintptr_t add_tick_listener(std::function<void(float)>&& cb);
     void remove_tick_listener(std::uintptr_t cookie) noexcept;
 
     // 启停与单步推进（由 ViewModel 或外部时钟驱动）
@@ -33,7 +33,7 @@ public:
     void reset() noexcept;
 
 private:
-    std::vector<TickCallback> m_tickListeners;
+    std::vector<std::function<void(float)>> m_tickListeners;
     EntityList m_entities;
     bool m_running = false;
     int m_nextId = 1;

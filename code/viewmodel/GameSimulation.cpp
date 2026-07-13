@@ -11,7 +11,7 @@ GameSimulation::GameSimulation()
 
 GameSimulation::~GameSimulation() = default;
 
-std::uintptr_t GameSimulation::add_tick_listener(TickCallback&& cb)
+std::uintptr_t GameSimulation::add_tick_listener(std::function<void(float)>&& cb)
 {
     std::uintptr_t index = 0;
     for (auto& item : m_tickListeners) {
