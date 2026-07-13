@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../common/actor.h"
-#include "../common/types.h"
+#include "../common/snapshot.h"
 
 #include <cstdint>
 #include <vector>
@@ -11,6 +10,17 @@ namespace alleyfist {
 // 这些类型只服务于 GameSimulation 的规则、AI 和战斗计算，
 // 不属于 View 与 ViewModel 之间的公共显示契约。
 // 老师检查 common 层时，可以看到这些内部类型已经留在 ViewModel 层内。
+
+using EncounterId = std::uint32_t;
+
+constexpr EncounterId kInvalidEncounterId = 0;
+
+struct Rect {
+    float x = 0.0f;
+    float y = 0.0f;
+    float width = 0.0f;
+    float height = 0.0f;
+};
 
 enum class EnemyBehavior {
     None,
@@ -68,7 +78,6 @@ struct CombatBox {
     DamageType damageType = DamageType::Light;
     int damage = 0;
     float stunSeconds = 0.0f;
-    ActorId ownerId = kInvalidActorId;
 };
 
 struct SpawnSpec {

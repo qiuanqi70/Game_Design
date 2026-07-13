@@ -34,7 +34,7 @@ public:
                         GameCommand::tick_command(deltaSeconds, frameIndex));
                 });
 
-        m_changeCookie = m_snapshotSource.add_change_callback([this](ChangeReason) {
+        m_changeCookie = m_snapshotSource.add_change_callback([this]() {
             m_widget->updateSnapshot(m_snapshotSource.snapshot());
         });
 

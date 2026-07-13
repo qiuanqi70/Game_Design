@@ -264,7 +264,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     drawStreet(p);
 
     // 按 depthSortY 排序绘制所有角色（远的先画）
-    std::vector<const ActorSnapshot*> drawList;
+    std::vector<const ActorViewData*> drawList;
 
     // 玩家
     if (m_snapshot.player.visible) {
@@ -285,7 +285,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
         }
     }
 
-    // 按 depthSortY 排序（laneY + z 作为排序依据，远的先画）
+    // 按 laneY + z 排序，远的先画。
     std::sort(drawList.begin(), drawList.end(),
               [](const ActorSnapshot* a, const ActorSnapshot* b) {
                   const float ya = a->position.laneY + a->position.z;
@@ -826,25 +826,13 @@ void GameWidget::drawHUD(QPainter& p)
         const float progX = (width() - progBarW) / 2.0f;
         const float progY = height() - progBarH - 8.0f * m_scaleY;
 
-        const float progress = m_snapshot.progress.progressRatio > 0.0f
-                                   ? m_snapshot.progress.progressRatio
+        const float progress = m_snapshot.progressRatio > 0.0f
+                                   ? m_snapshot.progressRatio
                                    : m_snapshot.player.position.x / m_snapshot.map.worldWidth;
 
         p.fillRect(QRectF(progX, progY, progBarW, progBarH), QColor(30, 30, 30, 180));
         p.fillRect(QRectF(progX, progY, progBarW * progress, progBarH),
                    QColor(255, 200, 50, 200));
-
-        // 遭遇战标记
-        for (const auto& enc : m_snapshot.map.encounters) {
-            if (m_snapshot.map.worldWidth > 0.0f) {
-                const float markerX = progX + (enc.triggerX / m_snapshot.map.worldWidth) * progBarW;
-                QColor markerColor = (enc.state == EncounterState::Cleared)
-                                         ? QColor(60, 200, 60)
-                                         : QColor(220, 60, 60);
-                p.fillRect(QRectF(markerX - 3.0f, progY - 4.0f, 6.0f, progBarH + 8.0f),
-                           markerColor);
-            }
-        }
 
         p.setPen(QPen(QColor(150, 150, 150, 150), 1.0f));
         p.drawRect(QRectF(progX, progY, progBarW, progBarH));

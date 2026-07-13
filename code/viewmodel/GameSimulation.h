@@ -4,10 +4,8 @@
 #include "../common/snapshot.h"
 #include "SimulationTypes.h"
 
-#include <vector>
 #include <deque>
-#include <unordered_map>
-#include <unordered_set>
+#include <vector>
 
 
 namespace alleyfist {
@@ -19,12 +17,21 @@ public:
     GameSimulation();
 
     void reset();
-    void step(float deltaSeconds, std::uint64_t frameIndex);
-    void handle_command(const GameCommand& command);
+    void step(float deltaSeconds, std::uint64_t frameIndex); //推进游戏状态，处理 Tick 命令
+    void handle_command(const GameCommand& command); //处理input命令，处理玩家输入
 
     const GameSnapshot& snapshot() const noexcept { return m_snapshot; }
 
 private:
+    // 推图锁是模拟内部状态，View 只看到边界、镜头和 GO 提示。
+    enum class ScrollLockState {
+        Free,
+        LockedByEncounter,
+        LockedByBoss,
+        LevelFinished
+    };
+
+    // gameplay logic
     void reset_gameplay(GamePhase phase);
     void update_player(float dt);
     void update_enemies(float dt);
@@ -36,7 +43,6 @@ private:
     void begin_attack(AttackKind attackKind, bool fromAir);
     void update_camera();
     void update_progress();
-    void update_actor_body_box(ActorSnapshot& actor) const noexcept;
     void spawn_grunt_encounter();
     void spawn_boss_encounter();
     void clear_active_encounter();
@@ -44,23 +50,29 @@ private:
     bool is_player_action_locked() const noexcept;
 
     // helpers
-    static bool rects_intersect(const Rect& a, const Rect& b) noexcept;
-    Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept;
+    static bool rects_intersect(const Rect& a, const Rect& b) noexcept; //判断两个矩形是否相交，用于碰撞检测
+    Rect actor_body_rect(const ActorSnapshot& actor) const noexcept;
+    Rect combat_box_world_rect(const ActorSnapshot& owner, const CombatBox& box) const noexcept; //计算攻击盒在世界坐标系中的矩形，用于碰撞检测
 
-    // command queue for input buffering
+    //命令队列，用于输入缓冲，存储来自 View 的输入命令
     std::deque<GameCommand> m_commandQueue;
 
-    // tracking which actor was hit in current frame to avoid multi-hit per attack frame
-    std::unordered_set<ActorId> m_hitThisFrame;
-
-    // enemy cooldown timers (attack cooldown)
-    std::unordered_map<ActorId, float> m_enemyAttackTimers;
+    // 敌人攻击冷却，与 m_snapshot.enemies 保持同序。
+    std::vector<float> m_enemyAttackTimers;
 
     GameRules m_rules;
     GameSnapshot m_snapshot;
-    float m_accumulated = 0.0f;
-    std::uint64_t m_frame = 0;
+    float m_accumulated = 0.0f; //累计时间，用于处理游戏逻辑的时间步长
+    std::uint64_t m_frame = 0; //当前帧索引，用于跟踪游戏的帧数
 
+    // 关卡流程控制字段留在 ViewModel 内部，不暴露给 View。
+    std::uint32_t m_stageIndex = 0;
+    EncounterId m_activeEncounterId = kInvalidEncounterId;
+    bool m_bossSpawned = false;
+    bool m_bossDefeated = false;
+    ScrollLockState m_scrollLock = ScrollLockState::Free;
+
+    //玩家的移动状态，表示玩家是否正在向左、向右、向上、向下移动，以及是否正在跳跃
     bool m_moveLeft = false;
     bool m_moveRight = false;
     bool m_moveUp = false;
