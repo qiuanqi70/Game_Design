@@ -58,9 +58,8 @@ private:
     float m_playerEnergy = 100.0f;
     float m_exhaustedWarningTimer = 0.0f;
     ActorActionState m_attackState = ActorActionState::Idle;
-    std::uint64_t m_frameIndex = 0;
 
-    void tick(float dt, std::uint64_t frameIndex);
+    void tick(float dt);
     void sync_state_from_simulation();
     std::function<void(bool)> make_move_command(bool& flag);
     void begin_attack(ActorActionState actionState, float seconds, float energyCost);

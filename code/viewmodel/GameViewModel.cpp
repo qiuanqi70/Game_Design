@@ -43,8 +43,8 @@ const GameState* GameViewModel::get_game_state() const noexcept
 
 std::function<void(float, std::uint64_t)> GameViewModel::get_tick_command()
 {
-    return [this](float dt, std::uint64_t frameIndex) {
-        tick(dt, frameIndex);
+    return [this](float dt, std::uint64_t) {
+        tick(dt);
     };
 }
 
@@ -175,7 +175,7 @@ const EntityList& GameViewModel::entities() const noexcept
     return m_sim->entities();
 }
 
-void GameViewModel::tick(float dt, std::uint64_t frameIndex)
+void GameViewModel::tick(float dt)
 {
     if (!m_sim || !is_gameplay_active()) {
         return;
@@ -191,22 +191,16 @@ void GameViewModel::tick(float dt, std::uint64_t frameIndex)
     }
 
     m_sim->step(dt);
-    m_frameIndex = frameIndex;
     sync_state_from_simulation();
     notify_state_changed();
 }
 
 void GameViewModel::sync_state_from_simulation()
 {
-    m_state.frameIndex = m_frameIndex;
-    m_state.map.worldWidth = kWorldWidth;
     m_state.map.viewportWidth = kViewportWidth;
     m_state.map.viewportHeight = kViewportHeight;
     m_state.map.streetTopY = kStreetTop;
     m_state.map.streetBottomY = kStreetBottom;
-    m_state.map.leftBoundaryX = 0.0f;
-    m_state.map.rightBoundaryX = kViewportWidth;
-    m_state.map.showGoIndicator = false;
 
     const auto& list = m_sim->entities();
     if (list.empty()) {
@@ -214,24 +208,20 @@ void GameViewModel::sync_state_from_simulation()
     }
 
     const auto& player = list.front();
-    m_state.player.kind = ActorKind::Player;
     m_state.player.team = Team::Player;
     m_state.player.position = player.pos;
     m_state.player.position.x = std::clamp(m_state.player.position.x, 0.0f, kWorldWidth);
     m_state.player.position.laneY = std::clamp(m_state.player.position.laneY, kStreetTop, kStreetBottom);
     m_state.player.drawSize = {64.0f, 96.0f};
     m_state.player.health = {std::max(0, player.hp), player.maxHp > 0 ? player.maxHp : 100};
-    m_state.player.energy = {static_cast<int>(std::lround(m_playerEnergy)), static_cast<int>(kMaxPlayerEnergy)};
     m_state.player.visible = player.alive;
     m_state.player.actionState = player.alive ? ((m_moveLeft || m_moveRight || m_moveUp || m_moveDown) ? ActorActionState::Walk : ActorActionState::Idle)
                                         : ActorActionState::Dead;
     m_state.player.position.z = 0.0f;
-    m_state.player.onGround = true;
 
     if (player.alive && m_jumpActive) {
         const float progress = std::clamp(m_jumpElapsed / kJumpSeconds, 0.0f, 1.0f);
         m_state.player.position.z = kJumpHeight * std::sin(kPi * progress);
-        m_state.player.onGround = false;
         m_state.player.actionState = ActorActionState::Jump;
     }
 
@@ -281,7 +271,7 @@ void GameViewModel::sync_state_from_simulation()
     }
 
     m_state.hud.playerHealth = m_state.player.health;
-    m_state.hud.playerEnergy = m_state.player.energy;
+    m_state.hud.playerEnergy = {static_cast<int>(std::lround(m_playerEnergy)), static_cast<int>(kMaxPlayerEnergy)};
     m_state.hud.playerExhausted = m_exhaustedWarningTimer > 0.0f;
     m_state.result.defeatedEnemies = defeatedEnemies;
     m_state.progressRatio = kWorldWidth > 0.0f ? std::clamp(m_state.player.position.x / kWorldWidth, 0.0f, 1.0f) : 0.0f;
@@ -291,12 +281,10 @@ void GameViewModel::sync_state_from_simulation()
 
     if (!player.alive) {
         m_state.phase = GamePhase::GameOver;
-        m_state.result.gameOverReason = GameOverReason::PlayerDefeated;
         m_state.result.elapsedSeconds = m_state.elapsedSeconds;
         m_state.screenMessage.clear();
     } else if (m_sim->boss_defeated()) {
         m_state.phase = GamePhase::Win;
-        m_state.result.winReason = WinReason::BossDefeated;
         m_state.result.elapsedSeconds = m_state.elapsedSeconds;
         m_state.screenMessage.clear();
     } else if (m_state.phase == GamePhase::Title) {

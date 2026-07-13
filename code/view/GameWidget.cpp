@@ -50,7 +50,7 @@ GameWidget::GameWidget(QWidget* parent)
 void GameWidget::set_game_state(const GameState* state) noexcept
 {
     m_gameState = state;
-    update(); // 触发 paintEvent
+    update(); //qt的内置函数，触发 paintEvent
 }
 
 const GameState& GameWidget::game_state() const noexcept
@@ -280,13 +280,6 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
         }
     }
 
-    // 特效
-    for (const auto& effect : game_state().effects) {
-        if (effect.visible) {
-            drawList.push_back(&effect);
-        }
-    }
-
     // 按 laneY + z 排序，远的先画。
     std::sort(drawList.begin(), drawList.end(),
               [](const ActorState* a, const ActorState* b) {
@@ -301,11 +294,6 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // ---- HUD ----
     drawHUD(p);
-
-    // ---- GO 指示器 ----
-    if (game_state().map.showGoIndicator) {
-        drawGOIndicator(p);
-    }
 
     // ---- 覆盖层（暂停 / 结算 / 胜利） ----
     if (phase == GamePhase::Paused   ||
@@ -537,12 +525,6 @@ void GameWidget::drawActor(QPainter& p, const ActorState& actor)
         return;
     }
 
-    // 无敌闪烁（每 0.1 秒切换可见性）
-    if (actor.invincible) {
-        const int tick = static_cast<int>(game_state().elapsedSeconds * 10.0f);
-        if (tick % 2 == 0) return;
-    }
-
     const QColor bodyColor = actorBodyColor(actor.team, actor.kind);
 
     p.save();
@@ -601,7 +583,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
         // 跳跃中腿收起
         p.fillRect(QRectF(-legW * 0.5f, legTop, legW, legH * 0.5f), pantsColor);
         p.fillRect(QRectF(legW * 0.3f, legTop, legW, legH * 0.5f), pantsColor);
-    } else if (actionState == ActorActionState::Walk || actionState == ActorActionState::Run) {
+    } else if (actionState == ActorActionState::Walk) {
         // 行走时前后腿
         const float stride = std::sin(game_state().elapsedSeconds * 10.0f) * 6.0f * m_scaleX;
         p.fillRect(QRectF(-legW - stride, legTop, legW, legH), pantsColor);
@@ -621,12 +603,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
     }
 
     // ---- 身体 ----
-    QColor drawBodyColor = bodyColor;
-    if (actionState == ActorActionState::Hurt) {
-        drawBodyColor = QColor(255, 100, 100); // 受击闪红
-    }
-
-    p.fillRect(QRectF(-bodyW / 2, bodyTop, bodyW, bodyH), drawBodyColor);
+    p.fillRect(QRectF(-bodyW / 2, bodyTop, bodyW, bodyH), bodyColor);
 
     // 衣服纹理线
     p.setPen(QPen(darkerBody, 1.0f));
@@ -634,8 +611,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
                QPointF(bodyW * 0.3f, bodyTop + bodyH * 0.3f));
 
     // ---- 手臂 ----
-    if (actionState == ActorActionState::LightAttack || actionState == ActorActionState::HeavyAttack ||
-        actionState == ActorActionState::ComboFinisher) {
+    if (actionState == ActorActionState::LightAttack || actionState == ActorActionState::HeavyAttack) {
         // 攻击时手臂伸出（向 facing 方向 = 向右）
         const float extend = (actionState == ActorActionState::HeavyAttack) ? armW * 3.0f : armW * 2.0f;
         p.fillRect(QRectF(bodyW * 0.2f, bodyTop + bodyH * 0.15f, extend, armH * 0.5f),
@@ -681,17 +657,6 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
         p.setPen(QPen(QColor(255, 60, 60, 120), 2.0f));
         p.drawLine(QPointF(-w * 0.4f, h * 0.1f), QPointF(w * 0.4f, h * 0.5f));
         p.drawLine(QPointF(w * 0.4f, h * 0.1f), QPointF(-w * 0.4f, h * 0.5f));
-    }
-
-    if (actionState == ActorActionState::Hurt) {
-        // 受击星效
-        p.setPen(QPen(QColor(255, 200, 50, 180), 2.0f));
-        const float sx = w * 0.4f;
-        const float sy = h * 0.15f;
-        p.drawLine(QPointF(sx - 6, sy), QPointF(sx + 6, sy));
-        p.drawLine(QPointF(sx, sy - 6), QPointF(sx, sy + 6));
-        p.drawLine(QPointF(sx - 4, sy - 4), QPointF(sx + 4, sy + 4));
-        p.drawLine(QPointF(sx - 4, sy + 4), QPointF(sx + 4, sy - 4));
     }
 }
 
@@ -767,30 +732,6 @@ void GameWidget::drawHUD(QPainter& p)
                    QString::fromUtf8("EXHAUSTED"));
     }
 
-    // ---- 连招计数 ----
-    if (hud.comboStep > 0) {
-        const float comboX = (game_state().map.viewportWidth * m_scaleX) / 2.0f;
-        const float comboY = margin * m_scaleY + 30.0f * m_scaleY;
-
-        QFont comboFont("Arial", 16, QFont::Bold);
-        p.setFont(comboFont);
-
-        // 根据 comboStep 变色
-        QColor comboColor;
-        switch (hud.comboStep) {
-        case 1: comboColor = QColor(255, 255, 255); break;
-        case 2: comboColor = QColor(255, 220, 60);  break;
-        case 3: comboColor = QColor(255, 80,  40);  break;
-        default: comboColor = QColor(255, 255, 255); break;
-        }
-
-        p.setPen(comboColor);
-        const QString comboText = QString("%1 HIT").arg(hud.comboStep);
-        p.drawText(QRectF(comboX - 60.0f * m_scaleX, comboY,
-                          120.0f * m_scaleX, 24.0f * m_scaleY),
-                   Qt::AlignCenter, comboText);
-    }
-
     // ---- Boss 血条 (上方居中偏右) ----
     if (hud.showBossHealth) {
         const float bossBarW = 250.0f * m_scaleX;
@@ -822,59 +763,18 @@ void GameWidget::drawHUD(QPainter& p)
     }
 
     // ---- 关卡进度条 (底部) ----
-    if (game_state().map.worldWidth > 0.0f) {
-        const float progBarW = width() * 0.6f;
-        const float progBarH = 6.0f * m_scaleY;
-        const float progX = (width() - progBarW) / 2.0f;
-        const float progY = height() - progBarH - 8.0f * m_scaleY;
+    const float progBarW = width() * 0.6f;
+    const float progBarH = 6.0f * m_scaleY;
+    const float progX = (width() - progBarW) / 2.0f;
+    const float progY = height() - progBarH - 8.0f * m_scaleY;
+    const float progress = std::clamp(game_state().progressRatio, 0.0f, 1.0f);
 
-        const float progress = game_state().progressRatio > 0.0f
-                                   ? game_state().progressRatio
-                                   : game_state().player.position.x / game_state().map.worldWidth;
+    p.fillRect(QRectF(progX, progY, progBarW, progBarH), QColor(30, 30, 30, 180));
+    p.fillRect(QRectF(progX, progY, progBarW * progress, progBarH),
+               QColor(255, 200, 50, 200));
 
-        p.fillRect(QRectF(progX, progY, progBarW, progBarH), QColor(30, 30, 30, 180));
-        p.fillRect(QRectF(progX, progY, progBarW * progress, progBarH),
-                   QColor(255, 200, 50, 200));
-
-        p.setPen(QPen(QColor(150, 150, 150, 150), 1.0f));
-        p.drawRect(QRectF(progX, progY, progBarW, progBarH));
-    }
-}
-
-// ============================================================================
-// GO 指示器
-// ============================================================================
-
-void GameWidget::drawGOIndicator(QPainter& p)
-{
-    // 闪烁：0.5 秒亮 / 0.5 秒灭
-    const float blinkCycle = std::fmod(m_goBlinkTimer, 1.0f);
-    if (blinkCycle > 0.5f) return;
-
-    const float centerX = game_state().map.viewportWidth * m_scaleX * 0.75f;
-    const float centerY = game_state().map.viewportHeight * m_scaleY * 0.4f;
-
-    QFont goFont("Arial", 24, QFont::Bold);
-    p.setFont(goFont);
-
-    // 发光效果（多层描边模拟）
-    QColor glowColors[] = {
-        QColor(255, 255, 100, 50),
-        QColor(255, 255, 100, 80),
-        QColor(255, 255, 50, 200),
-    };
-
-    for (int i = 2; i >= 0; --i) {
-        p.setPen(QPen(glowColors[i], static_cast<float>(3 + i * 3)));
-        p.drawText(QRectF(centerX - 80.0f * m_scaleX, centerY - 30.0f * m_scaleY,
-                          160.0f * m_scaleX, 60.0f * m_scaleY),
-                   Qt::AlignCenter, QString::fromUtf8("GO ▶"));
-    }
-
-    p.setPen(QColor(255, 255, 255));
-    p.drawText(QRectF(centerX - 80.0f * m_scaleX, centerY - 30.0f * m_scaleY,
-                      160.0f * m_scaleX, 60.0f * m_scaleY),
-               Qt::AlignCenter, QString::fromUtf8("GO ▶"));
+    p.setPen(QPen(QColor(150, 150, 150, 150), 1.0f));
+    p.drawRect(QRectF(progX, progY, progBarW, progBarH));
 }
 
 // ============================================================================

@@ -77,7 +77,6 @@ private:
     void drawHealthBar(QPainter& p, const ActorState& actor);
     void drawPlayerStatus(QPainter& p);
     void drawHUD(QPainter& p);
-    void drawGOIndicator(QPainter& p);
     void drawOverlay(QPainter& p);
 
     // ---- 坐标转换 ----
