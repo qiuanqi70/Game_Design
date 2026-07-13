@@ -2,15 +2,15 @@
 
 namespace alleyfist {
 
-// 基础值类型放在 Common，是因为 View 绘制和 ViewModel 输出快照都会用到这些简单数据形状。
-// 这里不放内部编号、碰撞矩形或规则状态，避免 Common 层暴露具体业务细节。
+// 基础值类型是 View 和 ViewModel 传递属性数据时共用的“小积木”。
+// 这里不放输入命令、流程状态、角色状态等规则概念，避免 Common 层承担业务职责。
 
 struct Size {
     float width = 0.0f;
     float height = 0.0f;
 };
 
-// 通用数值条：生命、能量、进度等由使用方定义含义。
+// 通用数值条：具体含义由使用方定义，可以是生命、能量、进度等。
 struct ResourceBar {
     int current = 0;
     int maximum = 0;
@@ -27,6 +27,7 @@ struct ResourceBar {
 };
 
 // 通用世界坐标：x 表示主轴位置，laneY 表示纵深/行位置，z 表示高度/层次。
+// 如果某个模块不需要 laneY 或 z，可以只使用 x，或者在自己的属性类型中重新定义更小的坐标结构。
 struct WorldPosition {
     float x = 0.0f;
     float laneY = 0.0f;
