@@ -30,7 +30,7 @@ public:
     explicit GameWidget(QWidget* parent = nullptr);
 
     /// 外部（App 层）调用，传入 ViewModel 持有的只读显示属性。
-    void set_game_state(const GameSnapshot* state) noexcept;
+    void set_game_state(const GameState* state) noexcept;
 
     /// 设置游戏循环是否运行。
     void setRunning(bool running);
@@ -71,10 +71,10 @@ private:
     void drawBackground(QPainter& p);
     void drawStreet(QPainter& p);
     void drawBuildings(QPainter& p);
-    void drawActor(QPainter& p, const ActorSnapshot& actor);
-    void drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
+    void drawActor(QPainter& p, const ActorState& actor);
+    void drawCharacterBody(QPainter& p, const ActorState& actor,
                            QColor bodyColor);
-    void drawHealthBar(QPainter& p, const ActorSnapshot& actor);
+    void drawHealthBar(QPainter& p, const ActorState& actor);
     void drawPlayerStatus(QPainter& p);
     void drawHUD(QPainter& p);
     void drawGOIndicator(QPainter& p);
@@ -83,7 +83,7 @@ private:
     // ---- 坐标转换 ----
     float worldToScreenX(float worldX) const;
     float worldToScreenY(float laneY, float z) const;
-    const GameSnapshot& game_state() const noexcept;
+    const GameState& game_state() const noexcept;
 
     // ---- 辅助绘制 ----
     static QColor actorBodyColor(Team team, ActorKind kind);
@@ -106,8 +106,8 @@ private:
     std::function<void()> m_pauseCommand;
 
     // ---- 状态 ----
-    const GameSnapshot* m_gameState = nullptr;
-    GameSnapshot m_emptyState;
+    const GameState* m_gameState = nullptr;
+    GameState m_emptyState;
     QTimer m_timer;
     QElapsedTimer m_elapsed;
     std::uint64_t m_frameIndex = 0;

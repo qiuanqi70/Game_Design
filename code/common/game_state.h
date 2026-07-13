@@ -28,14 +28,14 @@ enum class WinReason {
     BossDefeated
 };
 
-struct GameResultSnapshot {
+struct GameResultState {
     GameOverReason gameOverReason = GameOverReason::None;
     WinReason winReason = WinReason::None;
     float elapsedSeconds = 0.0f;
     std::uint32_t defeatedEnemies = 0;
 };
 
-struct MapSnapshot {
+struct MapState {
     float worldWidth = 3000.0f;
     float viewportWidth = 960.0f;
     float viewportHeight = 540.0f;
@@ -61,7 +61,7 @@ enum class ActorKind {
     Effect
 };
 
-enum class ActorState {
+enum class ActorActionState {
     Idle,
     Walk,
     Run,
@@ -81,14 +81,14 @@ enum class Facing {
     Right
 };
 
-struct ActorSnapshot {
+struct ActorState {
     ActorKind kind = ActorKind::Prop;
     Team team = Team::Neutral;
     alleyfist::WorldPosition position;
     alleyfist::Size drawSize;
     alleyfist::ResourceBar health;
     alleyfist::ResourceBar energy;
-    ActorState state = ActorState::Idle;
+    ActorActionState actionState = ActorActionState::Idle;
     Facing facing = Facing::Right;
     bool visible = true;
     bool targetable = true;
@@ -96,7 +96,7 @@ struct ActorSnapshot {
     bool onGround = true;
 };
 
-struct HudSnapshot {
+struct HudState {
     alleyfist::ResourceBar playerHealth;
     alleyfist::ResourceBar playerEnergy;
     alleyfist::ResourceBar bossHealth;
@@ -106,17 +106,17 @@ struct HudSnapshot {
     bool playerExhausted = false;
 };
 
-struct GameSnapshot {
+struct GameState {
     std::uint64_t frameIndex = 0;
     float elapsedSeconds = 0.0f;
     GamePhase phase = GamePhase::Title;
     float progressRatio = 0.0f;
-    MapSnapshot map;
-    ActorSnapshot player;
-    std::vector<ActorSnapshot> enemies;
-    std::vector<ActorSnapshot> effects;
-    HudSnapshot hud;
-    GameResultSnapshot result;
+    MapState map;
+    ActorState player;
+    std::vector<ActorState> enemies;
+    std::vector<ActorState> effects;
+    HudState hud;
+    GameResultState result;
     std::string screenMessage;
 };
 

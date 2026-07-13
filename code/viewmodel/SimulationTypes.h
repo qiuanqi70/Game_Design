@@ -12,7 +12,7 @@ enum class EntityKind {
     Boss
 };
 
-// 仅 ViewModel 内部使用的实体快照，不属于共享的 View 状态定义。
+// 仅 ViewModel 内部使用的实体状态，不属于共享的 Common 状态定义。
 struct EntityState {
     alleyfist::WorldPosition pos;
     EntityKind kind = EntityKind::Grunt;

@@ -24,7 +24,7 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
 
     // properties
-    void set_game_state(const GameSnapshot* state) noexcept;
+    void set_game_state(const GameState* state) noexcept;
 
     // commands
     void set_tick_command(std::function<void(float, std::uint64_t)> command);

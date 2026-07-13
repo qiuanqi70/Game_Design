@@ -24,7 +24,7 @@ public:
     void stop();
     void step(float deltaSeconds);
 
-    // 访问当前实体快照
+    // 访问当前实体状态
     const EntityList& entities() const noexcept { return m_entities; }
     bool boss_spawned() const noexcept { return m_bossSpawned; }
     bool boss_defeated() const noexcept { return m_bossDefeated; }

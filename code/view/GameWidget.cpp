@@ -47,13 +47,13 @@ GameWidget::GameWidget(QWidget* parent)
     m_timer.start(16); // ~60 FPS
 }
 
-void GameWidget::set_game_state(const GameSnapshot* state) noexcept
+void GameWidget::set_game_state(const GameState* state) noexcept
 {
     m_gameState = state;
     update(); // 触发 paintEvent
 }
 
-const GameSnapshot& GameWidget::game_state() const noexcept
+const GameState& GameWidget::game_state() const noexcept
 {
     return m_gameState != nullptr ? *m_gameState : m_emptyState;
 }
@@ -266,7 +266,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     drawStreet(p);
 
     // 按 depthSortY 排序绘制所有角色（远的先画）
-    std::vector<const ActorSnapshot*> drawList;
+    std::vector<const ActorState*> drawList;
 
     // 玩家
     if (game_state().player.visible) {
@@ -289,7 +289,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // 按 laneY + z 排序，远的先画。
     std::sort(drawList.begin(), drawList.end(),
-              [](const ActorSnapshot* a, const ActorSnapshot* b) {
+              [](const ActorState* a, const ActorState* b) {
                   const float ya = a->position.laneY + a->position.z;
                   const float yb = b->position.laneY + b->position.z;
                   return ya < yb;
@@ -519,7 +519,7 @@ void GameWidget::drawBar(QPainter& p, float x, float y, float w, float h,
     }
 }
 
-void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
+void GameWidget::drawActor(QPainter& p, const ActorState& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
@@ -565,7 +565,7 @@ void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
 
 }
 
-void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
+void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
                                     QColor bodyColor)
 {
     const float w = actor.drawSize.width * m_scaleX;
@@ -589,7 +589,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
     const float armW = w * 0.15f;
     const float armH = h * 0.28f;
 
-    const ActorState state = actor.state;
+    const ActorActionState actionState = actor.actionState;
 
     // ---- 阴影（地面上椭圆） ----
     p.setPen(Qt::NoPen);
@@ -597,11 +597,11 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
                QColor(0, 0, 0, 60));
 
     // ---- 腿 ----
-    if (state == ActorState::Jump || state == ActorState::AirAttack) {
+    if (actionState == ActorActionState::Jump || actionState == ActorActionState::AirAttack) {
         // 跳跃中腿收起
         p.fillRect(QRectF(-legW * 0.5f, legTop, legW, legH * 0.5f), pantsColor);
         p.fillRect(QRectF(legW * 0.3f, legTop, legW, legH * 0.5f), pantsColor);
-    } else if (state == ActorState::Walk || state == ActorState::Run) {
+    } else if (actionState == ActorActionState::Walk || actionState == ActorActionState::Run) {
         // 行走时前后腿
         const float stride = std::sin(game_state().elapsedSeconds * 10.0f) * 6.0f * m_scaleX;
         p.fillRect(QRectF(-legW - stride, legTop, legW, legH), pantsColor);
@@ -622,7 +622,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
 
     // ---- 身体 ----
     QColor drawBodyColor = bodyColor;
-    if (state == ActorState::Hurt) {
+    if (actionState == ActorActionState::Hurt) {
         drawBodyColor = QColor(255, 100, 100); // 受击闪红
     }
 
@@ -634,10 +634,10 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
                QPointF(bodyW * 0.3f, bodyTop + bodyH * 0.3f));
 
     // ---- 手臂 ----
-    if (state == ActorState::LightAttack || state == ActorState::HeavyAttack ||
-        state == ActorState::ComboFinisher) {
+    if (actionState == ActorActionState::LightAttack || actionState == ActorActionState::HeavyAttack ||
+        actionState == ActorActionState::ComboFinisher) {
         // 攻击时手臂伸出（向 facing 方向 = 向右）
-        const float extend = (state == ActorState::HeavyAttack) ? armW * 3.0f : armW * 2.0f;
+        const float extend = (actionState == ActorActionState::HeavyAttack) ? armW * 3.0f : armW * 2.0f;
         p.fillRect(QRectF(bodyW * 0.2f, bodyTop + bodyH * 0.15f, extend, armH * 0.5f),
                    skinColor);
         // 拳头
@@ -647,7 +647,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
                    skinColor.darker(120));
         // 另一只手稍后
         p.fillRect(QRectF(-bodyW * 0.5f, bodyTop + bodyH * 0.3f, armW, armH * 0.45f), skinColor);
-    } else if (state == ActorState::AirAttack) {
+    } else if (actionState == ActorActionState::AirAttack) {
         // 飞踢：腿伸出
         p.fillRect(QRectF(bodyW * 0.1f, legTop, legW * 2.5f, legH * 0.4f), pantsColor);
         p.fillRect(QRectF(-bodyW * 0.5f, bodyTop + bodyH * 0.25f, armW, armH * 0.4f), skinColor);
@@ -677,13 +677,13 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
     p.setBrush(Qt::NoBrush);
 
     // ---- 受伤/死亡特效 ----
-    if (state == ActorState::Dead) {
+    if (actionState == ActorActionState::Dead) {
         p.setPen(QPen(QColor(255, 60, 60, 120), 2.0f));
         p.drawLine(QPointF(-w * 0.4f, h * 0.1f), QPointF(w * 0.4f, h * 0.5f));
         p.drawLine(QPointF(w * 0.4f, h * 0.1f), QPointF(-w * 0.4f, h * 0.5f));
     }
 
-    if (state == ActorState::Hurt) {
+    if (actionState == ActorActionState::Hurt) {
         // 受击星效
         p.setPen(QPen(QColor(255, 200, 50, 180), 2.0f));
         const float sx = w * 0.4f;
@@ -695,7 +695,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
     }
 }
 
-void GameWidget::drawHealthBar(QPainter& p, const ActorSnapshot& actor)
+void GameWidget::drawHealthBar(QPainter& p, const ActorState& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);

@@ -11,7 +11,7 @@
 
 namespace alleyfist::viewmodel {
 
-constexpr std::uint32_t kGameSnapshotChangedEvent = 1;
+constexpr std::uint32_t kGameStateChangedEvent = 1;
 
 class GameViewModel : public EventTrigger {
 public:
@@ -22,7 +22,7 @@ public:
     GameViewModel& operator=(const GameViewModel&) = delete;
 
     // properties
-    const GameSnapshot* get_game_state() const noexcept;
+    const GameState* get_game_state() const noexcept;
 
     // commands
     std::function<void(float, std::uint64_t)> get_tick_command();
@@ -41,12 +41,12 @@ public:
     void start();
     void stop();
 
-    // 取得当前实体快照
+    // 取得当前实体状态
     const EntityList& entities() const noexcept;
 
 private:
     std::unique_ptr<GameSimulation> m_sim;
-    GameSnapshot m_state;
+    GameState m_state;
     bool m_moveLeft = false;
     bool m_moveRight = false;
     bool m_moveUp = false;
@@ -57,13 +57,13 @@ private:
     float m_attackTimer = 0.0f;
     float m_playerEnergy = 100.0f;
     float m_exhaustedWarningTimer = 0.0f;
-    ActorState m_attackState = ActorState::Idle;
+    ActorActionState m_attackState = ActorActionState::Idle;
     std::uint64_t m_frameIndex = 0;
 
     void tick(float dt, std::uint64_t frameIndex);
     void sync_state_from_simulation();
     std::function<void(bool)> make_move_command(bool& flag);
-    void begin_attack(ActorState state, float seconds, float energyCost);
+    void begin_attack(ActorActionState actionState, float seconds, float energyCost);
     void reset_actions() noexcept;
     void update_action_timers(float dt);
     bool try_spend_energy(float cost) noexcept;

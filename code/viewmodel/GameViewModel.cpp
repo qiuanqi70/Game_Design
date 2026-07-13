@@ -36,7 +36,7 @@ GameViewModel::GameViewModel()
 
 GameViewModel::~GameViewModel() = default;
 
-const GameSnapshot* GameViewModel::get_game_state() const noexcept
+const GameState* GameViewModel::get_game_state() const noexcept
 {
     return &m_state;
 }
@@ -71,14 +71,14 @@ std::function<void(bool)> GameViewModel::get_move_down_command()
 std::function<void()> GameViewModel::get_light_attack_command()
 {
     return [this]() {
-        begin_attack(ActorState::LightAttack, kLightAttackSeconds, kLightAttackEnergyCost);
+        begin_attack(ActorActionState::LightAttack, kLightAttackSeconds, kLightAttackEnergyCost);
     };
 }
 
 std::function<void()> GameViewModel::get_heavy_attack_command()
 {
     return [this]() {
-        begin_attack(ActorState::HeavyAttack, kHeavyAttackSeconds, kHeavyAttackEnergyCost);
+        begin_attack(ActorActionState::HeavyAttack, kHeavyAttackSeconds, kHeavyAttackEnergyCost);
     };
 }
 
@@ -223,8 +223,8 @@ void GameViewModel::sync_state_from_simulation()
     m_state.player.health = {std::max(0, player.hp), player.maxHp > 0 ? player.maxHp : 100};
     m_state.player.energy = {static_cast<int>(std::lround(m_playerEnergy)), static_cast<int>(kMaxPlayerEnergy)};
     m_state.player.visible = player.alive;
-    m_state.player.state = player.alive ? ((m_moveLeft || m_moveRight || m_moveUp || m_moveDown) ? ActorState::Walk : ActorState::Idle)
-                                        : ActorState::Dead;
+    m_state.player.actionState = player.alive ? ((m_moveLeft || m_moveRight || m_moveUp || m_moveDown) ? ActorActionState::Walk : ActorActionState::Idle)
+                                        : ActorActionState::Dead;
     m_state.player.position.z = 0.0f;
     m_state.player.onGround = true;
 
@@ -232,11 +232,11 @@ void GameViewModel::sync_state_from_simulation()
         const float progress = std::clamp(m_jumpElapsed / kJumpSeconds, 0.0f, 1.0f);
         m_state.player.position.z = kJumpHeight * std::sin(kPi * progress);
         m_state.player.onGround = false;
-        m_state.player.state = ActorState::Jump;
+        m_state.player.actionState = ActorActionState::Jump;
     }
 
     if (player.alive && m_attackTimer > 0.0f) {
-        m_state.player.state = m_jumpActive ? ActorState::AirAttack : m_attackState;
+        m_state.player.actionState = m_jumpActive ? ActorActionState::AirAttack : m_attackState;
     }
 
     if (m_moveLeft && !m_moveRight) {
@@ -259,14 +259,14 @@ void GameViewModel::sync_state_from_simulation()
         const bool isBoss = entity.kind == EntityKind::Boss;
         const int fallbackMaxHealth = isBoss ? 140 : 20;
 
-        ActorSnapshot actor;
+        ActorState actor;
         actor.kind = isBoss ? ActorKind::Boss : ActorKind::Grunt;
         actor.team = Team::Enemy;
         actor.position = entity.pos;
         actor.position.laneY = std::clamp(actor.position.laneY, kStreetTop, kStreetBottom);
         actor.drawSize = isBoss ? alleyfist::Size{88.0f, 128.0f} : alleyfist::Size{48.0f, 72.0f};
         actor.health = {std::max(0, entity.hp), entity.maxHp > 0 ? entity.maxHp : fallbackMaxHealth};
-        actor.state = entity.alive ? ActorState::Walk : ActorState::Dead;
+        actor.actionState = entity.alive ? ActorActionState::Walk : ActorActionState::Dead;
         actor.visible = entity.alive;
         actor.facing = actor.position.x < m_state.player.position.x ? Facing::Right : Facing::Left;
 
@@ -316,7 +316,7 @@ std::function<void(bool)> GameViewModel::make_move_command(bool& flag)
     };
 }
 
-void GameViewModel::begin_attack(ActorState state, float seconds, float energyCost)
+void GameViewModel::begin_attack(ActorActionState actionState, float seconds, float energyCost)
 {
     if (!m_sim || !is_gameplay_active()) {
         return;
@@ -328,7 +328,7 @@ void GameViewModel::begin_attack(ActorState state, float seconds, float energyCo
         return;
     }
 
-    m_attackState = state;
+    m_attackState = actionState;
     m_attackTimer = seconds;
     m_sim->player_attack();
     sync_state_from_simulation();
@@ -342,7 +342,7 @@ void GameViewModel::reset_actions() noexcept
     m_attackTimer = 0.0f;
     m_playerEnergy = kMaxPlayerEnergy;
     m_exhaustedWarningTimer = 0.0f;
-    m_attackState = ActorState::Idle;
+    m_attackState = ActorActionState::Idle;
     m_moveLeft = false;
     m_moveRight = false;
     m_moveUp = false;
@@ -365,7 +365,7 @@ void GameViewModel::update_action_timers(float dt)
     if (m_attackTimer > 0.0f) {
         m_attackTimer = std::max(0.0f, m_attackTimer - dt);
         if (m_attackTimer <= 0.0f) {
-            m_attackState = ActorState::Idle;
+            m_attackState = ActorActionState::Idle;
         }
     }
 }
@@ -392,7 +392,7 @@ bool GameViewModel::is_gameplay_active() const noexcept
 
 void GameViewModel::notify_state_changed()
 {
-    fire(kGameSnapshotChangedEvent);
+    fire(kGameStateChangedEvent);
 }
 
 } // namespace alleyfist::viewmodel
