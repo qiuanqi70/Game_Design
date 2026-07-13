@@ -1,108 +1,90 @@
 # 5 ViewModel 层分报告
 
-\sectionauthor{B}{待填写}
+\sectionauthor{邱安琪}{3240105004}
 
 ## 5.1 层次定位
 
-ViewModel 层负责游戏规则和可显示状态的生成。它接收 View 发来的 `GameCommand`，推进内部模拟，再输出 `GameSnapshot` 给 View 绘制。它不依赖 Qt，不读取键盘码，也不调用任何绘图函数。
+本工程遵循面向游戏类项目的 MVVM 实践规范。由于游戏场景中的核心数据（如实体状态、位置等）直接对应视图层的可绘制对象，无需进行二次业务模型转换，因此本架构合并了传统意义上的 Model 层，将其统一内聚于 ViewModel 层中。ViewModel 层负责把游戏规则封装为独立的模拟器（simulation）并将可绘制的状态快照提供给 View。View 只负责呈现和收集输入，所有玩法逻辑（移动、碰撞、伤害、敌人 AI、Boss 产生与判定等）都在 ViewModel/Simulation 中实现，且不依赖于 Qt 或绘图 API。
 
-该层分为两个部分：
+实现上该层由两部分组成：
 
-- `GameViewModel`：对外门面，实现 `IGameCommandSink` 和 `IGameSnapshotSource`。
-- `GameSimulation`：内部模拟核心，维护移动、攻击、敌人、遭遇战、胜负判定等规则。
+- `GameViewModel`：对外门面，负责命令绑定、状态同步和事件触发（在代码中为 `GameViewModel`，位于 `code/viewmodel/GameViewModel.*`）。
+- `GameSimulation`：内部仿真器，维护 `EntityState` 列表并推进物理/AI/战斗逻辑（位于 `code/viewmodel/GameSimulation.*` 和 `code/viewmodel/SimulationTypes.h`）。
 
-这种拆分让对外绑定逻辑和内部玩法逻辑分开，也避免了窗口代码与移动、攻击、敌人 AI 等规则直接混杂。
+这种将底层仿真逻辑（Simulation）直接内聚在 ViewModel 内部的设计，既简化了游戏数据的传递链路，避免了 Model 到 ViewModel 冗余的数据转换，又完美保持了核心逻辑对 UI 框架（Qt）的零依赖，极大地便利了无 UI 环境下的单元测试。
 
 ## 5.2 GameViewModel 门面
 
-`GameViewModel` 的职责比较克制：
+`GameViewModel` 负责把外部输入转成内部规则执行，并把仿真结果整理为 View 可直接使用的状态。
 
-1. 接收 `GameCommand`。
-2. 将输入命令转发给 `GameSimulation`。
-3. 将 Tick 命令转化为一次 `step`。
-4. 保存最新 `GameSnapshot`。
-5. 维护变化回调列表，状态变化后通知 View 更新。
+它的核心职责可以概括为三点：
 
-`add_change_callback` 会返回 `BindingCookie`，`remove_change_callback` 根据 cookie 移除回调。`notify()` 复制一份回调列表后逐个调用，减少回调过程中修改列表带来的风险。
+1. 接收 View 发送的命令，如移动、攻击、跳跃、暂停、确认和重置；
+2. 维护本地动作状态，包括按键状态、跳跃计时、攻击计时和玩家能量；
+3. 将仿真结果同步到 `GameState`，并通过事件通知 View 更新。
 
-## 5.3 游戏阶段状态机
+在实现上，它主要依赖以下机制：
 
-当前使用 `GamePhase` 表示游戏大阶段：
+- `get_tick_command()`、`get_move_left_command()` 等命令方法：把外部输入封装为 `std::function`，形成典型的命令模式接口；
+- `tick(dt, frameIndex)`：每帧更新动作计时器，并调用 `GameSimulation` 推进一步；
+- `sync_state_from_simulation()`：把实体状态映射为 `GameState` 快照；
+- `try_spend_energy()`：控制跳跃与攻击的能量消耗，防止连续高强度操作。
 
-| 阶段 | 含义 |
-| --- | --- |
-| `Title` | 标题界面，等待确认开始 |
-| `Playing` | 正常推进和战斗 |
-| `EncounterLocked` | 遭遇战锁屏，必须击败敌人 |
-| `ClearToGo` | 清屏后可继续前进，显示 GO 提示 |
-| `Paused` | 暂停 |
-| `GameOver` | 玩家失败 |
-| `Win` | 击败 Boss 后胜利 |
+其中，当前工程采用的是一种轻量级的“命令回调”风格：`GameViewModel` 通过 `std::function` 暴露一组命令接口，如 `get_move_left_command()`、`get_primary_action_command()` 等，View 只需要注册这些回调即可。它并不是传统意义上定义独立 `Command` 类层次结构的完整命令模式实现，而是用函数对象把“请求”封装成可回调的接口，从而实现了命令分离与解耦。这样做的好处是，View 不需要知道内部规则流程，只需要发出“移动”“攻击”“暂停”等请求即可。事件通知则由 `fire(kGameStateChangedEvent)` 负责，在状态发生变化后，把更新通知给订阅者，从而实现 View 的刷新。
 
-输入处理中，`Confirm` 可从标题、失败、胜利进入新游戏，也可从暂停恢复；`Pause` 可在游玩状态与暂停状态之间切换；`Restart` 可随时重置到游玩状态。非游玩阶段会阻止移动和攻击逻辑继续推进。
+此外，时钟驱动也通过事件/回调机制来实现。`GameSimulation` 允许注册 tick 监听器，`GameViewModel` 在每帧收到时间流逝后调用 `step(dt)`，再将结果同步到状态快照。换言之，游戏逻辑的推进不是通过直接调用界面更新，而是通过“时间事件 + 状态回调”的方式完成。
 
-## 5.4 移动与跳跃
+## 5.3 GameSimulation 仿真核心
 
-ViewModel 维护四个移动布尔值：`m_moveLeft`、`m_moveRight`、`m_moveUp`、`m_moveDown`。持续按键通过 `Pressed` 和 `Released` 修改这些状态，`apply_movement` 在每帧根据当前移动状态计算水平位移和街道纵深位移。
+`GameSimulation` 是整个 ViewModel 层的规则引擎，负责实体状态、战斗逻辑和关卡推进。
 
-横向移动会更新角色朝向，纵向移动会改变 `laneY`。角色位置会被限制在世界边界和街道上下边界内；遭遇战或 Boss 战锁屏时，还会被限制在当前锁屏区域内，防止玩家绕过战斗直接推进。
+它的主要职责包括：
 
-跳跃通过 `m_jumpActive`、`m_jumpElapsed` 和规则参数 `jumpSeconds`、`jumpHeight` 实现。角色的 `z` 值按正弦曲线变化：
+- 维护玩家与敌人实体列表；
+- 根据输入更新玩家位置；
+- 处理敌人的移动与攻击行为；
+- 处理攻击命中、伤害与死亡判定；
+- 根据玩家推进情况生成 Boss，并更新胜负状态。
 
-```cpp
-z = jumpHeight * sin(pi * progress);
-```
+### 5.3.1 玩家与实体状态
 
-这样可以得到上升和下落较自然的抛物线效果。跳跃会消耗精力，精力耗尽时设置疲劳状态。
+仿真层使用 `EntityState` 维护每个实体。玩家为列表第一个实体，后续实体为敌人或 Boss。每个实体包含位置、血量、最大血量、是否存活等信息。
 
-## 5.5 攻击、碰撞与伤害
+### 5.3.2 移动与战斗
 
-攻击输入不会立即直接修改敌人，而是先设置待处理攻击：
+- 玩家移动由 `player_move()` 负责，位置会被限制在世界范围内；
+- 攻击由 `player_attack()` 处理，命中后会对敌人造成固定伤害，并在敌人死亡时更新 Boss 状态；
+- 敌人 AI 由 `simulate_ai()` 处理，敌人会朝玩家方向靠近，并在接近时对玩家造成伤害。
 
-- 轻攻击对应 `LightPunch`。
-- 重攻击对应 `HeavyStrike`。
-- 跳跃时触发攻击对应 `JumpKick`。
+### 5.3.3 Boss 与胜负判定
 
-`apply_attacks` 根据攻击类型设置 `CombatBox`，再将局部攻击盒转换到世界坐标，与敌人的身体矩形做相交检测。命中后扣除敌人血量，更新敌人状态为 `Hurt` 或 `Dead`，并在击败敌人时增加 `defeatedEnemies` 计数。
+- 当玩家推进到指定触发位置后，`spawn_boss_if_needed()` 会生成 Boss；
+- `update_boss_state()` 会持续检查 Boss 是否仍存活；
+- 当玩家死亡时，视图层会看到 `GameOver`；当 Boss 被击败时，视图层会看到 `Win`。
 
-攻击同时会更新连击显示和精力消耗。若精力降为 0，则设置 `hud.playerExhausted`，后续攻击会被限制，直到能量恢复到足够轻攻击为止。
+## 5.4 状态快照与阶段切换
 
-## 5.6 敌人 AI 与 Boss 战
+`GameViewModel` 的 `sync_state_from_simulation()` 会把仿真结果整理为对外的 `GameState`。
 
-`update_enemies` 每帧更新敌人：
+它主要输出以下内容：
 
-- 存活敌人会向玩家横向靠近。
-- 敌人会根据玩家 `laneY` 调整纵深位置，形成简单的追击行为。
-- 敌人接近玩家且冷却结束时会攻击玩家。
-- Boss 使用更高移动速度和更高伤害，并在 HUD 中显示独立血条。
+- 玩家位置、血量、能量、朝向和动作状态；
+- 敌人列表与 Boss 血条信息；
+- 地图相机位置、推进比例和 HUD 状态；
+- 当前阶段（Playing、Paused、GameOver、Win）。
 
-敌人和攻击冷却数组保持同序更新。死亡、不可见或血量为 0 的敌人会被过滤出当前敌人列表。
+其中阶段切换逻辑较为简单：
 
-## 5.7 遭遇战和关卡推进
+- 玩家死亡进入 `GameOver`；
+- Boss 死亡进入 `Win`；
+- 暂停时切换为 `Paused`；
+- 确认键可在标题、失败或胜利状态下重开游戏。
 
-关卡推进使用触发点和滚动锁控制：
+## 5.5 小结
 
-- 玩家到达 `kGruntTriggerX` 后触发普通敌人遭遇战，生成 3 个小怪。
-- 玩家到达 `kBossTriggerX` 后触发 Boss 战，生成 Boss。
-- 遭遇战开始时，`m_scrollLock` 切换为锁定状态，并设置地图左右边界。
-- 场上敌人全部被击败后，普通遭遇战切换为 `ClearToGo` 并显示 GO 提示。
-- Boss 被击败后，切换到 `Win`，记录胜利原因和用时。
+本工程的 ViewModel 层实现了一个简洁但完整的“输入—规则—状态”链路：
 
-View 只看到阶段、边界、GO 提示和敌人快照，不需要知道内部的遭遇战 ID 或滚动锁枚举。
+- `GameViewModel` 负责输入接收、状态同步与事件通知；
+- `GameSimulation` 负责纯规则逻辑，包括移动、攻击、敌人 AI、Boss 生成与胜负判定。
 
-## 5.8 快照维护
-
-每帧 `step` 会更新：
-
-- `frameIndex` 和 `elapsedSeconds`。
-- 玩家位置、状态、血量、精力。
-- 敌人列表和 Boss 状态。
-- HUD 中的血量、精力、Boss 血条、连击、疲劳。
-- 地图镜头和推进比例。
-- 胜负结算数据。
-
-`update_camera` 根据玩家位置计算镜头目标，并限制在世界边界内。锁屏时，镜头也会受到遭遇战区域约束。`update_progress` 根据玩家在世界中的横向位置计算进度比例，并扫描敌人列表决定是否显示 Boss 血条。
-
-## 5.9 小结
-
-ViewModel 层的核心贡献是把游戏规则集中在独立的模拟器中，并把结果整理成 View 可直接使用的快照。当前已经实现横版动作游戏的主要骨架：移动、跳跃、攻击、精力、敌人追击、遭遇战锁屏、Boss 战和胜负结算。后续可以继续扩展更完整的连招、击飞、敌人包抄和关卡配置表，而不需要改变 View 与 ViewModel 的基本通信方式。
+这种结构使 View 只需关注显示与交互，而玩法逻辑则被集中封装在 ViewModel 层内，便于后续继续扩展更复杂的关卡与战斗系统。

@@ -161,16 +161,16 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
 
     switch (key) {
     case Qt::Key_J: case Qt::Key_Z:
-        if (m_lightAttackCommand) m_lightAttackCommand();
+        if (m_primaryActionCommand) m_primaryActionCommand();
         break;
     case Qt::Key_K: case Qt::Key_X:
-        if (m_heavyAttackCommand) m_heavyAttackCommand();
+        if (m_secondaryActionCommand) m_secondaryActionCommand();
         break;
     case Qt::Key_Space:
-        if (m_jumpCommand) m_jumpCommand();
+        if (m_stateToggleCommand) m_stateToggleCommand();
         break;
     case Qt::Key_R:
-        if (m_restartCommand) m_restartCommand();
+        if (m_resetCommand) m_resetCommand();
         break;
     case Qt::Key_Return: case Qt::Key_Enter:
         if (m_confirmCommand) m_confirmCommand();

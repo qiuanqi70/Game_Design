@@ -68,21 +68,21 @@ std::function<void(bool)> GameViewModel::get_move_down_command()
     return make_move_command(m_moveDown);
 }
 
-std::function<void()> GameViewModel::get_light_attack_command()
+std::function<void()> GameViewModel::get_primary_action_command()
 {
     return [this]() {
         begin_attack(ActorActionState::LightAttack, kLightAttackSeconds, kLightAttackEnergyCost);
     };
 }
 
-std::function<void()> GameViewModel::get_heavy_attack_command()
+std::function<void()> GameViewModel::get_secondary_action_command()
 {
     return [this]() {
         begin_attack(ActorActionState::HeavyAttack, kHeavyAttackSeconds, kHeavyAttackEnergyCost);
     };
 }
 
-std::function<void()> GameViewModel::get_jump_command()
+std::function<void()> GameViewModel::get_state_toggle_command()
 {
     return [this]() {
         if (!is_gameplay_active() || m_jumpActive) {
@@ -102,7 +102,7 @@ std::function<void()> GameViewModel::get_jump_command()
     };
 }
 
-std::function<void()> GameViewModel::get_restart_command()
+std::function<void()> GameViewModel::get_reset_command()
 {
     return [this]() {
         if (m_sim) {

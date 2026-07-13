@@ -56,24 +56,24 @@ void MainWindow::set_move_down_command(std::function<void(bool)> command)
     m_gameWidget->set_move_down_command(std::move(command));
 }
 
-void MainWindow::set_light_attack_command(std::function<void()> command)
+void MainWindow::set_primary_action_command(std::function<void()> command)
 {
-    m_gameWidget->set_light_attack_command(std::move(command));
+    m_gameWidget->set_primary_action_command(std::move(command));
 }
 
-void MainWindow::set_heavy_attack_command(std::function<void()> command)
+void MainWindow::set_secondary_action_command(std::function<void()> command)
 {
-    m_gameWidget->set_heavy_attack_command(std::move(command));
+    m_gameWidget->set_secondary_action_command(std::move(command));
 }
 
-void MainWindow::set_jump_command(std::function<void()> command)
+void MainWindow::set_state_toggle_command(std::function<void()> command)
 {
-    m_gameWidget->set_jump_command(std::move(command));
+    m_gameWidget->set_state_toggle_command(std::move(command));
 }
 
-void MainWindow::set_restart_command(std::function<void()> command)
+void MainWindow::set_reset_command(std::function<void()> command)
 {
-    m_gameWidget->set_restart_command(std::move(command));
+    m_gameWidget->set_reset_command(std::move(command));
 }
 
 void MainWindow::set_confirm_command(std::function<void()> command)

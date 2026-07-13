@@ -35,10 +35,10 @@ struct GameApplication::Impl {
         mainWindow.set_move_right_command(viewModel.get_move_right_command());
         mainWindow.set_move_up_command(viewModel.get_move_up_command());
         mainWindow.set_move_down_command(viewModel.get_move_down_command());
-        mainWindow.set_light_attack_command(viewModel.get_light_attack_command());
-        mainWindow.set_heavy_attack_command(viewModel.get_heavy_attack_command());
-        mainWindow.set_jump_command(viewModel.get_jump_command());
-        mainWindow.set_restart_command(viewModel.get_restart_command());
+        mainWindow.set_primary_action_command(viewModel.get_primary_action_command());
+        mainWindow.set_secondary_action_command(viewModel.get_secondary_action_command());
+        mainWindow.set_state_toggle_command(viewModel.get_state_toggle_command());
+        mainWindow.set_reset_command(viewModel.get_reset_command());
         mainWindow.set_confirm_command(viewModel.get_confirm_command());
         mainWindow.set_pause_command(viewModel.get_pause_command());
 

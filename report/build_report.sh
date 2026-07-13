@@ -42,7 +42,7 @@ pandoc "${INPUT_MDS[@]}" \
   --lua-filter="$FILTER_LUA" \
   --include-in-header="$HEADER_TEX" \
   --include-before-body="$TITLEPAGE_TEX" \
-  --syntax-highlighting=pygments \
+  --highlight-style=pygments \
   --metadata=documentclass:ctexart \
   --metadata=classoption:"12pt,fontset=none" \
   --metadata=date:"" \

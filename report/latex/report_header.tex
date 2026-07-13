@@ -18,41 +18,41 @@
 \usepackage{hyperref}
 \usepackage{xurl}
 
-\IfFontExistsTF{Times New Roman}{
-  \setmainfont{Times New Roman}
+\IfFontExistsTF{Latin Modern Roman}{
+  \setmainfont{Latin Modern Roman}
 }{
-  \setmainfont{Times}
+  \setmainfont{DejaVu Serif}
 }
-\IfFontExistsTF{Helvetica}{
-  \setsansfont{Helvetica}
+\IfFontExistsTF{Latin Modern Sans}{
+  \setsansfont{Latin Modern Sans}
 }{
-  \setsansfont{Arial}
+  \setsansfont{DejaVu Sans}
 }
-\IfFontExistsTF{Maple Mono NF CN}{
-  \setmonofont[Scale=0.92]{Maple Mono NF CN}
+\IfFontExistsTF{Latin Modern Mono}{
+  \setmonofont[Scale=0.92]{Latin Modern Mono}
 }{
-  \setmonofont[Scale=0.92]{Menlo}
+  \setmonofont[Scale=0.92]{DejaVu Sans Mono}
 }
-\IfFontExistsTF{Source Han Serif CN}{
-  \setCJKmainfont{Source Han Serif CN}
+\IfFontExistsTF{Noto Serif CJK SC}{
+  \setCJKmainfont{Noto Serif CJK SC}
 }{
-  \setCJKmainfont{Songti SC}
+  \setCJKmainfont{SimSun}
 }
-\IfFontExistsTF{Source Han Sans CN}{
-  \setCJKsansfont{Source Han Sans CN}
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKsansfont{Noto Sans CJK SC}
 }{
-  \setCJKsansfont{Heiti SC}
+  \setCJKsansfont{SimHei}
 }
-\IfFontExistsTF{Source Han Serif CN}{
-  \setCJKmonofont[AutoFakeSlant]{Source Han Serif CN}
+\IfFontExistsTF{Noto Serif CJK SC}{
+  \setCJKmonofont[AutoFakeSlant]{Noto Serif CJK SC}
 }{
-  \setCJKmonofont[AutoFakeSlant]{Songti SC}
+  \setCJKmonofont[AutoFakeSlant]{SimSun}
 }
 
-\IfFontExistsTF{Source Han Sans CN}{
-  \setCJKfamilyfont{zhhei}{Source Han Sans CN}
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKfamilyfont{zhhei}{Noto Sans CJK SC}
 }{
-  \setCJKfamilyfont{zhhei}{Heiti SC}
+  \setCJKfamilyfont{zhhei}{SimHei}
 }
 \newcommand{\heiti}{\CJKfamily{zhhei}}
 
