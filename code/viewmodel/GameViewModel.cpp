@@ -57,7 +57,7 @@ std::function<void(bool)> GameViewModel::get_move_down_command()
     return make_move_command(m_moveDown);
 }
 
-std::function<void()> GameViewModel::get_light_attack_command()
+std::function<void()> GameViewModel::get_primary_action_command()
 {
     return [this]() {
         if (m_sim && !m_paused) {
@@ -68,12 +68,12 @@ std::function<void()> GameViewModel::get_light_attack_command()
     };
 }
 
-std::function<void()> GameViewModel::get_heavy_attack_command()
+std::function<void()> GameViewModel::get_secondary_action_command()
 {
-    return get_light_attack_command();
+    return get_primary_action_command();
 }
 
-std::function<void()> GameViewModel::get_jump_command()
+std::function<void()> GameViewModel::get_state_toggle_command()
 {
     return [this]() {
         m_state.player.state = ActorState::Jump;
@@ -81,7 +81,7 @@ std::function<void()> GameViewModel::get_jump_command()
     };
 }
 
-std::function<void()> GameViewModel::get_restart_command()
+std::function<void()> GameViewModel::get_reset_command()
 {
     return [this]() {
         if (m_sim) {

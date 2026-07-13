@@ -30,10 +30,10 @@ public:
     std::function<void(bool)> get_move_right_command();
     std::function<void(bool)> get_move_up_command();
     std::function<void(bool)> get_move_down_command();
-    std::function<void()> get_light_attack_command();
-    std::function<void()> get_heavy_attack_command();
-    std::function<void()> get_jump_command();
-    std::function<void()> get_restart_command();
+    std::function<void()> get_primary_action_command();
+    std::function<void()> get_secondary_action_command();
+    std::function<void()> get_state_toggle_command();
+    std::function<void()> get_reset_command();
     std::function<void()> get_confirm_command();
     std::function<void()> get_pause_command();
 

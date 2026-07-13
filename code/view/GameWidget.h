@@ -45,10 +45,10 @@ public:
     void set_move_right_command(std::function<void(bool)> command) { m_moveRightCommand = std::move(command); }
     void set_move_up_command(std::function<void(bool)> command) { m_moveUpCommand = std::move(command); }
     void set_move_down_command(std::function<void(bool)> command) { m_moveDownCommand = std::move(command); }
-    void set_light_attack_command(std::function<void()> command) { m_lightAttackCommand = std::move(command); }
-    void set_heavy_attack_command(std::function<void()> command) { m_heavyAttackCommand = std::move(command); }
-    void set_jump_command(std::function<void()> command) { m_jumpCommand = std::move(command); }
-    void set_restart_command(std::function<void()> command) { m_restartCommand = std::move(command); }
+    void set_primary_action_command(std::function<void()> command) { m_primaryActionCommand = std::move(command); }
+    void set_secondary_action_command(std::function<void()> command) { m_secondaryActionCommand = std::move(command); }
+    void set_state_toggle_command(std::function<void()> command) { m_stateToggleCommand = std::move(command); }
+    void set_reset_command(std::function<void()> command) { m_resetCommand = std::move(command); }
     void set_confirm_command(std::function<void()> command) { m_confirmCommand = std::move(command); }
     void set_pause_command(std::function<void()> command) { m_pauseCommand = std::move(command); }
 
@@ -98,10 +98,10 @@ private:
     std::function<void(bool)> m_moveRightCommand;
     std::function<void(bool)> m_moveUpCommand;
     std::function<void(bool)> m_moveDownCommand;
-    std::function<void()> m_lightAttackCommand;
-    std::function<void()> m_heavyAttackCommand;
-    std::function<void()> m_jumpCommand;
-    std::function<void()> m_restartCommand;
+    std::function<void()> m_primaryActionCommand;
+    std::function<void()> m_secondaryActionCommand;
+    std::function<void()> m_stateToggleCommand;
+    std::function<void()> m_resetCommand;
     std::function<void()> m_confirmCommand;
     std::function<void()> m_pauseCommand;
 

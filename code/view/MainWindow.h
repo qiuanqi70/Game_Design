@@ -32,10 +32,10 @@ public:
     void set_move_right_command(std::function<void(bool)> command);
     void set_move_up_command(std::function<void(bool)> command);
     void set_move_down_command(std::function<void(bool)> command);
-    void set_light_attack_command(std::function<void()> command);
-    void set_heavy_attack_command(std::function<void()> command);
-    void set_jump_command(std::function<void()> command);
-    void set_restart_command(std::function<void()> command);
+    void set_primary_action_command(std::function<void()> command);
+    void set_secondary_action_command(std::function<void()> command);
+    void set_state_toggle_command(std::function<void()> command);
+    void set_reset_command(std::function<void()> command);
     void set_confirm_command(std::function<void()> command);
     void set_pause_command(std::function<void()> command);
 
