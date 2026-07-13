@@ -26,7 +26,7 @@ MainWindow::MainWindow(QWidget* parent)
     setCentralWidget(widget);
 }
 
-void MainWindow::set_game_state(const viewmodel::GameViewState* state) noexcept
+void MainWindow::set_game_state(const GameSnapshot* state) noexcept
 {
     m_gameWidget->set_game_state(state);
 }

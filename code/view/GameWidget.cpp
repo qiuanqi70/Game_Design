@@ -13,18 +13,6 @@ namespace alleyfist {
 // GameWidget 是纯 View：这里可以出现 Qt 事件、QPainter、颜色和布局，
 // 但不写 AI、碰撞、伤害、刷怪等规则；这些规则通过只读显示属性从 ViewModel 单向流入。
 
-namespace {
-
-using ActorKind = viewmodel::ActorKind;
-using ActorState = viewmodel::ActorState;
-using ActorViewState = viewmodel::ActorViewState;
-using Facing = viewmodel::Facing;
-using GamePhase = viewmodel::GamePhase;
-using GameViewState = viewmodel::GameViewState;
-using Team = viewmodel::Team;
-
-} // namespace
-
 // ============================================================================
 // 构造与生命周期
 // ============================================================================
@@ -59,13 +47,13 @@ GameWidget::GameWidget(QWidget* parent)
     m_timer.start(16); // ~60 FPS
 }
 
-void GameWidget::set_game_state(const GameViewState* state) noexcept
+void GameWidget::set_game_state(const GameSnapshot* state) noexcept
 {
     m_gameState = state;
     update(); // 触发 paintEvent
 }
 
-const GameViewState& GameWidget::game_state() const noexcept
+const GameSnapshot& GameWidget::game_state() const noexcept
 {
     return m_gameState != nullptr ? *m_gameState : m_emptyState;
 }
@@ -278,7 +266,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     drawStreet(p);
 
     // 按 depthSortY 排序绘制所有角色（远的先画）
-    std::vector<const ActorViewState*> drawList;
+    std::vector<const ActorSnapshot*> drawList;
 
     // 玩家
     if (game_state().player.visible) {
@@ -301,7 +289,7 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // 按 laneY + z 排序，远的先画。
     std::sort(drawList.begin(), drawList.end(),
-              [](const ActorViewState* a, const ActorViewState* b) {
+              [](const ActorSnapshot* a, const ActorSnapshot* b) {
                   const float ya = a->position.laneY + a->position.z;
                   const float yb = b->position.laneY + b->position.z;
                   return ya < yb;
@@ -531,7 +519,7 @@ void GameWidget::drawBar(QPainter& p, float x, float y, float w, float h,
     }
 }
 
-void GameWidget::drawActor(QPainter& p, const ActorViewState& actor)
+void GameWidget::drawActor(QPainter& p, const ActorSnapshot& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);
@@ -577,7 +565,7 @@ void GameWidget::drawActor(QPainter& p, const ActorViewState& actor)
 
 }
 
-void GameWidget::drawCharacterBody(QPainter& p, const ActorViewState& actor,
+void GameWidget::drawCharacterBody(QPainter& p, const ActorSnapshot& actor,
                                     QColor bodyColor)
 {
     const float w = actor.drawSize.width * m_scaleX;
@@ -707,7 +695,7 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorViewState& actor,
     }
 }
 
-void GameWidget::drawHealthBar(QPainter& p, const ActorViewState& actor)
+void GameWidget::drawHealthBar(QPainter& p, const ActorSnapshot& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
     const float screenY = worldToScreenY(actor.position.laneY, actor.position.z);

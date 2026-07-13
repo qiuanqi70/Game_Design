@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace alleyfist::viewmodel {
+namespace alleyfist {
 
 enum class GamePhase {
     Title,
@@ -28,14 +28,14 @@ enum class WinReason {
     BossDefeated
 };
 
-struct GameResultViewState {
+struct GameResultSnapshot {
     GameOverReason gameOverReason = GameOverReason::None;
     WinReason winReason = WinReason::None;
     float elapsedSeconds = 0.0f;
     std::uint32_t defeatedEnemies = 0;
 };
 
-struct MapViewState {
+struct MapSnapshot {
     float worldWidth = 3000.0f;
     float viewportWidth = 960.0f;
     float viewportHeight = 540.0f;
@@ -81,7 +81,7 @@ enum class Facing {
     Right
 };
 
-struct ActorViewState {
+struct ActorSnapshot {
     ActorKind kind = ActorKind::Prop;
     Team team = Team::Neutral;
     alleyfist::WorldPosition position;
@@ -96,7 +96,7 @@ struct ActorViewState {
     bool onGround = true;
 };
 
-struct HudViewState {
+struct HudSnapshot {
     alleyfist::ResourceBar playerHealth;
     alleyfist::ResourceBar playerEnergy;
     alleyfist::ResourceBar bossHealth;
@@ -106,18 +106,18 @@ struct HudViewState {
     bool playerExhausted = false;
 };
 
-struct GameViewState {
+struct GameSnapshot {
     std::uint64_t frameIndex = 0;
     float elapsedSeconds = 0.0f;
     GamePhase phase = GamePhase::Title;
     float progressRatio = 0.0f;
-    MapViewState map;
-    ActorViewState player;
-    std::vector<ActorViewState> enemies;
-    std::vector<ActorViewState> effects;
-    HudViewState hud;
-    GameResultViewState result;
+    MapSnapshot map;
+    ActorSnapshot player;
+    std::vector<ActorSnapshot> enemies;
+    std::vector<ActorSnapshot> effects;
+    HudSnapshot hud;
+    GameResultSnapshot result;
     std::string screenMessage;
 };
 
-} // namespace alleyfist::viewmodel
+} // namespace alleyfist

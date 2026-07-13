@@ -36,7 +36,7 @@ GameViewModel::GameViewModel()
 
 GameViewModel::~GameViewModel() = default;
 
-const GameViewState* GameViewModel::get_game_state() const noexcept
+const GameSnapshot* GameViewModel::get_game_state() const noexcept
 {
     return &m_state;
 }
@@ -259,7 +259,7 @@ void GameViewModel::sync_state_from_simulation()
         const bool isBoss = entity.kind == EntityKind::Boss;
         const int fallbackMaxHealth = isBoss ? 140 : 20;
 
-        ActorViewState actor;
+        ActorSnapshot actor;
         actor.kind = isBoss ? ActorKind::Boss : ActorKind::Grunt;
         actor.team = Team::Enemy;
         actor.position = entity.pos;
@@ -392,7 +392,7 @@ bool GameViewModel::is_gameplay_active() const noexcept
 
 void GameViewModel::notify_state_changed()
 {
-    fire(kGameViewStateChangedEvent);
+    fire(kGameSnapshotChangedEvent);
 }
 
 } // namespace alleyfist::viewmodel

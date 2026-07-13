@@ -11,7 +11,7 @@
 
 namespace alleyfist::viewmodel {
 
-constexpr std::uint32_t kGameViewStateChangedEvent = 1;
+constexpr std::uint32_t kGameSnapshotChangedEvent = 1;
 
 class GameViewModel : public EventTrigger {
 public:
@@ -22,7 +22,7 @@ public:
     GameViewModel& operator=(const GameViewModel&) = delete;
 
     // properties
-    const GameViewState* get_game_state() const noexcept;
+    const GameSnapshot* get_game_state() const noexcept;
 
     // commands
     std::function<void(float, std::uint64_t)> get_tick_command();
@@ -46,7 +46,7 @@ public:
 
 private:
     std::unique_ptr<GameSimulation> m_sim;
-    GameViewState m_state;
+    GameSnapshot m_state;
     bool m_moveLeft = false;
     bool m_moveRight = false;
     bool m_moveUp = false;
