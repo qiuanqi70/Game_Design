@@ -1,0 +1,166 @@
+\usepackage[a4paper,margin=2.35cm,headheight=25pt,footskip=24pt]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{microtype}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fvextra}
+\usepackage{xcolor}
+\usepackage{etoolbox}
+\usepackage{upquote}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xurl}
+
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{Times}
+}
+\IfFontExistsTF{Helvetica}{
+  \setsansfont{Helvetica}
+}{
+  \setsansfont{Arial}
+}
+\IfFontExistsTF{Maple Mono NF CN}{
+  \setmonofont[Scale=0.92]{Maple Mono NF CN}
+}{
+  \setmonofont[Scale=0.92]{Menlo}
+}
+\IfFontExistsTF{Source Han Serif CN}{
+  \setCJKmainfont{Source Han Serif CN}
+}{
+  \setCJKmainfont{Songti SC}
+}
+\IfFontExistsTF{Source Han Sans CN}{
+  \setCJKsansfont{Source Han Sans CN}
+}{
+  \setCJKsansfont{Heiti SC}
+}
+\IfFontExistsTF{Source Han Serif CN}{
+  \setCJKmonofont[AutoFakeSlant]{Source Han Serif CN}
+}{
+  \setCJKmonofont[AutoFakeSlant]{Songti SC}
+}
+
+\IfFontExistsTF{Source Han Sans CN}{
+  \setCJKfamilyfont{zhhei}{Source Han Sans CN}
+}{
+  \setCJKfamilyfont{zhhei}{Heiti SC}
+}
+\newcommand{\heiti}{\CJKfamily{zhhei}}
+
+\definecolor{TitleBlue}{HTML}{123B64}
+\definecolor{AccentTeal}{HTML}{2E6F73}
+\definecolor{RuleGray}{HTML}{D6DEE6}
+\definecolor{CodeBg}{HTML}{F6F8FA}
+\definecolor{CodeFrame}{HTML}{DCE4EC}
+\definecolor{QuoteBg}{HTML}{F8FBFD}
+\definecolor{QuoteFrame}{HTML}{C8D8E4}
+\definecolor{LinkBlue}{HTML}{0B5CAD}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=TitleBlue,
+  urlcolor=LinkBlue,
+  citecolor=AccentTeal,
+  pdftitle={AlleyFist Midterm Report},
+  pdfauthor={AlleyFist Team}
+}
+
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.42em}
+\setlength{\emergencystretch}{5em}
+\renewcommand{\arraystretch}{1.22}
+\setlist{topsep=0.45em,itemsep=0.25em,parsep=0pt,leftmargin=2.35em}
+\sloppy
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textsf{AlleyFist Midterm Report}}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{RuleGray}\leaders\hrule height \headrulewidth\hfill}}
+
+\titleformat{\section}
+  {\centering\normalfont\zihao{2}\bfseries\color{TitleBlue}}
+  {}
+  {0pt}
+  {}
+
+\titleformat{\subsection}
+  {\normalfont\zihao{4}\bfseries\color{TitleBlue}}
+  {}
+  {0pt}
+  {}
+
+\titleformat{\subsubsection}
+  {\normalfont\bfseries\color{AccentTeal}}
+  {}
+  {0pt}
+  {}
+
+\titlespacing*{\section}{0pt}{2em}{1.5em}
+\titlespacing*{\subsection}{0pt}{1.15em}{0.55em}
+\titlespacing*{\subsubsection}{0pt}{0.85em}{0.4em}
+
+\newcounter{reportsectionpage}
+\pretocmd{\section}{%
+  \ifnum\value{reportsectionpage}=0
+    \setcounter{reportsectionpage}{1}%
+  \else
+    \clearpage
+  \fi
+}{}{}
+
+\let\oldtableofcontents\tableofcontents
+\renewcommand{\tableofcontents}{%
+  \clearpage
+  \pagenumbering{Roman}
+  \setcounter{page}{1}
+  \oldtableofcontents
+  \clearpage
+  \pagenumbering{arabic}
+  \setcounter{page}{1}
+}
+
+\captionsetup{
+  font=small,
+  labelfont={bf,color=TitleBlue},
+  textfont=small,
+  labelsep=space
+}
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+  commandchars=\\\{\},
+  breaklines=true,
+  breakanywhere=true,
+  frame=single,
+  framerule=0.45pt,
+  rulecolor=\color{CodeFrame},
+  fillcolor=\color{CodeBg},
+  framesep=6pt,
+  fontsize=\small,
+  baselinestretch=1,
+  xleftmargin=0.8em,
+  xrightmargin=0.2em
+}
+
+\renewenvironment{Shaded}{}{}
+\AtBeginEnvironment{longtable}{\small}
+
+\newcommand{\sectionauthor}[2]{%
+  \begin{flushright}
+  \small\textsf{负责人：#1\quad 学号：#2}
+  \end{flushright}
+  \vspace{0.2em}
+}
+
