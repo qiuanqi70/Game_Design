@@ -46,6 +46,19 @@ public:
         m_tickCallback = std::move(callback);
     }
 
+    // ---- 属性设置器（每个私有属性都有对应的 public setter） ----
+
+    void setFrameIndex(std::uint64_t index) { m_frameIndex = index; }
+
+    void setMovement(const view::MovementIntent& intent) { m_movement = intent; }
+
+    void setTriggeredKeys(const QSet<int>& keys) { m_triggeredThisPress = keys; }
+
+    void setGoBlinkTimer(float seconds) { m_goBlinkTimer = seconds; }
+
+    void setScaleX(float sx) { m_scaleX = sx; }
+    void setScaleY(float sy) { m_scaleY = sy; }
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
