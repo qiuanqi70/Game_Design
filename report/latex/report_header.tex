@@ -45,26 +45,42 @@
     \setmonofont[Scale=0.92]{Menlo}
   }
 }
-\IfFontExistsTF{SimSun}{
-  \setCJKmainfont[AutoFakeBold]{SimSun}
+\IfFontExistsTF{Noto Serif CJK SC}{
+  \setCJKmainfont{Noto Serif CJK SC}
 }{
-  \setCJKmainfont[AutoFakeBold]{Noto Serif SC}
+  \IfFontExistsTF{Songti SC}{
+    \setCJKmainfont{Songti SC}
+  }{
+    \setCJKmainfont{PingFang SC}
+  }
 }
-\IfFontExistsTF{SimHei}{
-  \setCJKsansfont[AutoFakeBold]{SimHei}
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKsansfont{Noto Sans CJK SC}
 }{
-  \setCJKsansfont[AutoFakeBold]{Microsoft YaHei}
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKsansfont{PingFang SC}
+  }{
+    \setCJKsansfont{Heiti SC}
+  }
 }
-\IfFontExistsTF{FangSong}{
-  \setCJKmonofont[AutoFakeSlant]{FangSong}
+\IfFontExistsTF{Noto Serif CJK SC}{
+  \setCJKmonofont[AutoFakeSlant]{Noto Serif CJK SC}
 }{
-  \setCJKmonofont[AutoFakeSlant]{SimSun}
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKmonofont[AutoFakeSlant]{PingFang SC}
+  }{
+    \setCJKmonofont[AutoFakeSlant]{Songti SC}
+  }
 }
 
-\IfFontExistsTF{SimHei}{
-  \setCJKfamilyfont{zhhei}{SimHei}
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKfamilyfont{zhhei}{Noto Sans CJK SC}
 }{
-  \setCJKfamilyfont{zhhei}{Microsoft YaHei}
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKfamilyfont{zhhei}{PingFang SC}
+  }{
+    \setCJKfamilyfont{zhhei}{Heiti SC}
+  }
 }
 \newcommand{\heiti}{\CJKfamily{zhhei}}
 
@@ -166,7 +182,7 @@
   xrightmargin=0.2em
 }
 
-\newenvironment{Shaded}{}{}
+\renewenvironment{Shaded}{}{}
 \AtBeginEnvironment{longtable}{\small}
 
 \newcommand{\sectionauthor}[2]{%
