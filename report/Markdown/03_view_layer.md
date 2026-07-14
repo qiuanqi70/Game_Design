@@ -25,7 +25,6 @@ View 层负责"玩家看到什么"和"玩家输入了什么"。它由主窗口 `
 View 层位于 `code/view/` 目录下，由以下文件组成：
 
 | 文件 | 作用 |
-
 | --- | --- |
 | `MainWindow.h` / `MainWindow.cpp` | 主窗口封装，提供属性注入、命令注入和通知注册接口 |
 | `GameWidget.h` / `GameWidget.cpp` | 游戏画布，包含输入处理、定时循环和全部绘制逻辑 |
