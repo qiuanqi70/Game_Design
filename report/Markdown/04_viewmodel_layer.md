@@ -168,39 +168,4 @@ constexpr int kBossHealth = 140;
 
 **难点三：动作系统与能量系统的协调。** 跳跃、攻击、能量恢复和疲劳状态需要同时管理——玩家不能在被攻击硬直时跳跃，不能在空中连续跳跃，能量耗尽后需要恢复期。解决方案是通过 `m_jumpElapsed`、`m_attackTimer`、`m_playerEnergy`、`m_exhaustedWarningTimer` 以及 `try_spend_energy()` 组成一组局部状态管理，`is_gameplay_active()` 和 `is_player_action_locked()` 作为守卫条件，在命令入口处拦截不合法的操作。
 
-**难点四：Boss 与胜负条件的判定。** 当 Boss 生成、敌人死亡和玩家死亡同时可能发生时，阶段切换逻辑容易混乱。最终通过 `spawn_boss_if_needed()`、`update_boss_state()` 与 `boss_defeated()` 的分层处理，把 Boss 触发、存活检测和胜负切换拆解为独立的步骤，再由 `sync_state_from_simulation()` 统一设置 `GameState.phase`。
-
-## 5.8 团队协作情况
-
-ViewModel 层作为项目核心规则层，与 View、App 和 Common 层保持了持续沟通。
-
-**协作亮点：**
-
-- Common 层定义的 `GameState` 和 `EventTrigger` 在前期经过几轮迭代后趋于稳定，ViewModel 层据此独立完成逻辑与快照映射，减少了接口反复修改的成本。
-- `GameViewModel` 暴露的命令接口（如 `get_move_left_command`、`get_primary_action_command`）与 View 层的 setter 命名一一对应，联调时几乎不需要额外沟通。
-- App 层在组合根中统一完成 properties / commands / notification 的注入，ViewModel 只负责实现接口，不参与绑定细节。
-
-**可改进之处：**
-
-- 仿真层（`GameSimulation`）和 ViewModel 层的职责边界可以更清晰——当前部分状态（如 `m_moveLeft` 等移动标志）在 ViewModel 维护，部分在 Simulation 维护，后续可以统一为 Simulation 内部持有所有规则状态。
-- 缺少 ViewModel 层的独立单元测试。虽然逻辑层不依赖 Qt，便于测试，但目前 `GameSimulationTest.cpp` 的覆盖范围有限。
-
-## 5.9 阶段性成果展示
-
-截至当前迭代，ViewModel 层已经完成了以下可演示的功能：
-
-- 玩家移动与边界限制（八方向按键 → 世界坐标位移 + 街道边界钳制）
-- 轻攻击、重攻击、跳跃，每个动作带独立的能量消耗和冷却计时
-- 精力恢复系统，精力耗尽后触发疲劳状态
-- 小怪 AI 追击与近距离伤害
-- Boss 触发（玩家推进到指定位置后自动生成）与 Boss 血量状态检测
-- 游戏阶段切换（Playing → Paused ↔ Playing / Playing → GameOver / Playing → Win）
-- 将内部规则结果整理为可供 View 直接绘制的 `GameState` 快照
-
-## 5.10 总体心得与个人感悟
-
-作为 ViewModel 层开发者，本次项目的最大收获是对 MVVM 中”规则与表现的分离”有了实践层面的理解。之前写游戏时习惯于在键盘事件里直接改坐标、在绘制函数里顺手写碰撞判断，开发速度快但后续改动成本很高。这次严格按照 MVVM 设计后，虽然前期投入更多时间拆分层级和定义接口，但后期联调和迭代确实更顺畅——改 AI 行为不需要动 View 的绘制代码，改界面布局也不需要担心影响游戏规则。
-
-另一个体会是：ViewModel 层的”门面”设计很重要。`GameViewModel` 对外暴露的是属性（`get_game_state()`）和命令（`get_xxx_command()`），内部委托 `GameSimulation` 处理规则细节，这种两层划分使得代码结构清晰，也便于后续对仿真核心进行单元测试。
-
-智能体的使用：在 ViewModel 层开发中，使用了 Claude Code 辅助生成命令回调的样板代码和 `sync_state_from_simulation()` 的初始框架，节省了部分机械编码时间。但智能体在处理动作状态机等复杂逻辑时容易漏掉边界条件（如”跳跃中不能攻击”需要在两个不同的代码路径中添加守卫），最终的逻辑细节仍需要人工审核和修正。
+**难点四：Boss 与胜负条件的判定。** 规则系统一开始较简单，但当 Boss 生成、敌人死亡和玩家胜负条件同时存在时，逻辑容易变得混乱。最终通过 `spawn_boss_if_needed()`、`update_boss_state()` 与 `boss_defeated()` 的分层处理，成功把 Boss 触发、存活检测和胜负切换拆解成明确的步骤。
