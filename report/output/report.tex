@@ -1,0 +1,1251 @@
+\documentclass[12pt,fontset=none]{ctexart}
+\input{latex/report_header.tex}
+\begin{document}
+\input{latex/titlepage.tex}
+\tableofcontents
+\section{1 实验概述}
+
+本实验仓库实现的是一款横版街机动作游戏，主题为“双截龙”。项目使用 C++17、Qt6、CMake 与 vcpkg 组织工程，当前代码已经形成了较清晰的 MVVM 分层：\texttt{common} 层提供跨层公共状态和通知工具，\texttt{viewmodel} 层负责游戏规则和状态推进，\texttt{view} 层负责 Qt 窗口、输入和绘制，\texttt{app} 层作为组合根管理生命周期以及属性、命令、通知三类绑定。
+
+从玩法目标看，玩家扮演一名格斗角色，在带有纵深的城市街道上从左向右推进。当前实现支持标题画面、移动、跳跃、轻攻击、重攻击、血量、精力、疲劳提示、普通敌人追击、Boss 触发、暂停、失败、胜利和重开等核心流程。普通敌人在初始阶段生成并主动靠近玩家；当玩家推进到关卡后段时，系统生成 Boss，击败 Boss 后进入胜利结算。
+
+\subsection{1.1 组内分工}
+
+本组以层次边界作为分工单位，每位成员既负责对应代码，也负责对应分报告：
+
+\begin{itemize}
+\item 苏易文：负责 App/Common 层，分报告为 \texttt{02\_app\_common\_layer.md}，主要内容包括生命周期、组合根、公共状态、通知工具和三类绑定。
+\item 陈棋隆：负责 View 层，分报告为 \texttt{03\_view\_layer.md}，主要内容包括窗口、画布、输入、HUD 和覆盖层。
+\item 邱安琪：负责 ViewModel 层，分报告为 \texttt{04\_viewmodel\_layer.md}，主要内容包括命令回调、状态推进、AI、战斗和胜负判定。
+\end{itemize}
+
+\subsection{1.2 协作与版本管理}
+
+为了体现组内协作过程，本项目在开发中持续使用 Git 和 GitHub 记录提交历史。三位成员围绕不同层次并行推进：Common/App 层先确定公共状态和绑定方式，View 层根据公共状态完成输入和绘制，ViewModel 层独立实现规则模拟和状态同步，最后通过主分支合并和冲突处理完成整合。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\linewidth]{Markdown/image.png}
+\caption{GitHub Contributors 统计图}
+\end{figure}
+
+图中的 GitHub 账号与组员对应关系如下：\texttt{wys917} 对应苏易文，\texttt{qiuanqi70} 对应邱安琪，\texttt{odetta1} 对应陈棋隆。从 GitHub Contributors 页面可以看到三位成员均有提交记录，说明项目并不是由单人集中完成，而是按照分层职责持续推进。
+
+需要补充说明的是，上图中统计的提交数和增删行数不能等同于实际工作量，本次任务中我们小组全程保持顺畅的沟通，每个人都很负责的完成了自己的部分，并在有余力时对队友的工作提出建议或帮助，三人的工作量是一致的。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\linewidth]{Markdown/git-history-combined.png}
+\caption{Git 提交历史与协作解耦记录}
+\end{figure}
+
+上图合并展示了项目的提交历史。可以看到仓库中存在多次围绕 \texttt{viewmodel}、\texttt{view}、\texttt{common} 和 \texttt{app} 的独立提交与分支合并，并不是在同一个大文件中串行修改，而是按照 MVVM 层次拆分任务，并持续进行解耦：把公共契约从具体规则中分离出来，让 View 和 ViewModel 可以围绕稳定的 \texttt{GameState}、命令回调和通知机制并行开发，最后再通过 merge 将各层成果整合到主分支。
+
+\subsection{1.3 当前完成情况}
+
+当前仓库已经完成了游戏的基本可运行骨架和核心流程：
+
+\begin{itemize}
+\item 工程层面：通过 CMake 分 target 组织 \texttt{alleyfist\_common}、\texttt{alleyfist\_viewmodel}、\texttt{alleyfist\_view}、\texttt{alleyfist\_app} 和最终可执行文件 \texttt{AlleyFist}。
+\item 公共契约：使用 \texttt{types.h} 定义 \texttt{Size}、\texttt{WorldPosition}、\texttt{ResourceBar} 等基础值类型；使用 \texttt{game\_state.h} 定义 \texttt{GameState}、\texttt{ActorState}、\texttt{MapState}、\texttt{HudState} 等只读显示状态；使用 \texttt{notification.h} 提供 \texttt{EventTrigger} 与 \texttt{EventNotification}。
+\item ViewModel：通过 \texttt{GameViewModel} 对外暴露属性和命令，通过 \texttt{GameSimulation} 维护实体列表和规则推进，支持玩家移动、跳跃、攻击、精力恢复、普通敌人追击、Boss 生成、失败和胜利判定。
+\item View：实现 60 FPS 定时器、键盘输入映射、世界坐标到屏幕坐标的投影、街道背景、视差建筑、角色几何绘制、血条、精力条、Boss 血条、进度条、标题画面和胜负覆盖层。
+\item App：通过 \texttt{GameApplication} 创建 \texttt{QApplication}、\texttt{GameViewModel} 和 \texttt{MainWindow}，并集中完成 \texttt{properties / commands / notification} 绑定。
+\end{itemize}
+
+\section{2 总体架构设计}
+
+\subsection{2.1 架构目标}
+
+本项目选择 MVVM 风格的分层设计，主要目标有三个：
+
+\begin{enumerate}
+\item View 只处理“如何显示”和“如何接收输入”，不保存玩法规则状态。
+\item ViewModel 只处理“游戏如何推进”和“当前状态是什么”，不依赖 Qt 控件或绘图 API。
+\item Common 层只定义两边共享的数据形状和轻量通知工具，让 View 与 ViewModel 可以通过稳定合同通信。
+\end{enumerate}
+
+这个设计使得界面、规则和应用启动逻辑分别处在不同 target 中。后续无论是替换绘制方式、扩展敌人 AI，还是调整应用启动流程，都不需要牵动整个项目。
+
+\subsection{2.2 依赖方向}
+
+项目的依赖方向如下：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+main
+  -> app
+       -> view
+       -> viewmodel
+       -> common
+       -> Qt6 Core / Widgets
+view
+  -> common
+  -> Qt6 Widgets / Gui
+viewmodel
+  -> common
+common
+  -> C++ standard library only
+\end{Shaded}
+\end{Highlighting}
+
+\texttt{app} 层可以看到具体的 View 和 ViewModel，因为它承担组合根职责；但 \texttt{view} 和 \texttt{viewmodel} 之间没有直接依赖。两者通过 Common 中的 \texttt{GameState}、\texttt{EventNotification} 以及 App 注入的 \texttt{std::function} 命令回调完成协作。
+
+\begin{longtable}{l l l l}
+\toprule
+\textbf{层次} & \textbf{主要文件} & \textbf{对外暴露} & \textbf{不应承担的职责} \\
+\midrule
+\endhead
+Common & \texttt{types.h}、\texttt{game\_state.h}、\texttt{notification.h}、\texttt{common.h} & 基础值类型、只读游戏状态、事件通知工具 & Qt 绘制、AI、碰撞、生命周期管理 \\
+ViewModel & \texttt{GameViewModel}、\texttt{GameSimulation}、\texttt{SimulationTypes.h} & \texttt{const GameState*}、命令回调、变化通知 & 直接绘制画面、读取键盘码 \\
+View & \texttt{MainWindow}、\texttt{GameWidget}、\texttt{InputDefs.h} & 属性 setter、命令 setter、Qt 窗口与画布 & 修改游戏内部状态、计算伤害 \\
+App & \texttt{GameApplication} & \texttt{run()} & 游戏规则、具体绘制细节 \\
+\bottomrule
+\end{longtable}
+
+\subsection{2.3 绑定方式}
+
+当前项目参考袁老师的Plane 示例，将跨层绑定拆成三类。
+
+第一类是属性绑定：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+GameViewModel::get\_game\_state()
+  -> const GameState*
+  -> MainWindow::set\_game\_state(...)
+  -> GameWidget::set\_game\_state(...)
+  -> paintEvent 读取只读状态
+\end{Shaded}
+\end{Highlighting}
+
+View 持有的是 \texttt{const GameState*}，只能读，不能写。\texttt{GameState} 中包含阶段、地图、玩家、敌人、HUD、结算等绘制所需信息。
+
+第二类是命令绑定：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+GameViewModel::get\_move\_left\_command()
+  -> std::function<void(bool)>
+  -> MainWindow::set\_move\_left\_command(...)
+  -> GameWidget::keyPressEvent / keyReleaseEvent 调用
+\end{Shaded}
+\end{Highlighting}
+
+移动命令使用 \texttt{std::function<void(bool)>} 表达按下和释放；轻攻击、重攻击、跳跃、暂停、确认、重置等单次动作使用 \texttt{std::function<void()>}；Tick 使用 \texttt{std::function<void(float, std::uint64\_t)>}。这样 ViewModel 不需要知道用户按的是方向键、WASD、J 还是 Z，View 也不需要知道命令内部如何修改规则状态。
+
+第三类是通知绑定：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+GameViewModel::fire(kGameStateChangedEvent)
+  -> EventNotification
+  -> MainWindow 返回的 lambda
+  -> GameWidget::update()
+\end{Shaded}
+\end{Highlighting}
+
+状态变化后，ViewModel 只发出“状态已变”的通知。View 收到通知后安排重绘，并在 \texttt{paintEvent} 中通过之前绑定的只读指针读取最新 \texttt{GameState}。
+
+\subsection{2.4 数据流设计}
+
+项目中存在两条单向数据流。
+
+第一条是输入和时间通道：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+Qt key event 
+  -> GameWidget
+  -> std::function command
+  -> GameViewModel
+  -> GameSimulation
+\end{Shaded}
+\end{Highlighting}
+
+View 将物理输入翻译成语义命令，例如“左移动开启”“轻攻击触发”“暂停触发”。
+
+第二条是状态通道：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+GameSimulation
+  -> GameViewModel::sync\_state\_from\_simulation()
+  -> GameState
+  -> EventTrigger 通知
+  -> GameWidget::paintEvent
+\end{Shaded}
+\end{Highlighting}
+
+ViewModel 将内部实体状态整理为 \texttt{GameState}。View 只根据其中的 \texttt{phase}、\texttt{map}、\texttt{player}、\texttt{enemies}、\texttt{hud}、\texttt{result}、\texttt{screenMessage} 等字段绘制画面。
+
+\subsection{2.5 时间推进机制}
+
+游戏循环由 View 层的 \texttt{QTimer} 驱动，约每 16 ms 触发一次。触发时，\texttt{GameWidget} 根据 \texttt{QElapsedTimer} 计算真实 delta time，并将单帧推进限制在 0.1 秒以内，避免调试或卡顿后一次性推进过多逻辑。随后 \texttt{GameWidget} 调用已绑定的 \texttt{m\_tickCommand(clampedDt, frameIndex)}。
+
+
+\subsection{2.6 状态边界}
+
+\texttt{GameState} 是 ViewModel 到 View 的主要状态出口。当前状态中包含：
+
+\begin{itemize}
+\item \texttt{GamePhase}：标题、游玩、暂停、失败、胜利等阶段。
+\item \texttt{MapState}：视口大小、镜头位置、街道上下边界。
+\item \texttt{ActorState}：玩家、敌人、Boss 的位置、绘制尺寸、血量、动作状态、朝向和可见性。
+\item \texttt{HudState}：玩家血量、玩家精力、Boss 血条和疲劳提示。
+\item \texttt{GameResultState}：用时和击败敌人数。
+\item \texttt{screenMessage}：标题或暂停等阶段的屏幕提示。
+\end{itemize}
+
+内部的实体列表、敌人追踪规则、Boss 触发位置、玩家移动标志、跳跃计时、攻击计时和能量消耗常量都保留在 ViewModel 内部，不向 View 暴露。这使得 View 可以保持稳定，即使后续增加更复杂的 AI、连招或关卡配置，也只需要在 \texttt{GameState} 中补充必要显示字段。
+
+\section{3 App/Common 层分报告}
+
+\sectionauthor{苏易文}{3240103466}
+
+\subsection{3.1 层次定位}
+
+App/Common 这一部分承担两个不同但相关的职责。
+
+\texttt{common/} 是 View 与 ViewModel 之间的公共合同。它不依赖 Qt，也不写具体玩法，只定义两层都能理解的基础值类型、只读游戏状态和通知工具。\texttt{app/} 是应用组合根，负责创建 Qt 应用对象、主窗口和 ViewModel，并把 View 与 ViewModel 通过属性、命令和通知三类接口绑定起来。
+
+这两层的共同目标是控制依赖边界：公共状态和通知工具放在 Common，具体对象创建和绑定放在 App，避免 View 和 ViewModel 彼此直接包含对方头文件。
+
+\subsection{3.2 Common 层设计}
+
+Common 层主要由四类文件组成：
+
+\begin{longtable}{l l}
+\toprule
+\textbf{文件} & \textbf{作用} \\
+\midrule
+\endhead
+\texttt{types.h} & 定义 \texttt{Size}、\texttt{WorldPosition}、\texttt{ResourceBar} 等基础值类型 \\
+\texttt{game\_state.h} & 定义 \texttt{GameState} 及其子结构，作为 View 可读取的状态协议 \\
+\texttt{notification.h} & 定义 \texttt{EventNotification} 与 \texttt{EventTrigger}，作为变化通知工具 \\
+\texttt{common.h} & 便捷入口，统一包含 Common 层公共头文件 \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{3.2.1 基础值类型}
+
+\texttt{types.h} 中只保留跨层都会用到、但不携带具体玩法规则的基础属性：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+struct Size \{
+    float width = 0.0f;
+    float height = 0.0f;
+\};
+
+struct ResourceBar \{
+    int current = 0;
+    int maximum = 0;
+
+    float ratio() const noexcept;
+    bool is\_empty() const noexcept;
+\};
+
+struct WorldPosition \{
+    float x = 0.0f;
+    float laneY = 0.0f;
+    float z = 0.0f;
+\};
+\end{Shaded}
+\end{Highlighting}
+
+这些类型可以被 View 和 ViewModel 同时理解。\texttt{WorldPosition} 中 \texttt{x} 表示横向推进，\texttt{laneY} 表示街道纵深，\texttt{z} 表示离地高度；View 用它投影到屏幕坐标，ViewModel 用它记录实体位置。
+
+\subsubsection{3.2.2 游戏状态}
+
+\texttt{game\_state.h} 将 View 需要读取的状态拆成几个层次：
+
+\begin{itemize}
+\item \texttt{GamePhase} 描述当前阶段，包括 \texttt{Title}、\texttt{Playing}、\texttt{Paused}、\texttt{GameOver} 和 \texttt{Win}。
+\item \texttt{MapState} 描述视口、镜头和街道边界。
+\item \texttt{ActorState} 描述单个角色，包括阵营、种类、位置、绘制尺寸、血量、动作状态、朝向和可见性。
+\item \texttt{HudState} 整理 HUD 专用数据，包括玩家血量、精力、Boss 血条和疲劳状态。
+\item \texttt{GameResultState} 记录结算数据，包括用时和击败数量。
+\item \texttt{GameState} 汇总完整帧状态，作为 View 绘制一帧画面的主要输入。
+\end{itemize}
+
+这样的设计避免 View 从多个内部对象中拼接信息。View 只需要读取 \texttt{GameState}，ViewModel 负责把内部规则状态整理成适合显示的数据。
+
+\subsubsection{3.2.3 事件通知}
+
+\texttt{notification.h} 提供一个与 Qt 无关的轻量通知工具：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+using EventNotification = std::function<void(std::uint32\_t eventId)>;
+
+class EventTrigger \{
+public:
+    std::uintptr\_t add\_notification(EventNotification\&\& notification);
+    void remove\_notification(std::uintptr\_t cookie) noexcept;
+
+protected:
+    void fire(std::uint32\_t eventId);
+\};
+\end{Shaded}
+\end{Highlighting}
+
+ViewModel 继承 \texttt{EventTrigger}，状态变化后调用 \texttt{fire(kGameStateChangedEvent)}；View 通过 \texttt{MainWindow::get\_notification()} 提供一个闭包，收到通知后调用 \texttt{GameWidget::update()}。通知只表达“某类事件发生了”，不携带 Qt 对象，也不暴露 ViewModel 内部对象。
+
+
+
+\subsection{3.3 App 层设计}
+
+\texttt{GameApplication} 是 App 层对外暴露的生命周期接口。它使用 PImpl 隐藏 Qt、主窗口和 ViewModel 的具体类型，公共头文件中只保留构造、析构和 \texttt{run()}。
+
+实现层中，\texttt{GameApplication::Impl} 创建三个核心对象：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+QApplication qtApp;
+GameViewModel viewModel;
+MainWindow mainWindow;
+\end{Shaded}
+\end{Highlighting}
+
+随后在构造函数中集中完成三类绑定。
+
+第一类是属性绑定：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+mainWindow.set\_game\_state(viewModel.get\_game\_state());
+\end{Shaded}
+\end{Highlighting}
+
+第二类是命令绑定：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+mainWindow.set\_tick\_command(viewModel.get\_tick\_command());
+mainWindow.set\_move\_left\_command(viewModel.get\_move\_left\_command());
+mainWindow.set\_move\_right\_command(viewModel.get\_move\_right\_command());
+mainWindow.set\_move\_up\_command(viewModel.get\_move\_up\_command());
+mainWindow.set\_move\_down\_command(viewModel.get\_move\_down\_command());
+mainWindow.set\_primary\_action\_command(viewModel.get\_primary\_action\_command());
+mainWindow.set\_secondary\_action\_command(viewModel.get\_secondary\_action\_command());
+mainWindow.set\_state\_toggle\_command(viewModel.get\_state\_toggle\_command());
+mainWindow.set\_reset\_command(viewModel.get\_reset\_command());
+mainWindow.set\_confirm\_command(viewModel.get\_confirm\_command());
+mainWindow.set\_pause\_command(viewModel.get\_pause\_command());
+\end{Shaded}
+\end{Highlighting}
+
+第三类是通知绑定：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+viewModel.add\_notification(mainWindow.get\_notification());
+\end{Shaded}
+\end{Highlighting}
+
+App 层知道 \texttt{MainWindow} 和 \texttt{GameViewModel} 的具体类型，但绑定结果仍然保持 View 与 ViewModel 的单向依赖：View 只持有只读状态指针和命令闭包，不包含 \texttt{viewmodel/} 头文件；ViewModel 只保存通知闭包，不知道具体的 \texttt{GameWidget}。
+
+
+
+\subsection{3.4 小结}
+
+App/Common 层建立了稳定边界：Common 把基础值类型、只读状态和通知工具抽象成跨层协议；App 把具体对象创建和三类绑定集中在组合根中。这样整个项目的依赖方向保持清晰，也为 View 和 ViewModel 分别开发提供了基础。
+
+\section{4 View 层分报告}
+
+\sectionauthor{陈棋隆}{3240103461}
+
+\subsection{4.1 层次定位}
+
+View 层负责"玩家看到什么"和"玩家输入了什么"。它由主窗口 \texttt{MainWindow}、游戏画布 \texttt{GameWidget} 和输入聚合定义 \texttt{InputDefs.h} 组成，主要使用 Qt 的窗口 (\texttt{QMainWindow})、定时器 (\texttt{QTimer})、键盘事件 (\texttt{QKeyEvent}) 和 \texttt{QPainter} 完成界面工作。
+
+按照 MVVM 分工，View 层遵循以下约束：
+
+\begin{longtable}{l l}
+\toprule
+\textbf{约束} & \textbf{说明} \\
+\midrule
+\endhead
+只依赖 Common 层 & \texttt{\#include "../common/game\_state.h"} 和 \texttt{"../common/notification.h"}，不包含 \texttt{viewmodel/} 下的任何头文件 \\
+不修改游戏数据 & 持有 \texttt{const GameState*} 只读指针，绘制时直接读取，绝不回写 \\
+命令单向注入 & 所有命令通过 \texttt{std::function} setter 从外部注入，View 内部不创建命令对象 \\
+不判断规则对错 & 不写 AI、碰撞、伤害、刷怪、推图等逻辑，这些全部属于 ViewModel \\
+\bottomrule
+\end{longtable}
+
+作为一个 Qt Widgets 之上的薄层，View 把物理输入（键盘码）翻译为已绑定的命令回调，把只读状态（\texttt{GameState}）翻译为像素，把时间节奏（60 FPS 定时器）翻译为 tick 通知。
+
+与常见的简单 MVVM 视图不同，游戏 View 还需要处理帧同步与流畅绘制的双重任务——既要保证逻辑帧的稳定递进，又要确保视觉帧的流畅渲染。
+
+
+\subsection{4.2 文件组织与编译}
+
+View 层位于 \texttt{code/view/} 目录下，由以下文件组成：
+
+\begin{longtable}{l l}
+\toprule
+\textbf{文件} & \textbf{作用} \\
+\midrule
+\endhead
+\texttt{MainWindow.h} / \texttt{MainWindow.cpp} & 主窗口封装，提供属性注入、命令注入和通知注册接口 \\
+\texttt{GameWidget.h} / \texttt{GameWidget.cpp} & 游戏画布，包含输入处理、定时循环和全部绘制逻辑 \\
+\texttt{InputDefs.h} & View 层内部的输入聚合类型 \texttt{MovementIntent} \\
+\texttt{CMakeLists.txt} & 编译为 \texttt{alleyfist\_view} 静态库，链接 \texttt{alleyfist\_common} 和 \texttt{Qt6::Widgets}、\texttt{Qt6::Gui} \\
+\bottomrule
+\end{longtable}
+
+编译配置精简且明确：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+add\_library(alleyfist\_view STATIC
+    MainWindow.cpp
+    GameWidget.cpp
+)
+
+target\_link\_libraries(alleyfist\_view
+    PUBLIC
+        alleyfist\_common
+        Qt6::Widgets
+        Qt6::Gui
+)
+\end{Shaded}
+\end{Highlighting}
+
+View 库不链接 \texttt{alleyfist\_viewmodel}，确保 View 与 ViewModel 之间不存在编译级耦合。所有跨层通信均通过 Common 层定义的 \texttt{GameState}、\texttt{EventNotification} 和 \texttt{std::function} 回调完成。
+
+
+\subsection{4.3 MainWindow 主窗口}
+
+\texttt{MainWindow} 继承自 \texttt{QMainWindow}，内部创建并持有 \texttt{GameWidget} 作为中心控件。它是 View 层对外的入口，App 层通过它完成属性绑定、命令注入和通知注册。
+
+MainWindow 的接口设计直接对应 M-V-VM 三层关系的三种绑定方式：
+
+\subsubsection{4.3.1 属性绑定（Properties）}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+void set\_game\_state(const GameState* state) noexcept;
+\end{Shaded}
+\end{Highlighting}
+
+App 层将 ViewModel 的只读 \texttt{GameState} 指针传入 View。MainWindow 不做任何处理，直接转发给 \texttt{GameWidget::set\_game\_state()}。View 端在每次绘制时通过 \texttt{game\_state()} 辅助函数解引用该指针读取最新状态。
+
+\subsubsection{4.3.2 命令注入（Commands）}
+
+MainWindow 对外暴露十一个命令 setter，每个对应一种游戏语义动作：
+
+\begin{longtable}{l l l}
+\toprule
+\textbf{方法} & \textbf{命令签名} & \textbf{用途} \\
+\midrule
+\endhead
+\texttt{set\_tick\_command} & \texttt{std::function<void(float, uint64\_t)>} & 帧时间驱动 \\
+\texttt{set\_move\_left\_command} & \texttt{std::function<void(bool)>} & 左移动（按下/松开） \\
+\texttt{set\_move\_right\_command} & \texttt{std::function<void(bool)>} & 右移动 \\
+\texttt{set\_move\_up\_command} & \texttt{std::function<void(bool)>} & 上移动 \\
+\texttt{set\_move\_down\_command} & \texttt{std::function<void(bool)>} & 下移动 \\
+\texttt{set\_primary\_action\_command} & \texttt{std::function<void()>} & 轻攻击 \\
+\texttt{set\_secondary\_action\_command} & \texttt{std::function<void()>} & 重攻击 \\
+\texttt{set\_state\_toggle\_command} & \texttt{std::function<void()>} & 跳跃 \\
+\texttt{set\_reset\_command} & \texttt{std::function<void()>} & 重新开始 \\
+\texttt{set\_confirm\_command} & \texttt{std::function<void()>} & 确认/开始 \\
+\texttt{set\_pause\_command} & \texttt{std::function<void()>} & 暂停/恢复 \\
+\bottomrule
+\end{longtable}
+
+所有命令 setter 都是直接将 \texttt{std::function} 转发给 \texttt{GameWidget} 的对应 setter，MainWindow 本身不做命令封装。这种透传设计使得 MainWindow 保持极薄的职责——仅作为 App 层到 GameWidget 的命令管道。
+
+\subsubsection{4.3.3 通知注册（Notification）}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+EventNotification get\_notification();
+\end{Shaded}
+\end{Highlighting}
+
+该方法返回一个 \texttt{EventNotification}（\texttt{std::function<void(uint32\_t)>}）闭包。闭包捕获 \texttt{this}，在被调用时触发 \texttt{GameWidget::update()} 引起重绘。App 层在组合根中通过 \texttt{viewModel.add\_notification(mainWindow.get\_notification())} 将闭包注入 ViewModel。
+
+当 ViewModel 完成状态更新后调用 \texttt{fire(kGameStateChangedEvent)} 时，这个闭包被执行，GameWidget 随即调度重绘。GameWidget 在 \texttt{paintEvent} 中通过已绑定的只读指针读取 ViewModel 的最新状态，完成从"变化通知"到"数据读取"的解耦闭环。
+
+\subsubsection{4.3.4 整体绑定流程}
+
+在 App 层的组合根中，绑定三个步骤按如下顺序执行：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+mainWindow.set\_game\_state(viewModel.get\_game\_state());
+
+mainWindow.set\_tick\_command(viewModel.get\_tick\_command());
+mainWindow.set\_move\_left\_command(viewModel.get\_move\_left\_command());
+mainWindow.set\_move\_right\_command(viewModel.get\_move\_right\_command());
+mainWindow.set\_move\_up\_command(viewModel.get\_move\_up\_command());
+mainWindow.set\_move\_down\_command(viewModel.get\_move\_down\_command());
+mainWindow.set\_primary\_action\_command(viewModel.get\_primary\_action\_command());
+mainWindow.set\_secondary\_action\_command(viewModel.get\_secondary\_action\_command());
+mainWindow.set\_state\_toggle\_command(viewModel.get\_state\_toggle\_command());
+mainWindow.set\_reset\_command(viewModel.get\_reset\_command());
+mainWindow.set\_confirm\_command(viewModel.get\_confirm\_command());
+mainWindow.set\_pause\_command(viewModel.get\_pause\_command());
+
+viewModel.add\_notification(mainWindow.get\_notification());
+\end{Shaded}
+\end{Highlighting}
+
+这个模式直接参考了课程课件 Plane 示例项目中 \texttt{AirApp::initialize()} 的绑定方式：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+m\_main\_wnd.get\_board().set\_map(m\_game\_viewmodel.get\_map());
+m\_main\_wnd.set\_next\_step\_command(m\_game\_viewmodel.get\_next\_step\_command());
+m\_game\_viewmodel.add\_notification(m\_main\_wnd.get\_notification());
+\end{Shaded}
+\end{Highlighting}
+
+与 Plane 示例的一致性表明，本项目的 View 层遵循了标准的 MVVM 绑定范式。
+
+
+\subsection{4.4 GameWidget 游戏画布}
+
+\texttt{GameWidget} 是 View 层的核心，继承自 \texttt{QWidget}，约 550 行实现。它同时承担四个职责：\textbf{接收数据}、\textbf{收集输入}、\textbf{驱动帧循环}和\textbf{渲染画面}。
+
+\subsubsection{4.4.1 数据访问模式}
+
+GameWidget 持有 \texttt{const GameState* m\_gameState} 只读指针，由 App 层在绑定时通过 \texttt{set\_game\_state()} 注入。此外持有一个默认构造的 \texttt{GameState m\_emptyState} 作为后备——当指针为空（尚未绑定）时使用空状态，避免空指针解引用。
+
+通过私有辅助方法 \texttt{game\_state()} 统一访问：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+const GameState\& game\_state() const noexcept
+\{
+    return m\_gameState != nullptr ? *m\_gameState : m\_emptyState;
+\}
+\end{Shaded}
+\end{Highlighting}
+
+所有绘制方法（\texttt{drawBackground}、\texttt{drawActor}、\texttt{drawHUD} 等）通过 \texttt{game\_state()} 获取快照引用，再访问其中的 \texttt{map}、\texttt{player}、\texttt{enemies}、\texttt{hud}、\texttt{phase} 等字段。这种间接访问方式有两个好处：一是集中处理空指针边界条件；二是为后续引入帧间插值等高级特性预留了扩展点。
+
+\subsubsection{4.4.2 命令注入}
+
+GameWidget 持有十一个 \texttt{std::function} 成员变量，对应十一种游戏语义命令：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+std::function<void(float, std::uint64\_t)> m\_tickCommand;
+std::function<void(bool)> m\_moveLeftCommand;
+std::function<void(bool)> m\_moveRightCommand;
+std::function<void(bool)> m\_moveUpCommand;
+std::function<void(bool)> m\_moveDownCommand;
+std::function<void()> m\_primaryActionCommand;
+std::function<void()> m\_secondaryActionCommand;
+std::function<void()> m\_stateToggleCommand;
+std::function<void()> m\_resetCommand;
+std::function<void()> m\_confirmCommand;
+std::function<void()> m\_pauseCommand;
+\end{Shaded}
+\end{Highlighting}
+
+每个成员都有对应的 public setter（例如 \texttt{set\_tick\_command}、\texttt{set\_move\_left\_command} 等）。这些 setter 由 App 层经由 MainWindow 逐层注入 ViewModel 的闭包。键盘事件和定时器回调直接调用这些 \texttt{std::function}，不经过任何 Qt 信号中间层。
+
+这样的设计与参考项目 Plane 完全一致：View 持有 ViewModel 给出的命令闭包，在发生输入事件时直接调用它们，形成从 View 到 ViewModel 的直接控制通道。
+
+\subsubsection{4.4.3 键盘输入处理}
+
+GameWidget 重写 \texttt{keyPressEvent} 和 \texttt{keyReleaseEvent}，将 Qt 物理键码映射为已注入的游戏语义命令。按键映射集中在 \texttt{isHandledKey} 静态方法和两个事件处理函数中，换手柄或触屏只需修改这里的映射逻辑。
+
+\textbf{移动键处理}采用"状态聚合 + 命令回调"的模式。GameWidget 内部维护 \texttt{view::MovementIntent m\_movement} 结构体，其中包含四个方向布尔值 \texttt{left}、\texttt{right}、\texttt{up}、\texttt{down}。当用户按下移动键时：
+
+\begin{enumerate}
+\item 检查对应方向标志是否已处于按下状态，避免重复触发
+\item 设置方向标志为 \texttt{true}
+\item 调用已注入的方向命令回调（如 \texttt{m\_moveLeftCommand(true)}）
+\end{enumerate}
+
+释放移动键时则反向操作——清除方向标志并调用回调（如 \texttt{m\_moveLeftCommand(false)}）。这种设计将"哪些键被按住"的状态维护在 View 层内部，ViewModel 只需要知道每个方向是激活还是停用，无需关心具体哪个物理按键产生了这种变化。
+
+\textbf{单次触发动作}（攻击、跳跃、暂停、确认、重置）使用 \texttt{m\_triggeredThisPress}（\texttt{QSet<int>}）防止同一按键在按住期间产生多次触发。按下时如果该按键不在集合中，则执行命令回调并将按键加入集合；释放时从集合中移除。这保证了攻击、跳跃等操作的输入语义稳定，避免键盘自动重复导致的意外连击。
+
+按键映射关系如下：
+
+\begin{longtable}{l l}
+\toprule
+\textbf{Qt 物理键} & \textbf{触发的命令} \\
+\midrule
+\endhead
+← / A & \texttt{m\_moveLeftCommand(true/false)} \\
+→ / D & \texttt{m\_moveRightCommand(true/false)} \\
+↑ / W & \texttt{m\_moveUpCommand(true/false)} \\
+↓ / S & \texttt{m\_moveDownCommand(true/false)} \\
+J / Z & \texttt{m\_primaryActionCommand()} \\
+K / X & \texttt{m\_secondaryActionCommand()} \\
+Space & \texttt{m\_stateToggleCommand()} \\
+R & \texttt{m\_resetCommand()} \\
+Enter & \texttt{m\_confirmCommand()} \\
+P / Esc & \texttt{m\_pauseCommand()} \\
+\bottomrule
+\end{longtable}
+
+所有命令回调直接从按键事件中调用，不再经过 Qt 的 \texttt{signal}/\texttt{slot} 机制。这意味着：
+
+\begin{itemize}
+\item View → ViewModel 的控制通道纯粹由 C++ \texttt{std::function} 构成
+\item Qt 仅作为操作系统事件源（\texttt{QKeyEvent}）和渲染后端（\texttt{QPainter}），不参与 MVVM 绑定
+\item 将来替换为其他 GUI 框架（如 SDL、GLFW）时，只需替换 \texttt{QKeyEvent} 到命令的映射逻辑，无需修改 ViewModel 或 Common 层
+\end{itemize}
+
+\subsubsection{4.4.4 Tick 与游戏循环}
+
+\texttt{GameWidget} 内部使用 \texttt{QTimer} 以约 60 FPS（16 ms 间隔）的频率驱动游戏逻辑帧。每次定时器触发时：
+
+\begin{enumerate}
+\item 通过 \texttt{QElapsedTimer::restart()} 获取自上一帧以来的真实时间间隔
+\item 将 delta time 限制在 0.1 秒以内，防止断点调试或系统卡顿后一次性推进过多逻辑
+\item 递增帧序号
+\item 累积 GO 闪烁计时（用于 \texttt{showGoIndicator} 时的提示闪烁效果）
+\item 调用已注入的 \texttt{m\_tickCommand(clampedDt, m\_frameIndex)}
+\end{enumerate}
+
+与旧版不同，Tick 不再通过 Qt \texttt{signal} 发出 \texttt{tickRequested}，而是直接在定时器 lambda 中调用 \texttt{std::function} 回调。QTimer 在此仅作为操作系统定时事件的来源——Qt 的信号机制仍然用于将定时器事件从 Qt 事件循环传递到 GameWidget 的回调 lambda，但这是 Qt 内部的事件传递机制，与 MVVM 跨层绑定无关。
+
+这种设计使得 View 层的定时器成为一个"纯 View 内部"的时钟源——定时器启动、停止、频率控制全部在 GameWidget 内部完成，对外只暴露 \texttt{setRunning(bool)} 用于外部启停控制。
+
+\subsubsection{4.4.5 坐标转换}
+
+ViewModel 输出的是游戏世界坐标：
+
+\begin{itemize}
+\item \texttt{x}：关卡横向推进位置（0 ~ 3000）
+\item \texttt{laneY}：街道纵深位置（300 ~ 500）
+\item \texttt{z}：离地高度，用于跳跃和空中攻击（0 ~ 90）
+\end{itemize}
+
+View 层通过以下变换将世界坐标映射到屏幕像素：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+screenX = (worldX - cameraX) * scaleX;
+screenY = (laneY - z) * scaleY;
+\end{Shaded}
+\end{Highlighting}
+
+其中 \texttt{cameraX} 来自 \texttt{game\_state().map.cameraX}，由 ViewModel 根据玩家位置和锁屏状态计算。\texttt{scaleX} 和 \texttt{scaleY} 根据标准视口（960×540）与当前窗口实际尺寸的比例动态计算，在 \texttt{resizeEvent} 和 \texttt{paintEvent} 中更新，使得游戏画面可以适应不同的窗口大小。
+
+\subsubsection{4.4.6 绘制管线}
+
+\texttt{paintEvent} 是 View 层的主绘制入口。整体流程以游戏阶段 \texttt{GamePhase} 为分支条件：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+填充黑色背景
+if phase == Title:
+    drawOverlay          → 标题画面
+else:
+    drawBackground       → 夜空 + 视差建筑
+    drawStreet           → 人行道 + 车道 + 标线
+    按 laneY+z 排序所有可见角色
+    drawActor 逐个绘制  → 玩家、敌人
+    drawHUD              → 血条、精力条、连击、进度条
+    if showGoIndicator:
+        闪烁 "GO ▶" 提示
+    if phase == Paused | GameOver | Win:
+        drawOverlay      → 半透明遮罩 + 对应文字
+\end{Shaded}
+\end{Highlighting}
+
+这种分阶段绘制的方式使得 View 可以自然地支持所有游戏界面，无需额外标志位。
+
+\subsubsection{4.4.7 背景与场景绘制}
+
+\textbf{天空}：使用 \texttt{QLinearGradient} 绘制从深蓝到地平线亮色的垂直渐变，模拟夜幕下的城市街道氛围。
+
+\textbf{远景建筑}：通过硬编码的建筑物位置和尺寸数据，绘制一系列深灰色矩形作为城市剪影。建筑使用视差滚动——位置随镜头移动的速度仅为主场景的 0.3 倍（\texttt{parallaxFactor = 0.3f}），增强了横向推进时的空间纵深感。每栋建筑还通过位置哈希绘制明暗交替的窗户网格，避免静态重复感。
+
+\textbf{街道}：从 \texttt{map.streetTopY} 到 \texttt{map.streetBottomY} 分三层：
+\begin{itemize}
+\item 上人行道（15\% 高度，浅灰色）
+\item 车道（70\% 高度，深灰色），中央黄色虚线随镜头位置动态偏移
+\item 下人行道（15\% 高度，浅灰色）
+\item 路缘石和人行道以下的地面填充
+\end{itemize}
+
+所有街道元素均使用 \texttt{QPainter::fillRect} 绘制，不依赖外部图片资源，保证在没有图像素材时依然可以完整展示游戏场景。
+
+\subsubsection{4.4.8 角色绘制}
+
+\texttt{drawActor} 方法为单个角色绘制完整形象。它调用 \texttt{worldToScreenX} 和 \texttt{worldToScreenY} 将世界坐标转换为屏幕坐标后，根据 \texttt{Facing}（左右朝向）对画布做水平翻转，再按 \texttt{ActorState}（站立、行走、攻击、跳跃、受伤、死亡等）绘制不同姿态。
+
+角色图形完全由 \texttt{QPainter} 几何图形构成，包括：
+
+\begin{itemize}
+\item \textbf{腿}：根据状态变化——站立时呈静态、行走时交替前后摆动、跳跃时收起。使用裤子颜色和鞋子颜色区分
+\item \textbf{身体}：矩形躯干，颜色由 \texttt{Team}（玩家蓝、小怪红、Boss 深红）和 \texttt{ActorKind} 决定。受击时变为红色闪烁
+\item \textbf{手臂}：攻击时向前伸出并带拳头方块，重攻击伸出距离更长。空中攻击时以踢腿姿态展示
+\item \textbf{头部}：圆形头部 + 白色眼白 + 黑色瞳孔 + 队色头巾/头发
+\item \textbf{阴影}：角色底部的地面椭圆阴影
+\item \textbf{特效}：死亡状态红色 X 线、受击状态黄色星形粒子
+\end{itemize}
+
+敌人头顶还会绘制小型血条（绿色→黄色→红色渐变），帮助玩家判断战斗反馈。无敌状态的角色按 0.1 秒周期交替显示/隐藏。
+
+\subsubsection{4.4.9 HUD 绘制}
+
+\texttt{drawHUD} 将所有界面元素集中在 View 层内部：
+
+\begin{itemize}
+\item \textbf{血条（HP）}：左上角，绿色→黄色→红色渐变填充，标注 \texttt{HP} 标签和当前值/最大值
+\item \textbf{精力条（EN）}：HP 条下方，蓝色填充，标注 \texttt{EN} 标签和当前值/最大值
+\item \textbf{疲劳警告}：精力耗尽时显示红色 \texttt{EXHAUSTED} 文字
+\item \textbf{连击计数}：屏幕中上方，白色 1 HIT → 黄色 2 HIT → 红色 3 HIT
+\item \textbf{Boss 血条}：屏幕顶部居中偏右，Boss 出现时显示，标注 \texttt{BOSS} 和血量数值
+\item \textbf{屏幕消息}：中央位置显示 ViewModel 传入的提示文字（如 "Paused"）
+\item \textbf{关卡进度条}：底部居中，金色填充进度，根据 \texttt{progressRatio} 或玩家位置/世界宽度计算
+\end{itemize}
+
+所有 HUD 元素的颜色、字体和位置均通过 \texttt{m\_scaleX} / \texttt{m\_scaleY} 缩放，保证在不同窗口尺寸下比例一致。
+
+\subsubsection{4.4.10 GO 提示与覆盖层}
+
+\textbf{GO 提示}：当 ViewModel 设置 \texttt{map.showGoIndicator = true}（清屏解锁后），View 以 0.5 秒亮/0.5 秒灭的节奏在屏幕右上方绘制闪烁的 \texttt{GO ▶} 文字。闪烁通过多层描边（3 层不同透明度和宽度的黄色描边 + 白色主体）实现发光效果。
+
+\textbf{覆盖层}：\texttt{drawOverlay} 根据 \texttt{GamePhase} 绘制四种不同的全屏界面：
+
+\begin{longtable}{l l}
+\toprule
+\textbf{阶段} & \textbf{覆盖层内容} \\
+\midrule
+\endhead
+Title & 深色渐变背景 + 渐变标题 \texttt{ALLEY FIST} + 副标题 + 操作说明列表 + 闪烁 \texttt{Press ENTER to Start} \\
+Paused & 半透明黑色遮罩 + \texttt{PAUSED} 大字 + \texttt{Press P or ESC to Resume} \\
+GameOver & 半透明遮罩 + 红色 \texttt{GAME OVER} + 存活时间和击败敌人统计 + 闪烁 \texttt{Press R to Restart} \\
+Win & 半透明遮罩 + 金色渐变 \texttt{YOU WIN!} + 通关时间和击败敌人统计 + 闪烁 \texttt{Press R to Restart} \\
+\bottomrule
+\end{longtable}
+
+标题画面的操作说明直接编码在 View 中，与当前的键盘映射一致，既能作为启动界面引导，也便于测试时快速验证输入映射是否正确。
+
+
+\subsection{4.5 InputDefs.h 输入聚合}
+
+\texttt{InputDefs.h} 将输入层的类型定义在 View 内部（\texttt{namespace alleyfist::view}）：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+namespace alleyfist::view \{
+
+struct MovementIntent \{
+    bool left  = false;
+    bool right = false;
+    bool up    = false;
+    bool down  = false;
+
+    bool is\_moving() const noexcept
+    \{
+        return left || right || up || down;
+    \}
+
+    void clear() noexcept
+    \{
+        left = right = up = down = false;
+    \}
+\};
+
+\} // namespace alleyfist::view
+\end{Shaded}
+\end{Highlighting}
+
+\texttt{MovementIntent} 将四个独立方向标志聚合为一个语义结构。这些方向标志在 \texttt{keyPressEvent} / \texttt{keyReleaseEvent} 中被设置和清除。\texttt{is\_moving()} 用于快速判断是否有任何方向键被按下，而具体的移动方向推导可由 ViewModel 在收到各方向的 \texttt{bool} 命令后自行完成。
+
+将 \texttt{MovementIntent} 放在 \texttt{view} 子命名空间而非 Common 层，遵循了"输入设备相关类型不应出现在公共契约中"的架构原则。换手柄、触屏等输入方式时，只需修改 \texttt{GameWidget} 的按键映射和 \texttt{MovementIntent} 的填充逻辑。
+
+
+\subsection{4.6 与旧版设计的对比}
+
+本项目 View 层的架构经历了两次重要的设计迭代：
+
+\subsubsection{4.6.1 第一版：Qt 信号驱动的 MVVM}
+
+最初版本采用 Qt \texttt{signal}/\texttt{slot} 作为 MVVM 绑定机制：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+signals:
+    void commandGenerated(const GameCommand\& command);
+    void tickRequested(float deltaSeconds, std::uint64\_t frameIndex);
+
+connect(m\_widget, \&GameWidget::commandGenerated, this, [this](const GameCommand\& command) \{
+    m\_commandSink.handle\_command(command);
+\});
+\end{Shaded}
+\end{Highlighting}
+
+这种设计的耦合问题：
+\begin{itemize}
+\item \texttt{GameCommand} 需要在 Common 层定义结构体包装输入数据和 Tick 数据
+\item ViewModel 需要实现 \texttt{IGameCommandSink} / \texttt{IGameSnapshotSource} 接口
+\item 绑定器 \texttt{GameWidgetBinding} 作为中间人同时持有 View 和 ViewModel 的引用
+\item Qt 信号机制渗透进 MVVM 绑定路径
+\end{itemize}
+
+\subsubsection{4.6.2 第二版（当前版本）：std::function 直接注入}
+
+参考课程 Plane 示例后，改为 \texttt{std::function} 直接回调：
+
+\begin{longtable}{l l l}
+\toprule
+\textbf{对比维度} & \textbf{第一版} & \textbf{第二版} \\
+\midrule
+\endhead
+命令传播 & \texttt{emit signal → connect → lambda → handle\_command} & \texttt{std::function()} 直接调用 \\
+命令粒度 & 一个 \texttt{GameCommand} 结构体 + \texttt{CommandType} 分发 & 十个独立语义命令，各司其职 \\
+接口契约 & \texttt{IGameCommandSink} / \texttt{IGameSnapshotSource} 抽象类 & \texttt{std::function} setter + \texttt{const GameState*} \\
+通知方式 & cookie 回调列表 & \texttt{EventTrigger} 的 \texttt{add\_notification} \\
+绑定器 & 独立的 \texttt{GameWidgetBinding} 类 & App 层在主函数中直接注入 \\
+移动输入 & 四个独立 \texttt{Pressed}/\texttt{Released} & 四个方向 \texttt{bool} 命令 + View 内 \texttt{MovementIntent} 聚合 \\
+\bottomrule
+\end{longtable}
+
+第二版的关键改进：
+\begin{enumerate}
+\item Qt 仅作为事件源（\texttt{QKeyEvent}）和渲染后端（\texttt{QPainter}），不参与 MVVM 绑定
+\item 命令签名自文档化——\texttt{set\_move\_left\_command(std::function<void(bool)>)} 明确表达了"向左移动的开/关"
+\item View 层不依赖任何 ViewModel 头文件，只依赖 \texttt{common/game\_state.h} 和 \texttt{common/notification.h}
+\item 将来替换 GUI 框架只需改 \texttt{keyPressEvent}/\texttt{keyReleaseEvent} 和 \texttt{paintEvent}，无需动其他层
+\end{enumerate}
+
+
+\subsection{4.7 小结}
+
+View 层在本项目中的核心贡献是把 Common 契约转化为可玩的 Qt 游戏界面，同时严格保持自身职责边界：
+
+\begin{itemize}
+\item \textbf{输入}：键盘物理事件被翻译为已注入的命令回调，每个方向独立可追踪
+\item \textbf{时间}：60 FPS 定时器驱动逻辑帧，tick 命令通过 \texttt{std::function} 发出
+\item \textbf{状态}：ViewModel 的只读 \texttt{GameState} 指针被解释为可视化的场景、角色和 HUD
+\item \textbf{通知}：ViewModel 的 \texttt{fire(kGameStateChangedEvent)} 触发 View 重绘，View 在重绘时从指针拉取最新数据
+\end{itemize}
+
+由于 View 不直接操作规则对象，也不包含任何 ViewModel 头文件，后续 ViewModel 继续扩展玩法时，View 只需要响应 \texttt{GameState} 中新增的字段或状态枚举即可。这种分层方式使界面迭代和逻辑迭代可以独立进行，降低了多人协作时的合并冲突概率。
+
+
+\subsection{4.8 技术难点的克服}
+
+开发 View 层过程中遇到的主要技术难点及解决方案：
+
+\textbf{难点一：Common 接口频繁变更导致 View 编译失败。} 项目初期 Common 层经历了多次重构——\texttt{ActorViewData} 改名为 \texttt{ActorSnapshot}、\texttt{GameSnapshot} 的字段重组（\texttt{progressRatio} 从子结构移至顶层）、\texttt{GameCommand} 结构体被移除改为 \texttt{std::function} 注入。每次 Common 变更都会导致 View 层多处引用失效。解决方式是每次收到 Common 变更通知后，先用 IDE 全局搜索旧类型名，逐个定位并更新引用；同时 View 层内部通过 \texttt{game\_state()} 辅助函数统一访问入口，减少了直接引用分散字段的代码量，降低了后续适配成本。
+
+\textbf{难点二：Qt 信号到 std::function 的模式迁移。} 第一版 View 使用 Qt \texttt{signal}/\texttt{slot} 做 MVVM 绑定——\texttt{GameWidget} 通过 \texttt{emit commandGenerated()} 和 \texttt{emit tickRequested()} 发出信号，\texttt{GameWidgetBinding} 用 \texttt{connect} 桥接到 ViewModel。老师指出这与 Plane 示例的 \texttt{std::function} 回调模式不一致。改造的挑战在于：键盘事件遍布 \texttt{keyPressEvent} 和 \texttt{keyReleaseEvent} 两处，定时器回调在构造函数 lambda 中，每处都需要从 \texttt{emit signal(...)} 改为 \texttt{if (m\_xxx) m\_xxx(...)}，且要保证每个 \texttt{std::function} 都有对应的 setter 和空指针安全检查。解决方式是先完成 MainWindow 层的接口设计（十一个独立命令 setter），再逐个替换 GameWidget 中的 emit 调用，最后删除 \texttt{GameWidgetBinding} 和所有 \texttt{signals:} 声明。
+
+\textbf{难点三：键位去重与状态聚合。} 游戏需要区分"持续按住方向键移动"和"单次按下攻击/跳跃"。Qt 键盘事件自带的 \texttt{isAutoRepeat()} 无法完全解决问题：玩家快速连按同一攻击键时，如果键位没有完全释放就再次按下，会导致第二次攻击被忽略。解决方案是用 \texttt{QSet<int> m\_triggeredThisPress} 记录本轮已触发的按键，只有在 \texttt{keyReleaseEvent} 清除记录后，同一按键才能再次触发。对于移动键，通过 \texttt{MovementIntent} 结构体聚合四个方向，避免对同一方向重复发送 \texttt{Pressed} 命令。
+
+\textbf{难点四：无图片素材下的游戏画面呈现。} 项目没有使用任何外部 PNG 图片资源，所有视觉元素——玩家、敌人、Boss、建筑、街道、HUD 血条、GO 提示——全部用 \texttt{QPainter} 几何图形绘制。挑战在于用有限的矩形、圆形和线条组合出可辨识的角色形象和场景氛围。解决方案包括：用 \texttt{QLinearGradient} 模拟夜空和文字渐变、用视差系数（0.3x）区分远景建筑和主场景的深度、用正弦函数驱动行走时的腿部摆动、用不同颜色方案区分玩家/小怪/Boss、为受伤和死亡状态设计专门的视觉反馈（红色闪烁、黄色星效、红色 X 线）。
+
+
+\subsection{4.9 团队协作情况}
+
+View 层作为项目四个模块之一，与 Common、ViewModel、App 层同学保持了持续的沟通：
+
+\textbf{协作亮点：}
+
+\begin{itemize}
+\item Common 层的接口定义（\texttt{GameState}、\texttt{EventNotification}）在定稿后通过 README 和代码注释向 View 和 ViewModel 同步，View 层据此独立开发绘制逻辑，未出现因理解偏差导致的大面积返工。
+\item ViewModel 层暴露的 \texttt{std::function} 命令接口（如 \texttt{get\_move\_left\_command()}、\texttt{get\_primary\_action\_command()}）与 View 层的 setter 接口一一对应，双方在接口命名上提前对齐，减少了联调时的误解。
+\item App 层的组合根（\texttt{GameApplication}）在绑定阶段统一完成了 properties / commands / notification 三步注入，View 层只需实现对应的接收接口，不参与绑定决策，降低了 View 的复杂度。
+\end{itemize}
+
+\textbf{可改进之处：}
+
+\begin{itemize}
+\item 项目初期 Common 层的类型命名（如 \texttt{ActorViewData} → \texttt{ActorSnapshot}）和结构组织（如 \texttt{snapshot.h} 字段重组）经历了多次迭代，View 层需要被动跟随修改。如果事先在文档中约定好最终的数据结构，可以减少适配成本。
+\item View 层的绘制代码目前全部集中在 \texttt{GameWidget.cpp} 单文件中（约 550 行），后续角色种类和 HUD 元素增多时，可考虑将角色绘制器和 HUD 绘制器拆分为独立类，方便多人并行开发。
+\end{itemize}
+
+
+\subsection{4.10 阶段性成果展示}
+
+截至当前迭代，View 层完成了以下可演示的功能：
+
+\begin{itemize}
+\item 标题画面：渐变标题 "ALLEY FIST"、副标题 "巷战双截龙"、操作说明列表、闪烁提示 "Press ENTER to Start"
+\item 游戏场景：夜色天空渐变背景、视差滚动建筑群（14 栋带窗户灯光的大楼）、三层街道（人行道 + 车道虚线 + 人行道 + 路缘石）
+\item 角色系统：玩家（蓝色）、小怪（红色）、Boss（深红大尺寸）三种角色，支持站立/行走/轻攻击/重攻击/跳跃/飞踢/受击/死亡八种姿态，朝向翻转、无敌闪烁、敌人头顶血条
+\item HUD 系统：HP 血条（绿→黄→红）、EN 精力条（蓝色）、疲劳 "EXHAUSTED" 警告、1-3 HIT 连击计数器、Boss 血条、屏幕中央消息、底部关卡进度条
+\item 交互反馈：清屏后 "GO ▶" 闪烁提示（多层描边发光）、暂停半透明遮罩、Game Over 红色结算（存活时间 + 击败数 + "Press R to Restart"）、You Win 金色结算
+\item 输入系统：方向键/WASD 八方向移动、J/Z 轻攻击、K/X 重攻击、Space 跳跃、P/Esc 暂停、Enter 确认、R 重开
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.90\linewidth]{Markdown/image-3.png}
+\caption{游戏运行效果截图}
+\end{figure}
+
+
+
+
+
+\section{5 ViewModel 层分报告}
+
+\sectionauthor{邱安琪}{3240105004}
+
+\subsection{5.1 层次定位}
+
+本工程遵循面向游戏类项目的 MVVM 实践规范。由于游戏场景中的核心数据（如实体状态、位置等）直接对应视图层的可绘制对象，无需进行二次业务模型转换，因此本架构合并了传统意义上的 Model 层，将其统一内聚于 ViewModel 层中。ViewModel 层负责把游戏规则封装为独立的模拟器（simulation）并将可绘制的状态快照提供给 View。View 只负责呈现和收集输入，所有玩法逻辑（移动、碰撞、伤害、敌人 AI、Boss 产生与判定等）都在 Simulation 中实现，且不依赖于 Qt 或绘图 API。
+
+在实现上该层由两部分组成：
+
+\begin{itemize}
+\item \texttt{GameViewModel}：对外门面，负责命令绑定、状态同步和事件通知；
+\item \texttt{GameSimulation}：内部仿真器，维护 \texttt{EntityState} 列表并推进移动、攻击、敌人 AI 与 Boss 逻辑。
+\end{itemize}
+
+这种设计的优势在于：一方面避免了 Model 到 ViewModel 的冗余数据转换，另一方面使得核心逻辑完全不依赖 Qt 或绘图 API，因而可以在无界面环境下进行逻辑验证与后续扩展。
+
+\subsection{5.2 文件组织与编译}
+
+ViewModel 层位于 \texttt{code/viewmodel/} 目录下，主要由以下文件组成：
+
+\begin{longtable}{l l}
+\toprule
+\textbf{文件} & \textbf{作用} \\
+\midrule
+\endhead
+\texttt{GameViewModel.h} / \texttt{GameViewModel.cpp} & 对外暴露命令接口、维护本地状态、负责与 View 同步 \texttt{GameState} \\
+\texttt{GameSimulation.h} / \texttt{GameSimulation.cpp} & 实现规则引擎，处理实体移动、攻击、AI、Boss 生成与胜负判定 \\
+\texttt{SimulationTypes.h} & 定义 \texttt{EntityState}、\texttt{EntityList}、实体种类和动作相关类型 \\
+\texttt{CMakeLists.txt} & 编译为 \texttt{alleyfist\_viewmodel} 静态库 \\
+\bottomrule
+\end{longtable}
+
+编译配置如下：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+add\_library(alleyfist\_viewmodel STATIC
+    GameViewModel.cpp
+    GameSimulation.cpp
+)
+
+target\_link\_libraries(alleyfist\_viewmodel
+    PUBLIC
+        alleyfist\_common
+)
+\end{Shaded}
+\end{Highlighting}
+
+与 View 层相比，ViewModel 层不直接链接 Qt 库，而是通过 Common 层提供的公共契约与 View 进行通信。这样可以保证逻辑层与界面层的解耦，后续无论替换为 SDL、OpenGL 还是其他框架，都不会影响游戏规则本身。
+
+\subsection{5.3 GameViewModel}
+
+\texttt{GameViewModel} 是整个 ViewModel 层对外暴露的核心入口。它不直接参与具体规则计算，而是负责把 View 的输入转成内部命令，并将规则结果整理为 View需要的状态快照。
+
+\subsubsection{5.3.1 核心职责}
+
+\texttt{GameViewModel} 的职责可以概括为三点：
+
+\begin{enumerate}
+\item 接收 View 发送的命令，例如移动、攻击、跳跃、暂停、确认和重置；
+\item 维护本地动作状态，例如按键状态、跳跃计时、攻击计时和玩家能量；
+\item 将 \texttt{GameSimulation} 的结果同步到 \texttt{GameState}，并通过事件通知 View 刷新界面。
+\end{enumerate}
+
+\subsubsection{5.3.2 命令注入与回调}
+
+当前工程采用的是轻量级的“命令回调”风格，而不是传统意义上的完整命令类层次结构。\texttt{GameViewModel} 通过 \texttt{std::function} 暴露命令接口，例如：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+std::function<void(float, std::uint64\_t)> get\_tick\_command();
+std::function<void(bool)> get\_move\_left\_command();
+std::function<void()> get\_primary\_action\_command();
+std::function<void()> get\_pause\_command();
+\end{Shaded}
+\end{Highlighting}
+
+View 层只需要注册这些回调即可，在收到输入后，ViewModel 再由内部方法处理具体逻辑。比如 \texttt{make\_move\_command()} 用来维护方向键状态，\texttt{begin\_attack()} 则负责触发攻击并消耗能量。这种设计使 View 不必知道“攻击是如何发生的”，只需要发出“攻击”请求即可。
+
+\subsubsection{5.3.3 Tick 驱动与状态同步}
+
+\texttt{GameViewModel::tick()} 是整个逻辑循环的入口。每帧都会先更新跳跃、攻击和能量计时，然后根据当前按键状态调用 \texttt{GameSimulation::player\_move()} 与 \texttt{GameSimulation::step()}，最后通过 \texttt{sync\_state\_from\_simulation()} 将内部实体状态映射为对外的 \texttt{GameState}。这一过程体现了 ViewModel 的典型职责链路：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+输入命令 → 本地状态更新 → Simulation 推进 → 状态快照 → 事件通知
+\end{Shaded}
+\end{Highlighting}
+
+在实现上，\texttt{fire(kGameStateChangedEvent)} 用于在状态变化后通知订阅者，View 层收到通知后即可调用重绘，从而形成完整的“变化通知—数据读取—界面刷新”闭环。
+
+\subsection{5.4 GameSimulation 仿真核心}
+
+\texttt{GameSimulation} 是整个 ViewModel 层的规则引擎，负责实体状态、战斗逻辑和关卡推进。
+
+\subsubsection{5.4.1 实体与世界状态}
+
+仿真层使用 \texttt{EntityState} 维护每个实体。玩家为列表第一个实体，后续实体为敌人或 Boss。每个实体包含位置、血量、最大血量、是否存活等信息。这样的设计使得逻辑判断比较直观：所有规则都围绕一组实体进行，而不是围绕界面对象进行。
+
+\subsubsection{5.4.2 移动与战斗}
+
+\texttt{GameSimulation} 的主要规则方法包括：
+
+\begin{itemize}
+\item \texttt{player\_move()}：根据输入更新玩家的位置，并限制在世界范围内；
+\item \texttt{player\_attack()}：对附近敌人造成固定伤害，并在部分敌人死亡时更新 Boss 状态；
+\item \texttt{simulate\_ai()}：让敌人朝玩家方向接近，并在接近时对玩家造成伤害。
+\end{itemize}
+
+其中，玩家的移动和攻击是在逻辑层完成的，而不是由 View 直接处理，因此 View 层可以保持“只负责展示”这一职责边界。
+
+\subsubsection{5.4.3 Boss 与胜负判定}
+
+为了增强关卡感，仿真器还内置了 Boss 触发逻辑：
+
+\begin{itemize}
+\item \texttt{spawn\_boss\_if\_needed()}：当玩家推进到指定位置后生成 Boss；
+\item \texttt{update\_boss\_state()}：持续检查 Boss 是否仍然存活；
+\item \texttt{boss\_defeated()}：在 Boss 被击败后向外部报告胜负状态。
+\end{itemize}
+
+最终，\texttt{GameViewModel} 会根据这些结果切换当前阶段为 \texttt{Playing}、\texttt{Paused}、\texttt{GameOver} 或 \texttt{Win}，形成完整的战斗闭环。
+
+\subsection{5.5 状态快照与阶段切换}
+
+\texttt{sync\_state\_from\_simulation()} 是 ViewModel 向外输出状态的关键函数。它会把内部实体状态整理为 \texttt{GameState}，包括以下内容：
+
+\begin{itemize}
+\item 玩家位置、血量、能量、朝向和动作状态；
+\item 敌人列表与 Boss 血条信息；
+\item 地图相机位置、推进比例和 HUD 状态；
+\item 当前阶段（\texttt{Playing}、\texttt{Paused}、\texttt{GameOver}、\texttt{Win}）。
+\end{itemize}
+
+这一层的设计使 View 可以保持相对简单：它只需要读取一份快照，不需要自己去推断角色位置、敌人数量或阶段状态。对应地，ViewModel 也不需要知道屏幕上如何绘制，只需要保证快照字段语义明确即可。
+
+其中阶段切换逻辑较为清晰：
+
+\begin{itemize}
+\item 玩家死亡进入 \texttt{GameOver}；
+\item Boss 死亡进入 \texttt{Win}；
+\item 暂停时切换为 \texttt{Paused}；
+\item 确认键可在标题、失败或胜利状态下重开游戏。
+\end{itemize}
+
+\subsection{5.6 小结}
+
+本工程的 ViewModel 层实现了一个简洁但完整的”输入—规则—状态”链路：
+
+\begin{itemize}
+\item \texttt{GameViewModel} 负责输入接收、状态同步与事件通知；
+\item \texttt{GameSimulation} 负责纯规则逻辑，包括移动、攻击、敌人 AI、Boss 生成与胜负判定。
+\end{itemize}
+
+这种结构使 View 只需关注显示与交互，而玩法逻辑则被集中封装在 ViewModel 层内，便于后续继续扩展更复杂的关卡与战斗系统。
+
+\subsection{5.7 技术难点的克服}
+
+开发 ViewModel 层过程中，主要遇到以下技术难点：
+
+\textbf{难点一：输入与逻辑的解耦。} 最初版本在 Common 层定义了 \texttt{InputAction} 枚举和 \texttt{GameCommand} 结构体，View 发出 \texttt{GameCommand}，ViewModel 通过 \texttt{process\_input\_command()} 做 switch-case 分发。这种设计的耦合问题在于：Common 层被迫包含输入设备相关的概念（\texttt{MoveLeft}、\texttt{LightAttack} 等），而 ViewModel 也需要理解按下/释放的状态语义。在袁老师指导下，我们将命令改为 \texttt{std::function} 回调注入——\texttt{get\_move\_left\_command()} 返回 \texttt{std::function<void(bool)>}，\texttt{get\_primary\_action\_command()} 返回 \texttt{std::function<void()>}。ViewModel 不再需要知道”按键”这个概念，只需要响应”左移动开启/关闭”这样的语义信号。
+
+\textbf{难点二：Tick 与状态同步的一致性。} 每帧的逻辑推进涉及多个步骤：更新动作计时器、处理移动输入、调用 \texttt{GameSimulation::step()}、同步内部实体到 \texttt{GameState} 快照、触发通知。如果顺序不统一，容易出现画面滞后或逻辑状态不同步。解决方案是将 \texttt{tick()} 设计为统一入口，严格按”计时器更新 → 输入处理 → 模拟推进 → 状态同步 → 通知触发”的顺序执行，保证每帧的状态一致性。
+
+\textbf{难点三：动作系统与能量系统的协调。} 跳跃、攻击、能量恢复和疲劳状态需要同时管理——玩家不能在被攻击硬直时跳跃，不能在空中连续跳跃，能量耗尽后需要恢复期。解决方案是通过 \texttt{m\_jumpElapsed}、\texttt{m\_attackTimer}、\texttt{m\_playerEnergy}、\texttt{m\_exhaustedWarningTimer} 以及 \texttt{try\_spend\_energy()} 组成一组局部状态管理，\texttt{is\_gameplay\_active()} 和 \texttt{is\_player\_action\_locked()} 作为守卫条件，在命令入口处拦截不合法的操作。
+
+\textbf{难点四：Boss 与胜负条件的判定。} 当 Boss 生成、敌人死亡和玩家死亡同时可能发生时，阶段切换逻辑容易混乱。最终通过 \texttt{spawn\_boss\_if\_needed()}、\texttt{update\_boss\_state()} 与 \texttt{boss\_defeated()} 的分层处理，把 Boss 触发、存活检测和胜负切换拆解为独立的步骤，再由 \texttt{sync\_state\_from\_simulation()} 统一设置 \texttt{GameState.phase}。
+
+\subsection{5.8 团队协作情况}
+
+ViewModel 层作为项目核心规则层，与 View、App 和 Common 层保持了持续沟通。
+
+\textbf{协作亮点：}
+
+\begin{itemize}
+\item Common 层定义的 \texttt{GameState} 和 \texttt{EventTrigger} 在前期经过几轮迭代后趋于稳定，ViewModel 层据此独立完成逻辑与快照映射，减少了接口反复修改的成本。
+\item \texttt{GameViewModel} 暴露的命令接口（如 \texttt{get\_move\_left\_command}、\texttt{get\_primary\_action\_command}）与 View 层的 setter 命名一一对应，联调时几乎不需要额外沟通。
+\item App 层在组合根中统一完成 properties / commands / notification 的注入，ViewModel 只负责实现接口，不参与绑定细节。
+\end{itemize}
+
+\textbf{可改进之处：}
+
+\begin{itemize}
+\item 仿真层（\texttt{GameSimulation}）和 ViewModel 层的职责边界可以更清晰——当前部分状态（如 \texttt{m\_moveLeft} 等移动标志）在 ViewModel 维护，部分在 Simulation 维护，后续可以统一为 Simulation 内部持有所有规则状态。
+\item 缺少 ViewModel 层的独立单元测试。虽然逻辑层不依赖 Qt，便于测试，但目前 \texttt{GameSimulationTest.cpp} 的覆盖范围有限。
+\end{itemize}
+
+\subsection{5.9 阶段性成果展示}
+
+截至当前迭代，ViewModel 层已经完成了以下可演示的功能：
+
+\begin{itemize}
+\item 玩家移动与边界限制（八方向按键 → 世界坐标位移 + 街道边界钳制）
+\item 轻攻击、重攻击、跳跃，每个动作带独立的能量消耗和冷却计时
+\item 精力恢复系统，精力耗尽后触发疲劳状态
+\item 小怪 AI 追击与近距离伤害
+\item Boss 触发（玩家推进到指定位置后自动生成）与 Boss 血量状态检测
+\item 游戏阶段切换（Playing → Paused ↔ Playing / Playing → GameOver / Playing → Win）
+\item 将内部规则结果整理为可供 View 直接绘制的 \texttt{GameState} 快照
+\end{itemize}
+
+\subsection{5.10 总体心得与个人感悟}
+
+作为 ViewModel 层开发者，本次项目的最大收获是对 MVVM 中”规则与表现的分离”有了实践层面的理解。之前写游戏时习惯于在键盘事件里直接改坐标、在绘制函数里顺手写碰撞判断，开发速度快但后续改动成本很高。这次严格按照 MVVM 设计后，虽然前期投入更多时间拆分层级和定义接口，但后期联调和迭代确实更顺畅——改 AI 行为不需要动 View 的绘制代码，改界面布局也不需要担心影响游戏规则。
+
+另一个体会是：ViewModel 层的”门面”设计很重要。\texttt{GameViewModel} 对外暴露的是属性（\texttt{get\_game\_state()}）和命令（\texttt{get\_xxx\_command()}），内部委托 \texttt{GameSimulation} 处理规则细节，这种两层划分使得代码结构清晰，也便于后续对仿真核心进行单元测试。
+
+智能体的使用：在 ViewModel 层开发中，使用了 Claude Code 辅助生成命令回调的样板代码和 \texttt{sync\_state\_from\_simulation()} 的初始框架，节省了部分机械编码时间。但智能体在处理动作状态机等复杂逻辑时容易漏掉边界条件（如”跳跃中不能攻击”需要在两个不同的代码路径中添加守卫），最终的逻辑细节仍需要人工审核和修正。
+
+\section{6 总结与展望}
+
+\subsection{6.1 架构收获}
+
+本实验最重要的收获是通过 MVVM 把"输入、规则、显示"拆开。最初找袁老师验收时，我们的代码耦合度非常高：键盘事件里直接改坐标，绘制函数里顺手判断攻击，敌人 AI 和窗口状态混在一起。经袁老师指出，这样的代码很难并行开发，后续迭代和维护都会变得非常困难。
+
+在袁老师的指导下，我们进行了四次改进，最终通过了袁老师的验收。当前实现将跨层共享内容收敛为 \texttt{GameState}、基础值类型和通知工具，并把命令设计为从 ViewModel 暴露出来的 \texttt{std::function} 回调。ViewModel 负责规则，View 只根据只读状态完成绘制。如此一来，每个人可以围绕自己的层次推进，不必频繁修改其他人的内部实现。
+
+另一个收获是组合根的重要性。\texttt{GameApplication} 集中创建 Qt 应用、主窗口和 ViewModel，并在一个地方完成 properties / commands / notification 绑定。这样 main 函数、View 和 ViewModel 都不需要知道完整对象组装细节，依赖方向更加清楚。
+
+
+\subsection{6.2 技术难点的克服}
+
+在项目开发过程中，整个团队遇到了以下主要技术挑战，并通过协作逐一解决。
+
+\textbf{难点一：MVVM 绑定方式的演变。} 最初版本采用 Qt 的 \texttt{signal}/\texttt{slot} 机制做跨层绑定——View 发出 \texttt{commandGenerated} 信号，绑定器用 \texttt{connect} 桥接到 ViewModel。这种方案看起来直观，但暴露出两个问题：一是 \texttt{GameCommand} 结构体需要在 Common 层定义，把输入层概念（\texttt{InputAction}、\texttt{ButtonState}）带入公共契约；二是绑定路径依赖 Qt 信号机制，替换 GUI 框架时需要同时改动绑定逻辑。在袁老师的建议下，我们参考课程 Plane 示例，将绑定方式改为 \texttt{std::function} 回调注入：ViewModel 通过 \texttt{get\_xxx\_command()} 返回闭包，App 层在组合根中将这些闭包注入 View。这个改动由 View 层同学和 ViewModel 层同学协同完成——ViewModel 先定义新的命令接口，View 同步将所有 \texttt{emit signal} 替换为直接调用 \texttt{std::function}，App 层最后更新绑定代码。改造后，View 和 ViewModel 之间不再经过 Qt 信号，Common 层也不再需要 \texttt{InputAction} 等输入类型。
+
+\textbf{难点二：Common 接口的迭代与收敛。} Common 层作为 View 和 ViewModel 的共同依赖，经历了多轮重构：字段从 \texttt{ActorViewData} → \texttt{ActorSnapshot} → \texttt{ActorState}，\texttt{progressRatio} 从子结构提升到顶层，\texttt{GameCommand} 结构体被移除，命令改为 \texttt{std::function} 回调。每次接口变更都会导致 View 和 ViewModel 两端的引用失效。团队的应对策略是：Common 层同学在每次变更后同步更新示例代码并通知另外两人，View 和 ViewModel 层分别用 IDE 全局搜索批量更新引用。后期 Common 收敛为只包含 \texttt{types.h}、\texttt{game\_state.h} 和 \texttt{notification.h} 三个头文件后，改动频率明显下降，证明了"公共层越小越稳定"。
+
+\textbf{难点三：无图片素材下的游戏画面呈现。} 项目没有使用任何外部图片资源，所有视觉元素必须用 \texttt{QPainter} 几何图形绘制。如何在有限的矩形、圆形和线条组合下，让玩家、小怪和 Boss 具有辨识度，让背景有层次感，是 View 层面临的主要挑战。解决方案包括：用视差系数（0.3x）区分远景建筑和主场景的深度；用不同配色方案（蓝/红/深红）区分三方阵营；为不同 \texttt{ActorState} 设计不同的手臂、腿部姿态；用 \texttt{QLinearGradient} 模拟夜空、标题文字和胜利文字的光影效果。
+
+\textbf{难点四：ViewModel 层的规则与状态平衡。} ViewModel 既要维护丰富的内部状态（敌人追踪参数、能量恢复速率、跳跃物线、攻击硬直），又不能把这些实现细节泄漏给 View。解决方案是定义清晰的 \texttt{GameState} 出口——View 只需要知道位置、朝向、血量、动作状态、HUD 数据等可绘制的信息；而敌人 AI、攻击盒、能量消耗公式、Boss 触发位置等全部封装在 \texttt{GameSimulation} 内部。
+
+
+\subsection{6.3 团队协作情况}
+
+本组以 MVVM 三层为分工边界，三位成员分别负责 Common/App、View 和 ViewModel。整体协作顺畅，提交记录也体现了每层各自的推进节奏。
+
+\textbf{协作亮点：}
+
+\begin{itemize}
+\item 接口对齐效率高。App 层确定命名规范后，View 和 ViewModel 的 setter/getter 命名一一对应（如 \texttt{set\_move\_left\_command} ↔ \texttt{get\_move\_left\_command}），减少了很多沟通成本。
+\item 独立开发互不阻塞。在 Common 层稳定后，View 和 ViewModel 可以完全并行推进：View 照着 \texttt{GameState} 字段写绘制逻辑，ViewModel 照着命令接口写规则逻辑。两条线不需要彼此等待。
+\item 问题修复活跃。从 GitHub 提交历史可以看到，每位成员在完成自己模块后也参与了其他模块的 bug 修复和接口调整，例如 View 层同学协助排查 ViewModel 的同步时序问题，ViewModel 同学配合验证了绘制端的坐标偏移。
+\end{itemize}
+
+\textbf{可改进之处：}
+
+\begin{itemize}
+\item 前期 Common 接口的变更频率偏高。如果能在设计阶段先画出完整的 \texttt{GameState} 字段表和命令接口列表，可以避免中期的多轮重命名。
+\item 单元测试覆盖不足。目前只有 ViewModel 层有简单的测试用例，View 层的绘制和输入处理缺少自动化验证。后续可以考虑引入截图对比测试或输入重放测试。
+\item 代码 review 不够系统化。大部分 review 通过线下讨论完成，缺少 Pull Request 级别的正式审查。对于学生项目而言可以接受，但在正式工程中值得加强。
+\end{itemize}
+
+
+\subsection{6.4 阶段性成果展示}
+
+截至当前迭代，项目已经形成了一个可运行的游戏原型，支持以下核心功能：
+
+\begin{itemize}
+\item 标题画面：渐变标题 "ALLEY FIST"、副标题 "巷战双截龙"、操作说明列表
+\item 游戏场景：夜色天空渐变背景、视差滚动建筑群、三层街道（人行道 + 车道 + 人行道）
+\item 角色系统：玩家（蓝色）、小怪（红色）、Boss（深红大尺寸），支持站立/行走/轻攻击/重攻击/跳跃/飞踢/受击/死亡多种姿态
+\item HUD 系统：HP 血条、EN 精力条、疲劳提示、Boss 血条、关卡进度条、屏幕消息
+\item 交互反馈：暂停/Game Over/Win 覆盖层，结算统计（存活时间、击败敌人数量）
+\item 输入系统：方向键/WASD 移动、J/Z 轻攻击、K/X 重攻击、Space 跳跃、P/Esc 暂停、Enter 确认、R 重开
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.90\linewidth]{Markdown/image-3.png}
+\caption{游戏运行效果截图}
+\end{figure}
+
+上图展示了当前版本的游戏运行效果，包含标题画面、战斗场景、HUD 显示和 Boss 战等核心界面。
+
+
+\subsection{6.5 智能体的使用}
+
+本项目在开发过程中使用了 Claude Code 智能体辅助工作，主要应用在以下方面：
+
+\begin{itemize}
+\item \textbf{代码生成}：根据 Common 层的接口定义，批量生成 View 层的绘制代码骨架，包括背景、角色、HUD 和覆盖层的初始框架。
+\item \textbf{全局重构}：接口变更时（如类型重命名），通过智能体全局搜索并批量替换所有过时引用，减少手动逐一修改的工作量。
+\item \textbf{报告撰写}：协助生成本报告各章节的初稿，整理代码片段和技术说明。
+\end{itemize}
+
+智能体的资源是本次开发中的一个亮点——它能把重复性的代码生成和全局替换任务快速完成，让开发者专注于架构设计和技术决策。但也存在局限：生成的代码结构有时过于平铺，缺少合理的函数拆分；对 Qt API 的版本差异不够敏感；在理解游戏画面风格的细节上有较大偏差，生成的视觉效果需要较多人工调参。
+
+
+\subsection{6.6 后续改进方向}
+
+当前项目已经具备核心玩法骨架，但仍有一些可以继续完善的方向：
+
+\begin{itemize}
+\item 将敌人、Boss 触发和战斗数值从硬编码常量抽离成配置表，方便后续调整难度。
+\item 增加更完整的连招链、击退、击倒、无敌帧和受击硬直。
+\item 补充遭遇战锁屏、清屏解锁和 GO 提示字段，使关卡推进更接近最终设计。
+\item 引入图片、精灵动画和音效资源，替代当前的基础 \texttt{QPainter} 几何绘制。
+\item 补充单元测试，覆盖移动边界、攻击命中、Boss 生成、胜负判定等规则。
+\item 增加攻击命中的画面反馈——屏幕震动、受击粒子、伤害数字飘字。
+\end{itemize}
+
+
+\subsection{6.7 总结}
+
+本阶段完成了一个可运行且架构正确的横版动作游戏原型。项目从工程组织、公共状态、命令回调、界面绘制到规则模拟都已经形成闭环。通过 MVVM 分层和 \texttt{std::function} 命令注入，View 和 ViewModel 保持了清晰的单向依赖，为后续功能扩展和界面升级奠定了扎实的架构基础。
+
+
+\section{7 个人反思与收获}
+
+本章按题目要求由每位同学独立完成。下面仅提供统一格式模板，最终提交前请每位成员将占位内容替换为自己的真实反思与收获。
+
+\subsection{7.1 苏易文 - App/Common 层}
+
+姓名：苏易文
+
+学号：3240103466
+
+负责内容：App/Common 层，包括公共类型、游戏状态、通知工具、应用组合根、生命周期管理和三类绑定。
+
+个人反思与收获：
+
+本次项目中我主要负责 App/Common 层。开发过程中我最深的体会是：公共层不能什么都放，Common 层越克制，后续协作越轻松。
+
+一开始我们曾经倾向于在 Common 层定义比较完整的命令和快照接口，例如把输入动作、Tick、状态快照和绑定接口都统一抽象出来。这个方案看起来“完整”，但实际联调时会发现它容易让 Common 层承担过多职责：View 的输入细节、ViewModel 的命令粒度、状态同步方式都会被提前固定下来。后来参考课程示例后，我把公共契约收敛为三类更稳定的内容：\texttt{types.h} 中的基础值类型、\texttt{game\_state.h} 中的只读显示状态、\texttt{notification.h} 中的轻量事件通知。输入命令则由 ViewModel 通过 \texttt{std::function} 暴露，App 层负责注入给 View。这样 Common 层只保留真正需要跨层共享的内容，边界比之前清楚很多。
+
+在 \texttt{GameState} 的设计上，我也更理解了“给 View 的状态”和“ViewModel 内部状态”之间的区别。View 需要知道玩家位置、血量、动作状态、镜头位置、敌人列表和 HUD 数据，但不应该知道敌人追踪速度、Boss 触发阈值、攻击命中范围、跳跃计时等内部规则。把这些模拟细节留在 ViewModel 内部，可以避免 View 因规则调整频繁改动；而把绘制必需的数据整理进 \texttt{GameState}，又能让 View 不需要到处拼接内部对象。这个过程让我认识到，公共数据结构不是越详细越好，而是要刚好表达跨层协作所需的信息。
+
+App 层的 \texttt{GameApplication} 让我真正体会到组合根的价值。程序入口 \texttt{main.cpp} 只创建 \texttt{GameApplication} 并调用 \texttt{run()}，具体的 \texttt{QApplication}、\texttt{MainWindow} 和 \texttt{GameViewModel} 都被藏在 PImpl 里。这样公开头文件不会泄漏 Qt 和具体模块类型，也避免了其他层绕过 App 直接拿到内部对象。所有 properties / commands / notification 绑定都集中在 \texttt{GameApplication::Impl} 构造函数中完成，调试绑定问题时只需要看一个地方，项目结构也更容易向队友解释。
+
+这次协作中另一个收获是，接口稳定性对多人开发非常重要。View 层和 ViewModel 层同学都依赖 Common/App 提供的边界，如果我频繁修改命名或数据结构，就会给他们带来额外适配成本。因此后期我更注意在改接口前先确认它是否真的属于公共契约，是否可以用更小的类型表达，是否会迫使其他层知道不该知道的细节。这个思考过程比单纯写代码更有工程实践意义。
+
+总体来说，App/Common 层让我对 MVVM 有了更进一步的理解。一个好的分层不是把代码机械拆开，而是让每一层只看到自己应该看到的东西。Common 提供稳定语言，App 完成对象组装，View 和 ViewModel 才能相对独立地演进。后续如果继续完善这个项目，
+
+\subsection{7.2 陈棋隆 - View 层}
+
+姓名：陈棋隆
+
+学号：3240103461
+
+负责内容：View 层，包括 \texttt{MainWindow}、\texttt{GameWidget}、键盘输入、定时器、绘制、HUD 和覆盖层。
+
+个人反思与收获：
+
+这次做Qt小游戏，最大的收获就是学习了MVVM设计模式。原来键盘事件、绘图和游戏逻辑混着写，改功能成本高，后来学会用 GameState 存状态、靠命令解耦，界面只管读数据画图，逻辑只管算，改起来清爽多了，我深刻体会到了MVVM设计模式的好处
+
+\subsection{7.3 邱安琪 - ViewModel 层}
+
+姓名：邱安琪
+
+学号：3240105004
+
+负责内容：ViewModel 层，包括 \texttt{GameViewModel}、\texttt{GameSimulation}、移动、攻击、敌人 AI、Boss 生成和胜负判定。
+
+个人反思与收获：
+
+在本次项目中，我负责完成了 ViewModel 层的核心规则引擎和状态同步逻辑。MVVM架构中ViewModel层和View层解耦的思想让我能够专注于工程设计的推进逻辑，同时让工程本身具有极大的可拓展性和可维护性。这是我在第一轮迭代过程中感受最深的地方。当然，在于袁老师的交流中，我也纠正了一些关于MVVM架构和ViewModel层设计的误区。在实现Viewmodel和View之间的绑定的时候没有事先考虑工程的可拓展性，导致Viewmodel和View之间几乎是一对一绑定。这样设计的坏处在于一旦工程变得复杂，我只能通过更多的绑定接口实现逻辑，工程的可拓展性和可维护性就很差。  
+
+与此同时，Tick 驱动的推进方式让我进一步理解了游戏逻辑与渲染更新的关系：每一帧由 ViewModel 收集输入并调用 Simulation 进行一步推进，再把结果整理为统一的 GameState 快照，从而保证界面显示与内部规则始终保持一致。  
+
+在进行游戏设计的时候，由于之前没有做过相关的工程，我先去网上学习了相关的游戏逻辑的设计，从状态机到碰撞判定与攻击盒的实现，自己一步步地边学边用，看到一行行代码变成流畅的游戏体验让我非常有成就感。
+
+\end{document}
