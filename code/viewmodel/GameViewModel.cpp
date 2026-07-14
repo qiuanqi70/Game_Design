@@ -208,6 +208,8 @@ void GameViewModel::sync_state_from_simulation()
     }
 
     const auto& player = list.front();
+    m_state.player.id = static_cast<std::uint32_t>(player.id);
+    m_state.player.kind = ActorKind::Player;
     m_state.player.team = Team::Player;
     m_state.player.position = player.pos;
     m_state.player.position.x = std::clamp(m_state.player.position.x, 0.0f, kWorldWidth);
@@ -250,7 +252,8 @@ void GameViewModel::sync_state_from_simulation()
         const int fallbackMaxHealth = isBoss ? 140 : 20;
 
         ActorState actor;
-        actor.kind = isBoss ? ActorKind::Boss : ActorKind::Grunt;
+        actor.id = static_cast<std::uint32_t>(entity.id);
+        actor.kind = isBoss ? ActorKind::Boss : ActorKind::Patroller;
         actor.team = Team::Enemy;
         actor.position = entity.pos;
         actor.position.laneY = std::clamp(actor.position.laneY, kStreetTop, kStreetBottom);

@@ -35,7 +35,11 @@ enum class Team {
 };
 
 enum class ActorKind {
-    Grunt,
+    Player,
+    Patroller,
+    Ambusher,
+    Charger,
+    Ranged,
     Boss
 };
 
@@ -44,9 +48,19 @@ enum class ActorActionState {
     Walk,
     LightAttack,
     HeavyAttack,
+    RangedAttack,
+    Ambush,
+    Charge,
     Jump,
     AirAttack,
+    Hurt,
     Dead
+};
+
+enum class ImpactLevel {
+    None,
+    Light,
+    Heavy
 };
 
 enum class Facing {
@@ -55,7 +69,8 @@ enum class Facing {
 };
 
 struct ActorState {
-    ActorKind kind = ActorKind::Grunt;
+    std::uint32_t id = 0;
+    ActorKind kind = ActorKind::Player;
     Team team = Team::Player;
     alleyfist::WorldPosition position;
     alleyfist::Size drawSize;
@@ -63,6 +78,53 @@ struct ActorState {
     ActorActionState actionState = ActorActionState::Idle;
     Facing facing = Facing::Right;
     bool visible = true;
+    std::uint32_t impactRevision = 0;
+    ImpactLevel lastImpact = ImpactLevel::None;
+};
+
+enum class ProjectileKind {
+    ThrownObject
+};
+
+struct ProjectileState {
+    std::uint32_t id = 0;
+    ProjectileKind kind = ProjectileKind::ThrownObject;
+    Team team = Team::Enemy;
+    alleyfist::WorldPosition position;
+    Facing facing = Facing::Left;
+};
+
+enum class PickupKind {
+    Health,
+    Energy
+};
+
+struct PickupState {
+    std::uint32_t id = 0;
+    PickupKind kind = PickupKind::Health;
+    alleyfist::WorldPosition position;
+};
+
+enum class EncounterKind {
+    None,
+    EnemyWave,
+    Boss
+};
+
+enum class EncounterPhase {
+    None,
+    Intro,
+    Fighting,
+    Cleared
+};
+
+struct EncounterState {
+    EncounterKind kind = EncounterKind::None;
+    EncounterPhase phase = EncounterPhase::None;
+    std::uint32_t currentWave = 0;
+    std::uint32_t totalWaves = 0;
+    std::uint32_t remainingEnemies = 0;
+    float introProgress = 0.0f;
 };
 
 struct HudState {
@@ -80,9 +142,12 @@ struct GameState {
     MapState map;
     ActorState player;
     std::vector<ActorState> enemies;
+    std::vector<ProjectileState> projectiles;
+    std::vector<PickupState> pickups;
     HudState hud;
     GameResultState result;
     std::string screenMessage;
+    EncounterState encounter;
 };
 
 } // namespace alleyfist
