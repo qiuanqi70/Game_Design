@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 set -euo pipefail
 
@@ -23,7 +23,7 @@ for tool in pandoc xelatex; do
   fi
 done
 
-setopt null_glob
+shopt -s nullglob
 INPUT_MDS=("$MD_DIR"/*.md)
 if (( ${#INPUT_MDS[@]} == 0 )); then
   echo "错误: 未在 $MD_DIR 中找到 Markdown 文件。" >&2
@@ -31,7 +31,6 @@ if (( ${#INPUT_MDS[@]} == 0 )); then
 fi
 
 mkdir -p "$OUTPUT_DIR" "$TMP_LATEX_DIR"
-rm -f "$OUTPUT_PDF"
 
 pandoc "${INPUT_MDS[@]}" \
   --standalone \
@@ -42,7 +41,7 @@ pandoc "${INPUT_MDS[@]}" \
   --lua-filter="$FILTER_LUA" \
   --include-in-header="$HEADER_TEX" \
   --include-before-body="$TITLEPAGE_TEX" \
-  --highlight-style=pygments \
+  --syntax-highlighting=pygments \
   --metadata=documentclass:ctexart \
   --metadata=classoption:"12pt,fontset=none" \
   --metadata=date:"" \

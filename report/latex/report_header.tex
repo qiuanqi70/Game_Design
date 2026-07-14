@@ -21,38 +21,66 @@
 \IfFontExistsTF{Latin Modern Roman}{
   \setmainfont{Latin Modern Roman}
 }{
-  \setmainfont{DejaVu Serif}
+  \IfFontExistsTF{Times New Roman}{
+    \setmainfont{Times New Roman}
+  }{
+    \setmainfont{Times}
+  }
 }
 \IfFontExistsTF{Latin Modern Sans}{
   \setsansfont{Latin Modern Sans}
 }{
-  \setsansfont{DejaVu Sans}
+  \IfFontExistsTF{Arial}{
+    \setsansfont{Arial}
+  }{
+    \setsansfont{Helvetica}
+  }
 }
 \IfFontExistsTF{Latin Modern Mono}{
   \setmonofont[Scale=0.92]{Latin Modern Mono}
 }{
-  \setmonofont[Scale=0.92]{DejaVu Sans Mono}
+  \IfFontExistsTF{Courier New}{
+    \setmonofont[Scale=0.92]{Courier New}
+  }{
+    \setmonofont[Scale=0.92]{Menlo}
+  }
 }
 \IfFontExistsTF{Noto Serif CJK SC}{
   \setCJKmainfont{Noto Serif CJK SC}
 }{
-  \setCJKmainfont{SimSun}
+  \IfFontExistsTF{Songti SC}{
+    \setCJKmainfont{Songti SC}
+  }{
+    \setCJKmainfont{PingFang SC}
+  }
 }
 \IfFontExistsTF{Noto Sans CJK SC}{
   \setCJKsansfont{Noto Sans CJK SC}
 }{
-  \setCJKsansfont{SimHei}
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKsansfont{PingFang SC}
+  }{
+    \setCJKsansfont{Heiti SC}
+  }
 }
 \IfFontExistsTF{Noto Serif CJK SC}{
   \setCJKmonofont[AutoFakeSlant]{Noto Serif CJK SC}
 }{
-  \setCJKmonofont[AutoFakeSlant]{SimSun}
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKmonofont[AutoFakeSlant]{PingFang SC}
+  }{
+    \setCJKmonofont[AutoFakeSlant]{Songti SC}
+  }
 }
 
 \IfFontExistsTF{Noto Sans CJK SC}{
   \setCJKfamilyfont{zhhei}{Noto Sans CJK SC}
 }{
-  \setCJKfamilyfont{zhhei}{SimHei}
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKfamilyfont{zhhei}{PingFang SC}
+  }{
+    \setCJKfamilyfont{zhhei}{Heiti SC}
+  }
 }
 \newcommand{\heiti}{\CJKfamily{zhhei}}
 
@@ -163,4 +191,3 @@
   \end{flushright}
   \vspace{0.2em}
 }
-

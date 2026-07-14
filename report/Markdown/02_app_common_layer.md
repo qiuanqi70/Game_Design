@@ -1,14 +1,14 @@
 # 3 App/Common 层分报告
 
-\sectionauthor{C}{待填写}
+\sectionauthor{苏易文}{3240103466}
 
 ## 3.1 层次定位
 
 App/Common 这一部分承担两个不同但相关的职责。
 
-`common/` 是 View 与 ViewModel 之间的公共合同。它不依赖 Qt，也不写具体玩法，只定义两层都能理解的数据结构和接口。`app/` 是应用组合根，负责创建 Qt 应用对象、主窗口和 ViewModel，并把 View 与 ViewModel 通过 Common 接口绑定起来。
+`common/` 是 View 与 ViewModel 之间的公共合同。它不依赖 Qt，也不写具体玩法，只定义两层都能理解的基础值类型、只读游戏状态和通知工具。`app/` 是应用组合根，负责创建 Qt 应用对象、主窗口和 ViewModel，并把 View 与 ViewModel 通过属性、命令和通知三类接口绑定起来。
 
-这两层的共同目标是控制依赖边界：公共协议放在 Common，具体对象创建放在 App，避免 View 和 ViewModel 彼此直接包含对方头文件。
+这两层的共同目标是控制依赖边界：公共状态和通知工具放在 Common，具体对象创建和绑定放在 App，避免 View 和 ViewModel 彼此直接包含对方头文件。
 
 ## 3.2 Common 层设计
 
@@ -17,66 +17,70 @@ Common 层主要由四类文件组成：
 | 文件 | 作用 |
 | --- | --- |
 | `types.h` | 定义 `Size`、`WorldPosition`、`ResourceBar` 等基础值类型 |
-| `actions.h` | 定义 `InputAction`、`ButtonState`、`GameCommand`，作为输入通道协议 |
-| `snapshot.h` | 定义 `GameSnapshot` 及其子结构，作为状态通道协议 |
-| `contracts.h` | 定义 `IGameCommandSink`、`IGameSnapshotSource` 和回调绑定类型 |
+| `game_state.h` | 定义 `GameState` 及其子结构，作为 View 可读取的状态协议 |
+| `notification.h` | 定义 `EventNotification` 与 `EventTrigger`，作为变化通知工具 |
+| `common.h` | 便捷入口，统一包含 Common 层公共头文件 |
 
-### 3.2.1 输入命令
+### 3.2.1 基础值类型
 
-输入命令将 Qt 键盘事件抽象为游戏动作：
+`types.h` 中只保留跨层都会用到、但不携带具体玩法规则的基础属性：
 
 ```cpp
-enum class InputAction {
-    MoveLeft,
-    MoveRight,
-    MoveUp,
-    MoveDown,
-    LightAttack,
-    HeavyAttack,
-    Jump,
-    Restart,
-    Confirm,
-    Pause
+struct Size {
+    float width = 0.0f;
+    float height = 0.0f;
+};
+
+struct ResourceBar {
+    int current = 0;
+    int maximum = 0;
+
+    float ratio() const noexcept;
+    bool is_empty() const noexcept;
+};
+
+struct WorldPosition {
+    float x = 0.0f;
+    float laneY = 0.0f;
+    float z = 0.0f;
 };
 ```
 
-`ButtonState` 区分持续输入和瞬时输入。移动类命令使用 `Pressed` / `Released`，攻击、跳跃、暂停、确认等命令使用 `Triggered`。这样 ViewModel 可以自然地区分“正在移动”和“执行一次动作”。
+这些类型可以被 View 和 ViewModel 同时理解。`WorldPosition` 中 `x` 表示横向推进，`laneY` 表示街道纵深，`z` 表示离地高度；View 用它投影到屏幕坐标，ViewModel 用它记录实体位置。
 
-`GameCommand` 再把输入和 Tick 统一包装起来。View 每帧发出的时间推进也走同一个命令入口，从而让 ViewModel 对外只有一个 `handle_command` 方法。
+### 3.2.2 游戏状态
 
-### 3.2.2 状态快照
+`game_state.h` 将 View 需要读取的状态拆成几个层次：
 
-`snapshot.h` 将可显示状态拆成几个层次：
+- `GamePhase` 描述当前阶段，包括 `Title`、`Playing`、`Paused`、`GameOver` 和 `Win`。
+- `MapState` 描述视口、镜头和街道边界。
+- `ActorState` 描述单个角色，包括阵营、种类、位置、绘制尺寸、血量、动作状态、朝向和可见性。
+- `HudState` 整理 HUD 专用数据，包括玩家血量、精力、Boss 血条和疲劳状态。
+- `GameResultState` 记录结算数据，包括用时和击败数量。
+- `GameState` 汇总完整帧状态，作为 View 绘制一帧画面的主要输入。
 
-- `ActorSnapshot` 描述单个角色或对象，包括阵营、种类、位置、尺寸、血量、精力、状态、朝向和可见性。
-- `MapSnapshot` 描述地图和镜头，包括世界宽度、视口大小、街道边界、锁屏边界和 GO 提示。
-- `HudSnapshot` 整理 HUD 专用数据，包括玩家血量、精力、Boss 血条、连击和疲劳状态。
-- `GameResultSnapshot` 记录结算数据，包括胜负原因、用时和击败数量。
-- `GameSnapshot` 汇总完整帧状态，作为 View 绘制一帧画面的全部输入。
+这样的设计避免 View 从多个内部对象中拼接信息。View 只需要读取 `GameState`，ViewModel 负责把内部规则状态整理成适合显示的数据。
 
-这样的设计避免 View 从多个内部对象中拼接信息。View 只需要读取快照，ViewModel 负责把内部规则状态整理成适合显示的数据。
+### 3.2.3 事件通知
 
-### 3.2.3 绑定接口
-
-`contracts.h` 是 MVVM 边界的核心：
+`notification.h` 提供一个与 Qt 无关的轻量通知工具：
 
 ```cpp
-class IGameCommandSink {
-public:
-    virtual ~IGameCommandSink() = default;
-    virtual void handle_command(const GameCommand& command) = 0;
-};
+using EventNotification = std::function<void(std::uint32_t eventId)>;
 
-class IGameSnapshotSource {
+class EventTrigger {
 public:
-    virtual ~IGameSnapshotSource() = default;
-    virtual const GameSnapshot& snapshot() const = 0;
-    virtual BindingCookie add_change_callback(ChangeCallback callback) = 0;
-    virtual void remove_change_callback(BindingCookie cookie) = 0;
+    std::uintptr_t add_notification(EventNotification&& notification);
+    void remove_notification(std::uintptr_t cookie) noexcept;
+
+protected:
+    void fire(std::uint32_t eventId);
 };
 ```
 
-View 只依赖这两个接口：输入发给 `IGameCommandSink`，显示状态从 `IGameSnapshotSource` 获取。ViewModel 实现这两个接口，但不需要知道具体的 `GameWidget`。
+ViewModel 继承 `EventTrigger`，状态变化后调用 `fire(kGameStateChangedEvent)`；View 通过 `MainWindow::get_notification()` 提供一个闭包，收到通知后调用 `GameWidget::update()`。通知只表达“某类事件发生了”，不携带 Qt 对象，也不暴露 ViewModel 内部对象。
+
+
 
 ## 3.3 App 层设计
 
@@ -90,28 +94,40 @@ GameViewModel viewModel;
 MainWindow mainWindow;
 ```
 
-随后调用：
+随后在构造函数中集中完成三类绑定。
+
+第一类是属性绑定：
 
 ```cpp
-mainWindow.bind(viewModel, viewModel);
+mainWindow.set_game_state(viewModel.get_game_state());
 ```
 
-这里第一个 `viewModel` 作为 `IGameCommandSink` 接收命令，第二个 `viewModel` 作为 `IGameSnapshotSource` 提供快照。App 层知道具体类型，但绑定仍通过公共接口完成，没有让 View 直接依赖 ViewModel 的类定义。
+第二类是命令绑定：
 
-## 3.4 关键实现细节
+```cpp
+mainWindow.set_tick_command(viewModel.get_tick_command());
+mainWindow.set_move_left_command(viewModel.get_move_left_command());
+mainWindow.set_move_right_command(viewModel.get_move_right_command());
+mainWindow.set_move_up_command(viewModel.get_move_up_command());
+mainWindow.set_move_down_command(viewModel.get_move_down_command());
+mainWindow.set_primary_action_command(viewModel.get_primary_action_command());
+mainWindow.set_secondary_action_command(viewModel.get_secondary_action_command());
+mainWindow.set_state_toggle_command(viewModel.get_state_toggle_command());
+mainWindow.set_reset_command(viewModel.get_reset_command());
+mainWindow.set_confirm_command(viewModel.get_confirm_command());
+mainWindow.set_pause_command(viewModel.get_pause_command());
+```
 
-### 3.4.1 PImpl 控制公共接口
+第三类是通知绑定：
 
-`GameApplication.h` 没有包含 Qt 头文件，也没有暴露 `MainWindow` 或 `GameViewModel`。这让 App 的公共接口保持轻量，减少上层包含成本，也避免外部代码绕过组合根直接访问内部对象。
+```cpp
+viewModel.add_notification(mainWindow.get_notification());
+```
 
-### 3.4.2 Common 不泄漏模拟细节
+App 层知道 `MainWindow` 和 `GameViewModel` 的具体类型，但绑定结果仍然保持 View 与 ViewModel 的单向依赖：View 只持有只读状态指针和命令闭包，不包含 `viewmodel/` 头文件；ViewModel 只保存通知闭包，不知道具体的 `GameWidget`。
 
-Common 只放 View 需要理解的字段。例如 `WorldPosition` 包含 `x`、`laneY` 和 `z`，因为 View 需要用这些值把角色投影到屏幕上；而攻击盒、敌人冷却、遭遇战 ID 和滚动锁枚举都没有放进 Common，而是保留在 ViewModel 的 `SimulationTypes.h` 和 `GameSimulation` 中。
 
-### 3.4.3 App 不承担业务逻辑
 
-App 层只负责启动和绑定，不处理键盘、不绘制画面、不计算攻击伤害。这个边界使后续扩展时不会把初始化代码和业务代码混在一起。
+## 3.4 小结
 
-## 3.5 小结
-
-App/Common 层的核心贡献不在于复杂算法，而在于建立稳定边界。Common 把命令和快照抽象成跨层协议，App 把具体对象创建集中在组合根中。这样整个项目的依赖方向保持清晰，也为 View 和 ViewModel 分别开发提供了基础。
+App/Common 层建立了稳定边界：Common 把基础值类型、只读状态和通知工具抽象成跨层协议；App 把具体对象创建和三类绑定集中在组合根中。这样整个项目的依赖方向保持清晰，也为 View 和 ViewModel 分别开发提供了基础。
