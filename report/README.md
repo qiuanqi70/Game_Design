@@ -27,5 +27,4 @@ output/pdf/AlleyFist_midterm_report.pdf
 
 - `latex/titlepage.tex` 中的小组成员姓名、学号、课程信息。
 - 各分报告开头的 `\sectionauthor{姓名}{学号}`。
-- `Markdown/06_personal_reflections.md` 中每位同学的个人反思与收获。
-
+- `Markdown/05_personal_reflections.md` 中每位同学的个人反思与收获。
