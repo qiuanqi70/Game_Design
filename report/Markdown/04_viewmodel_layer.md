@@ -169,24 +169,3 @@ constexpr int kBossHealth = 140;
 **难点三：动作系统与能量系统的协调。** 跳跃、攻击、能量恢复和冷却时间都需要同时控制，否则容易出现“连续高强度操作”或状态混乱。解决方案是通过 `m_jumpElapsed`、`m_attackTimer`、`m_playerEnergy` 与 `try_spend_energy()` 这组局部状态组合成一个相对清晰的状态管理机制。
 
 **难点四：Boss 与胜负条件的判定。** 规则系统一开始较简单，但当 Boss 生成、敌人死亡和玩家胜负条件同时存在时，逻辑容易变得混乱。最终通过 `spawn_boss_if_needed()`、`update_boss_state()` 与 `boss_defeated()` 的分层处理，成功把 Boss 触发、存活检测和胜负切换拆解成明确的步骤。
-
-## 5.8 团队协作情况
-
-ViewModel 层作为项目四个模块之一，与 View、App 和 Common 层保持了持续沟通：
-
-**协作亮点：**
-
-- Common 层定义的 `GameState` 和通知机制在前期已经基本稳定，ViewModel 层据此独立完成逻辑与快照映射，减少了后期接口反复修改的成本。
-- `GameViewModel` 暴露的命令接口与 View 层的 setter 接口命名基本对齐，联调时只需关注回调绑定，而不需要重写整个调用链。
-- App 层在组合根中统一完成属性、命令和通知的注入，ViewModel 层只需实现对应接口即可，降低了模块间耦合。
-
-## 5.9 阶段性成果展示
-
-截至当前迭代，ViewModel 层已经完成了以下可演示的功能：
-
-- 玩家移动与边界限制；
-- 轻攻击、重攻击、跳跃与能量消耗控制；
-- 小怪追击与近距离伤害逻辑；
-- Boss 触发与 Boss 血量状态检测；
-- 游戏阶段切换（`Playing`、`Paused`、`GameOver`、`Win`）；
-- 将内部规则结果整理为可供 View 直接绘制的 `GameState` 快照。
