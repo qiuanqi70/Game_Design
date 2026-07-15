@@ -1,7 +1,15 @@
 #include "SoundManager.h"
 
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+#include <QProcess>
+#include <QStringList>
+
+#ifdef Q_OS_WIN
 #include <windows.h>
 #include <mmsystem.h>
+#endif
 
 namespace alleyfist {
 
@@ -10,30 +18,47 @@ std::unordered_map<std::string, std::string> SoundManager::s_pathCache;
 
 void SoundManager::init(const std::string& assetsPath)
 {
-    s_assetPath = assetsPath;
-    if (s_assetPath.back() != '/' && s_assetPath.back() != '\\') {
-        s_assetPath += '/';
+    QString resolvedPath = QDir::cleanPath(QString::fromStdString(assetsPath));
+    const QFileInfo requestedPath(resolvedPath);
+    if (requestedPath.isRelative()) {
+        const QString workingDirectoryPath = QDir::current().absoluteFilePath(resolvedPath);
+        if (QDir(workingDirectoryPath).exists()) {
+            resolvedPath = workingDirectoryPath;
+        } else {
+            resolvedPath = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(resolvedPath);
+        }
     }
+
+    s_assetPath = QDir::cleanPath(resolvedPath).toStdString();
     s_pathCache.clear();
 }
 
 void SoundManager::play(const std::string& name)
 {
-    // 缓存查找
     auto it = s_pathCache.find(name);
     if (it == s_pathCache.end()) {
-        std::string fullPath = s_assetPath + name + ".wav";
-        // 检查文件是否存在
-        DWORD attrs = GetFileAttributesA(fullPath.c_str());
-        if (attrs == INVALID_FILE_ATTRIBUTES) {
-            return; // 文件不存在，静默跳过
+        const QDir assetDirectory(QString::fromStdString(s_assetPath));
+        const QString fullPath = assetDirectory.filePath(QString::fromStdString(name) + ".wav");
+        if (!QFileInfo::exists(fullPath)) {
+            return;
         }
-        s_pathCache[name] = fullPath;
+
+        s_pathCache[name] = QDir::cleanPath(fullPath).toStdString();
         it = s_pathCache.find(name);
     }
 
-    PlaySoundA(it->second.c_str(), nullptr,
-               SND_ASYNC | SND_NODEFAULT | SND_NOSTOP);
+    const QString path = QString::fromStdString(it->second);
+
+#ifdef Q_OS_WIN
+    PlaySoundW(reinterpret_cast<LPCWSTR>(path.utf16()), nullptr,
+               SND_ASYNC | SND_FILENAME | SND_NODEFAULT | SND_NOSTOP);
+#elif defined(Q_OS_MACOS)
+    QProcess::startDetached("/usr/bin/afplay", QStringList{path});
+#else
+    if (!QProcess::startDetached("paplay", QStringList{path})) {
+        QProcess::startDetached("aplay", QStringList{path});
+    }
+#endif
 }
 
 } // namespace alleyfist

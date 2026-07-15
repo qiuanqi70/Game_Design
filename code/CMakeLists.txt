@@ -20,3 +20,10 @@ target_link_libraries(AlleyFist
     PRIVATE
         alleyfist_app
 )
+
+add_custom_command(TARGET AlleyFist POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${PROJECT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:AlleyFist>/assets"
+    COMMENT "Copying game assets"
+)
