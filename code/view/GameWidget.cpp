@@ -450,26 +450,6 @@ void GameWidget::drawBuildings(QPainter& p)
 
         // 建筑主体
         p.fillRect(QRectF(screenX, screenY, screenW, screenH), b.color);
-
-        // 窗户（简单网格）
-        p.setPen(Qt::NoPen);
-        const QColor winLit(255, 220, 100, 80);   // 亮窗
-        const QColor winDark(30, 25, 35, 120);    // 暗窗
-        const float winW = 12.0f * m_scaleX;
-        const float winH = 14.0f * m_scaleY;
-        const float winGapX = 20.0f * m_scaleX;
-        const float winGapY = 24.0f * m_scaleY;
-        const float marginX = 8.0f * m_scaleX;
-        const float marginY = 10.0f * m_scaleY;
-
-        for (float wy = screenY + marginY; wy + winH < bottomY; wy += winGapY) {
-            for (float wx = screenX + marginX; wx + winW < screenX + screenW; wx += winGapX) {
-                // 随机亮/暗（用位置哈希决定）
-                const int hash = (static_cast<int>(wx * 100) + static_cast<int>(wy * 200)) % 3;
-                p.fillRect(QRectF(wx, wy, winW, winH),
-                           (hash == 0) ? winLit : winDark);
-            }
-        }
     }
 }
 
@@ -674,27 +654,27 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
     }
 
     // ---- 腿 ----
+    const float legGap = legW * 0.2f;  // 两腿间距
     if (actionState == ActorActionState::Jump || actionState == ActorActionState::AirAttack) {
-        p.fillRect(QRectF(-legW * 0.5f, legTop, legW, legH * 0.5f), pantsColor);
-        p.fillRect(QRectF(legW * 0.3f, legTop, legW, legH * 0.5f), pantsColor);
+        p.fillRect(QRectF(-legW - legGap * 0.5f, legTop, legW, legH * 0.5f), pantsColor);
+        p.fillRect(QRectF(legGap * 0.5f, legTop, legW, legH * 0.5f), pantsColor);
     } else if (actionState == ActorActionState::Walk) {
         const float t = game_state().elapsedSeconds * 10.0f;
-        const float stride = std::sin(t) * 7.0f * m_scaleX;
+        const float stride = std::sin(t) * 6.0f * m_scaleX;
         const float kneeBend = std::abs(std::cos(t)) * 3.0f * m_scaleY;
-        // 前后腿（交替）
-        p.fillRect(QRectF(stride - legW * 0.5f, legTop + kneeBend, legW, legH - kneeBend), pantsColor);
-        p.fillRect(QRectF(-stride + legW * 0.3f, legTop - kneeBend * 0.5f, legW, legH + kneeBend * 0.5f), pantsColor);
-        // 鞋子
-        p.fillRect(QRectF(stride - legW * 0.5f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(-legW - legGap * 0.5f + stride, legTop + kneeBend, legW, legH - kneeBend), pantsColor);
+        p.fillRect(QRectF(legGap * 0.5f - stride, legTop - kneeBend * 0.5f, legW, legH + kneeBend * 0.5f), pantsColor);
+        // 鞋
+        p.fillRect(QRectF(-legW - legGap * 0.5f + stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
-        p.fillRect(QRectF(-stride + legW * 0.3f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(legGap * 0.5f - stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
     } else {
-        p.fillRect(QRectF(-legW * 0.5f, legTop, legW, legH), pantsColor);
-        p.fillRect(QRectF(legW * 0.3f, legTop, legW, legH), pantsColor);
-        p.fillRect(QRectF(-legW * 0.5f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(-legW - legGap * 0.5f, legTop, legW, legH), pantsColor);
+        p.fillRect(QRectF(legGap * 0.5f, legTop, legW, legH), pantsColor);
+        p.fillRect(QRectF(-legW - legGap * 0.5f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
-        p.fillRect(QRectF(legW * 0.3f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(legGap * 0.5f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
     }
 
@@ -1191,21 +1171,21 @@ void GameWidget::drawPickup(QPainter& p, const PickupState& pickup)
     const float sx = worldToScreenX(pickup.position.x);
     const float sy = worldToScreenY(pickup.position.laneY, 20.0f);
     const float r = 8.0f * m_scaleX;
-    const float bob = std::sin(game_state().elapsedSeconds * 5.0f + pickup.id * 1.3f) * 3.0f * m_scaleY;
+    const float hover = std::sin(game_state().elapsedSeconds * 2.0f + pickup.id * 0.7f) * 1.5f * m_scaleY;
 
     p.setPen(QPen(QColor(255, 255, 255, 150), 1.5f));
     if (pickup.kind == PickupKind::Health) {
         p.setBrush(QColor(220, 50, 50, 200));
-        p.drawEllipse(QPointF(sx, sy + bob), r, r);
+        p.drawEllipse(QPointF(sx, sy + hover), r, r);
         p.setPen(QColor(255, 255, 255));
         p.setFont(QFont("Arial", 8, QFont::Bold));
-        p.drawText(QRectF(sx - r, sy + bob - r, r * 2, r * 2), Qt::AlignCenter, "+");
+        p.drawText(QRectF(sx - r, sy + hover - r, r * 2, r * 2), Qt::AlignCenter, "+");
     } else {
         p.setBrush(QColor(50, 120, 220, 200));
-        p.drawEllipse(QPointF(sx, sy + bob), r, r);
+        p.drawEllipse(QPointF(sx, sy + hover), r, r);
         p.setPen(QColor(255, 255, 255));
         p.setFont(QFont("Arial", 8, QFont::Bold));
-        p.drawText(QRectF(sx - r, sy + bob - r, r * 2, r * 2), Qt::AlignCenter, "E");
+        p.drawText(QRectF(sx - r, sy + hover - r, r * 2, r * 2), Qt::AlignCenter, "E");
     }
 }
 
