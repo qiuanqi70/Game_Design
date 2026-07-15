@@ -131,12 +131,14 @@ private:
     mutable std::vector<QPointF> m_stars;
     bool m_starsGenerated = false;
     float m_bossIntroAnimTimer = 99.0f;
-    bool m_bossSeen = false;
+    bool m_bossWasInList = false;
     bool m_gameOverSounded = false;
     bool m_winSounded = false;
     std::uint32_t m_attackingEnemyId = 0;
     float m_attackingEnemyTimer = 0.0f;
     int m_prevPlayerHp = 100;
+    size_t m_lastPickupCount = 0;
+    float m_pickupFxTimer = 0.0f;
 
     // 视口缩放
     float m_scaleX = 1.0f;

@@ -57,6 +57,27 @@ GameWidget::GameWidget(QWidget* parent)
             m_screenShakeTimer = std::max(0.0f, m_screenShakeTimer - clampedDt);
         }
 
+        // 胜利音效（在定时器里检测比在 paintEvent 里更可靠）
+        if (m_gameState && m_gameState->phase == GamePhase::Win && !m_winSounded) {
+            SoundManager::play("win");
+            m_winSounded = true;
+        }
+
+        // 拾取检测：pickup 数量减少即被捡走
+        if (m_gameState) {
+            const auto curCount = m_gameState->pickups.size();
+            if (curCount < m_lastPickupCount && !m_gameState->pickups.empty()) {
+                // 有新拾取发生但列表非空，记录拾取效果
+            }
+            if (curCount < m_lastPickupCount) {
+                m_pickupFxTimer = 0.5f;
+            }
+            m_lastPickupCount = curCount;
+        }
+        if (m_pickupFxTimer > 0.0f) {
+            m_pickupFxTimer = std::max(0.0f, m_pickupFxTimer - clampedDt);
+        }
+
         // 敌人攻击动画检测：玩家扣血时找最近的敌人
         if (m_gameState && m_gameState->player.health.current < m_prevPlayerHp) {
             float minDist = 9999.0f;
@@ -78,17 +99,33 @@ GameWidget::GameWidget(QWidget* parent)
         }
         if (m_gameState) m_prevPlayerHp = m_gameState->player.health.current;
 
-        // Boss 出场动画计时：View 侧检测 Boss 首次出现
+        // Boss 出场检测 + 重开重置：追踪敌人列表中 Boss 的出现/消失
         if (m_gameState) {
-            bool bossVisible = false;
+            bool bossInList = false;
             for (const auto& e : m_gameState->enemies) {
-                if (e.kind == ActorKind::Boss && e.visible) { bossVisible = true; break; }
+                if (e.kind == ActorKind::Boss && e.visible) { bossInList = true; break; }
             }
-            if (bossVisible && !m_bossSeen) {
-                m_bossSeen = true;
+
+            // Boss 从无到有 → 播出场动画
+            if (bossInList && !m_bossWasInList) {
                 m_bossIntroAnimTimer = 0.0f;
                 SoundManager::play("boss_intro");
             }
+
+            // Boss 从有到无 → 游戏结束/重开，重置标记
+            if (!bossInList && m_bossWasInList) {
+                m_bossIntroAnimTimer = 99.0f;
+                m_gameOverSounded = false;
+                m_winSounded = false;
+                m_attackingEnemyId = 0;
+                m_attackingEnemyTimer = 0.0f;
+                m_prevPlayerHp = 100;
+                m_lastPickupCount = 0;
+                m_pickupFxTimer = 0.0f;
+            }
+
+            m_bossWasInList = bossInList;
+
             if (m_bossIntroAnimTimer < 2.0f) {
                 m_bossIntroAnimTimer += clampedDt;
             }
@@ -107,21 +144,6 @@ GameWidget::GameWidget(QWidget* parent)
 
 void GameWidget::set_game_state(const GameState* state) noexcept
 {
-    if (m_gameState && state && m_gameState->phase != state->phase) {
-        // 从 GameOver / Win 回到 Playing 时重置音效和 Boss 标记
-        if (state->phase == GamePhase::Playing &&
-            (m_gameState->phase == GamePhase::GameOver ||
-             m_gameState->phase == GamePhase::Win ||
-             m_gameState->phase == GamePhase::Title)) {
-            m_bossSeen = false;
-            m_bossIntroAnimTimer = 99.0f;
-            m_gameOverSounded = false;
-            m_winSounded = false;
-            m_attackingEnemyId = 0;
-            m_attackingEnemyTimer = 0.0f;
-            m_prevPlayerHp = 100;
-        }
-    }
     m_gameState = state;
     update();
 }
@@ -392,6 +414,19 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // ---- HUD ----
     drawHUD(p);
+
+    // ---- 拾取特效：飘字 ----
+    if (m_pickupFxTimer > 0.0f) {
+        const float px = worldToScreenX(game_state().player.position.x);
+        const float py = worldToScreenY(game_state().player.position.laneY, game_state().player.position.z) - 60.0f * m_scaleY;
+        const float alpha = m_pickupFxTimer / 0.5f;
+        const float rise = (0.5f - m_pickupFxTimer) * 30.0f * m_scaleY;
+        p.setPen(QColor(100, 255, 100, static_cast<int>(255 * alpha)));
+        p.setFont(QFont("Arial", 14, QFont::Bold));
+        p.drawText(QRectF(px - 30.0f * m_scaleX, py + rise - 15.0f * m_scaleY,
+                          60.0f * m_scaleX, 30.0f * m_scaleY),
+                   Qt::AlignCenter, "+");
+    }
 
     // ---- 覆盖层（暂停 / 结算 / 胜利） ----
     if (phase == GamePhase::Paused   ||
@@ -1125,7 +1160,6 @@ void GameWidget::drawOverlay(QPainter& p)
         }
 
     } else if (phase == GamePhase::Win) {
-        if (!m_winSounded) { SoundManager::play("win"); m_winSounded = true; }
         // ---- 胜利 ----
         QFont winFont("Arial", 42, QFont::Bold);
         p.setFont(winFont);
