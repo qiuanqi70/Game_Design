@@ -16,12 +16,22 @@ enum class EntityKind {
     Boss
 };
 
-enum class EnemyType {
-    Patroller,
-    Ambusher,
-    Charger,
-    Ranged,
-    Boss
+enum class PlayerActionType {
+    None,
+    Jump,
+    LightAttack,
+    HeavyAttack
+};
+
+enum class PlayerBehaviorState {
+    Idle,
+    Walk,
+    Jump,
+    LightAttack,
+    HeavyAttack,
+    AirAttack,
+    Hurt,
+    Dead
 };
 
 enum class EnemyBehaviorState {
@@ -36,12 +46,12 @@ enum class EnemyBehaviorState {
 
 struct ProjectileVm {
     std::uint32_t id = 0;
-    int ownerId = 0;
     alleyfist::ActorVisualVariant visualVariant = alleyfist::ActorVisualVariant::Default;
     alleyfist::WorldPosition position;
     alleyfist::Facing facing = alleyfist::Facing::Left;
     float velocityX = 0.0f;
-    float velocityY = 0.0f;
+    float velocityLaneY = 0.0f;
+    float velocityZ = 0.0f;
     float lifeSeconds = 0.0f;
     bool active = true;
 };
@@ -58,7 +68,6 @@ struct PickupVm {
 struct EntityState {
     alleyfist::WorldPosition pos;
     EntityKind kind = EntityKind::Patroller;
-    EnemyType enemyType = EnemyType::Patroller;
     alleyfist::ActorVisualVariant visualVariant = alleyfist::ActorVisualVariant::Default;
     alleyfist::Facing facing = alleyfist::Facing::Left;
     EnemyBehaviorState behaviorState = EnemyBehaviorState::Patrol;

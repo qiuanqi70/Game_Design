@@ -1,35 +1,87 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
+#include <unordered_set>
+
 namespace alleyfist {
 namespace view {
 
 // ============================================================================
 // View 层内部的输入聚合类型
 //
-// 输入命令由 App 从 ViewModel 注入，View 这里只保留 MovementIntent，
-// 用于把多个按键状态聚合成一个移动意图。
-// 换手柄/触屏只需要改 GameWidget 里的按键映射，不影响这里的聚合逻辑。
+// 输入命令由 App 从 ViewModel 注入。InputState 按语义方向分别记录物理键，
+// 换手柄/触屏只需要改 GameWidget 里的按键映射。
 // ============================================================================
 
-// 记录当前按住的移动键，用于推导复合移动方向。
-struct MovementIntent {
-    bool left  = false;
-    bool right = false;
-    bool up    = false;
-    bool down  = false;
+enum class MovementDirection : std::size_t {
+    Left,
+    Right,
+    Up,
+    Down,
+    Count
+};
 
-    bool is_moving() const noexcept
+inline constexpr std::size_t kMovementDirectionCount =
+    static_cast<std::size_t>(MovementDirection::Count);
+
+/// Tracks physical keys separately from the semantic direction they control.
+/// This keeps aliases such as A and Left active until both keys are released.
+class InputState {
+public:
+    bool press_movement(MovementDirection direction, int physicalKey)
     {
-        return left || right || up || down;
+        const auto directionIndex = index(direction);
+        if (directionIndex >= m_movementKeys.size()) return false;
+        auto& keys = m_movementKeys[directionIndex];
+        if (!keys.insert(physicalKey).second) return false;
+
+        return keys.size() == 1;
     }
 
-    void clear() noexcept
+    bool release_movement(MovementDirection direction, int physicalKey)
     {
-        left  = false;
-        right = false;
-        up    = false;
-        down  = false;
+        const auto directionIndex = index(direction);
+        if (directionIndex >= m_movementKeys.size()) return false;
+        auto& keys = m_movementKeys[directionIndex];
+        if (keys.erase(physicalKey) == 0 || !keys.empty()) return false;
+
+        return true;
     }
+
+    bool press_action(int physicalKey)
+    {
+        return m_actionKeys.insert(physicalKey).second;
+    }
+
+    void release_action(int physicalKey)
+    {
+        m_actionKeys.erase(physicalKey);
+    }
+
+    std::array<bool, kMovementDirectionCount> clear_movement()
+    {
+        std::array<bool, kMovementDirectionCount> active{};
+        for (std::size_t i = 0; i < m_movementKeys.size(); ++i) {
+            active[i] = !m_movementKeys[i].empty();
+            m_movementKeys[i].clear();
+        }
+        return active;
+    }
+
+    void clear_actions()
+    {
+        m_actionKeys.clear();
+    }
+
+private:
+    static constexpr std::size_t index(MovementDirection direction) noexcept
+    {
+        return static_cast<std::size_t>(direction);
+    }
+
+    std::array<std::unordered_set<int>, kMovementDirectionCount> m_movementKeys;
+    std::unordered_set<int> m_actionKeys;
 };
 
 } // namespace view

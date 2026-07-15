@@ -2,8 +2,6 @@
 
 #include "../common/game_state.h"
 #include "../common/notification.h"
-#include "GameSimulation.h"
-#include "SimulationTypes.h"
 
 #include <cstdint>
 #include <functional>
@@ -12,6 +10,9 @@
 namespace alleyfist::viewmodel {
 
 constexpr std::uint32_t kGameStateChangedEvent = 1;
+
+class GameSimulation;
+enum class PlayerActionType;
 
 class GameViewModel : public EventTrigger {
 public:
@@ -37,36 +38,22 @@ public:
     std::function<void()> get_confirm_command();
     std::function<void()> get_pause_command();
 
-    // 启动/停止视图模型（一般由 App 层控制）
-    void start();
-    void stop();
-
-    // 取得当前实体状态
-    const EntityList& entities() const noexcept;
-
 private:
+    enum class MoveInput {
+        Left,
+        Right,
+        Up,
+        Down
+    };
+
     std::unique_ptr<GameSimulation> m_sim;
     GameState m_state;
-    bool m_moveLeft = false;
-    bool m_moveRight = false;
-    bool m_moveUp = false;
-    bool m_moveDown = false;
-    bool m_paused = false;
-    bool m_jumpActive = false;
-    float m_jumpElapsed = 0.0f;
-    float m_attackTimer = 0.0f;
-    float m_playerEnergy = 100.0f;
-    float m_exhaustedWarningTimer = 0.0f;
-    ActorActionState m_attackState = ActorActionState::Idle;
-    std::uint32_t m_lastImpactRevision = 0;
 
     void tick(float dt);
     void sync_state_from_simulation();
-    std::function<void(bool)> make_move_command(bool& flag);
-    void begin_attack(ActorActionState actionState, float seconds, float energyCost);
-    void reset_actions() noexcept;
-    void update_action_timers(float dt);
-    bool try_spend_energy(float cost) noexcept;
+    std::function<void(bool)> make_move_command(MoveInput input);
+    std::function<void()> make_action_command(PlayerActionType action);
+    void reset_game();
     bool is_gameplay_active() const noexcept;
     void notify_state_changed();
 };

@@ -13,6 +13,6 @@ vcpkg_installed/
 *.out
 *.app/
 *.dSYM/
-code/Assets/界面图/Coupon by craftpix.pdf.*
-code/Assets/界面图/*.url
+code/view/Assets/界面图/Coupon by craftpix.pdf.*
+code/view/Assets/界面图/*.url
 plane

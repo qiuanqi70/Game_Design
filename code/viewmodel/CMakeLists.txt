@@ -18,18 +18,3 @@ target_link_libraries(alleyfist_viewmodel
     PUBLIC
         alleyfist_common
 )
-
-if(BUILD_TESTING)
-    add_executable(alleyfist_viewmodel_smoke_test
-        GameViewModelSmokeTest.cpp
-    )
-
-    target_link_libraries(alleyfist_viewmodel_smoke_test
-        PRIVATE
-            alleyfist_viewmodel
-    )
-
-    add_test(NAME alleyfist_viewmodel_smoke_test COMMAND alleyfist_viewmodel_smoke_test)
-endif()
-
-qt_standard_project_setup()

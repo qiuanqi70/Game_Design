@@ -1,233 +1,187 @@
-# ViewModel 迭代设计方案
+# ViewModel 层设计与规则
 
-本文档用于指导后续在 [code/viewmodel](code/viewmodel) 下推进 P0/P1 迭代。当前目标不是先把所有功能一次性做完，而是先把“公共状态契约已经明确”的内容，完整地映射到 ViewModel 的内部仿真与 GameState 快照输出。
+本目录实现游戏的规则系统和 MVVM 中的 ViewModel。它不依赖 Qt，也不读取键盘码或执行绘制。
 
-## 1. 设计目标
+## 1. 文件职责
 
-基于当前 Common 层已经补充的状态结构，ViewModel 需要完成以下能力：
+| 文件 | 职责 |
+| --- | --- |
+| `SimulationTypes.h` | 定义仅供规则层使用的实体、玩家动作、敌人行为、投射物和掉落物状态 |
+| `GameSimulation.h/.cpp` | 保存唯一的玩法状态，处理输入、动作、碰撞、AI、波次、Boss、投射物和掉落物 |
+| `GameViewModel.h/.cpp` | 接收语义命令，驱动 Simulation，将规则状态映射为 `GameState`，并发送变化通知 |
 
-- 让 Boss 遭遇、波次、Intro/Fighting/Cleared 阶段可被 View 直接消费。
-- 让命中、受击、击退、硬直等反馈以 `impactRevision` 和 `lastImpact` 的形式暴露给 View。
-- 用独立的投射物与补给道具状态表达远程攻击和掉落道具。
-- 为未来扩展四类敌人、敌人波次、Boss 战和道具系统预留清晰结构。
+View 只能通过 `GameViewModel::get_game_state()` 读取公共快照，通过 `get_*_command()` 发送语义命令。View 不访问 `EntityState`，也不参与伤害、能量或阶段计算。
 
----
+## 2. 状态所有权
 
-## 2. 现状与缺口
+一个状态只能有一个写入方。
 
-当前实现中，ViewModel 主要存在三点不足：
+`GameSimulation` 独占以下规则状态：
 
-1. 只存在一个简化的 `EntityKind::Grunt` / `EntityKind::Boss`，没有区分巡逻、伏击、冲撞、远程敌人。
-2. `GameState` 里缺少对 Boss 遭遇、敌人波次、投射物、补给道具和命中反馈的完整同步。
-3. 现有 `GameSimulation` 逻辑偏“单体敌人近战攻击”，不足以支撑 P0 里的 Boss 锁屏、受击反馈和未来的多波次设计。
+- 玩家位置、朝向、移动按键状态；
+- 跳跃高度、攻击种类、动作计时和命中帧；
+- 玩家能量、恢复和能量不足提示计时；
+- 实体生命、受击、敌人 AI 和死亡展示计时；
+- 投射物、掉落物及其生命周期；
+- 普通波次、移动门禁、Boss Intro、Boss 战和胜利就绪状态；
+- 游戏规则经过的时间。
 
-因此，下一阶段的重点不是“重写 UI”，而是把 ViewModel 从“单一简化模拟器”升级为“可表达游戏事件和表现状态的状态机”。
+`GameViewModel` 独占以下应用状态：
 
----
+- `GameState` 公共快照；
+- `Title`、`Playing`、`Paused`、`GameOver`、`Win` 页面阶段；
+- ViewModel 到 View 的 notification。
 
-## 3. 推荐的总体结构
+能量、跳跃和攻击不在两层重复保存。Simulation 只保存内部 `ProjectileVm` / `PickupVm`，ViewModel 每次同步时直接映射为 Common 的 `ProjectileState` / `PickupState`，不存在第二份公共镜像。
 
-### 3.1 责任划分
+## 3. 命令与数据流
 
-- [code/viewmodel/GameSimulation.h](code/viewmodel/GameSimulation.h) / [code/viewmodel/GameSimulation.cpp](code/viewmodel/GameSimulation.cpp)
-  - 负责内部规则、AI、碰撞、敌人生成、波次推进、投射物和补给道具生命周期。
-  - 只维护 ViewModel 内部数据，不直接面向 View。
+```text
+View input
+  -> GameViewModel command
+  -> GameSimulation input/action request
+  -> GameSimulation::step(dt)
+  -> GameViewModel::sync_state_from_simulation()
+  -> GameState
+  -> kGameStateChangedEvent
+  -> View repaint
+```
 
-- [code/viewmodel/GameViewModel.h](code/viewmodel/GameViewModel.h) / [code/viewmodel/GameViewModel.cpp](code/viewmodel/GameViewModel.cpp)
-  - 负责把内部仿真状态映射为 [code/common/game_state.h](code/common/game_state.h) 中的 `GameState`。
-  - 负责接收输入命令、驱动 tick、更新玩家动作状态和通知 View 更新。
+公开命令保持老师示例采用的回调形式：
 
-- [code/viewmodel/SimulationTypes.h](code/viewmodel/SimulationTypes.h)
-  - 定义 ViewModel 内部使用的扩展类型，例如敌人动作、攻击事件、投射物和道具数据结构。
+```cpp
+std::function<void(float, std::uint64_t)> get_tick_command();
+std::function<void(bool)> get_move_left_command();
+std::function<void()> get_primary_action_command();
+std::function<void()> get_pause_command();
+```
 
-### 3.2 设计原则
+`frameIndex` 为跨层兼容参数，当前规则不依赖它。移动命令的 `bool` 表示按下或释放。按下只在 `Playing` 阶段接受；释放始终转发，避免方向状态卡住。进入暂停、失败或胜利状态时会清空移动输入。
 
-- ViewModel 仍然是 `GameState` 的唯一写入方。
-- Common 层只保存“已经计算好、View 可直接读取”的结果。
-- 不把 AI、数值公式、碰撞半径、动画参数、Boss 出场样式等写进 Common。
-- 保留 `ActorState::id` 作为稳定身份标识，避免依赖数组下标。
+Simulation 构造后即可 `step()`，没有额外的 `start()` / `stop()` 生命周期。暂停由 ViewModel 停止推进 tick 实现。`reset()` 会重建规则状态，因为内部容器可能分配内存，所以它不声明 `noexcept`。
 
----
+## 4. 每帧推进顺序
 
-## 4. 具体修改方案
+`GameSimulation::step(dt)` 只接受有限且大于零的 `dt`。无效、负数、零、NaN 和无穷值不会改变规则状态。
 
-### 4.1 扩展内部实体与状态类型
+有效帧按以下顺序推进：
 
-先在 [code/viewmodel/SimulationTypes.h](code/viewmodel/SimulationTypes.h) 中给内部实体增加更细的类型和状态字段：
+1. 增加规则时间；
+2. 更新能量、疲劳提示、受击、跳跃和玩家攻击计时；
+3. 当攻击跨过命中帧时结算一次命中；
+4. 根据四向输入移动玩家，并应用当前波次或 Boss 场地边界；
+5. 推进普通波次和 Encounter；
+6. 在普通波次全部完成后推进 Boss Intro 并生成 Boss；
+7. 更新各类敌人 AI 和死亡掉落；
+8. 更新死亡展示、投射物和掉落物；
+9. 更新 Boss 死亡与胜利就绪状态。
 
-- `EntityKind` 扩展为：
-  - `Player`
-  - `Patroller`
-  - `Ambusher`
-  - `Charger`
-  - `Ranged`
-  - `Boss`
+顺序是规则的一部分。例如玩家攻击在敌人 AI 前到达命中帧时，敌人会先受击；掉落物在死亡处理后才可能被拾取。
 
-- 为每个敌人加入内部字段：
-  - `enemyType`：敌人类型
-  - `behaviorState`：如 `Idle`、`Patrol`、`Ambush`、`Charge`、`RangedAttack`、`Hurt`
-  - `attackCooldown`：攻击冷却时间
-  - `chargeTimer`：冲撞持续时间
-  - `ambushCooldown`：伏击触发冷却
-  - `patrolRangeLeft/Right`：巡逻边界
-  - `spawnWaveId`：所属波次 ID
+## 5. 玩家规则
 
-- 增加内部结构：
-  - `CombatHitEvent`：记录某个角色被命中的目标、伤害、命中等级。
-  - `ProjectileStateVm`：内部投射物数据，包含发射者、速度、生命周期、命中标记等。
-  - `PickupStateVm`：内部补给道具数据，包含掉落来源、剩余时间等。
+### 5.1 移动与跳跃
 
-这样做的目的是让 ViewModel 可以在内部“先生成事件”，再统一映射到 Common 的 `ActorState`、`ProjectileState` 和 `PickupState`。
+- 移动速度：`220 unit/s`；
+- 街道纵深范围：`300 <= laneY <= 500`；
+- 跳跃持续时间：`0.55 s`；
+- 跳跃最高点：`90`；
+- 跳跃消耗：`18` 能量；
+- 跳跃轨迹：`z = height * sin(pi * progress)`。
 
-### 4.2 把仿真逻辑从“近战小怪”升级为“带状态机的敌人系统”
+跳跃高度保存在 Simulation 的玩家位置中，并参与近战和投射物碰撞。它不是只用于绘制的动画值。空中发起攻击时输出行为为 `AirAttack`；攻击锁定期间不能再次攻击，也不能从地面开始新的跳跃。
 
-在 [code/viewmodel/GameSimulation.cpp](code/viewmodel/GameSimulation.cpp) 中，建议把原来的 `simulate_ai()` 拆成以下几个步骤：
+### 5.2 轻重攻击
 
-1. `update_encounter_state(dt)`
-   - 根据玩家进度或触发条件推进 Encounter 阶段。
-   - 当进入 `Intro` 时，设置 `EncounterState::phase = Intro`。
-   - 当真正进入战斗时，切换到 `Fighting`。
-   - 当 Boss 被击败或波次被清空时，切换到 `Cleared`。
+| 动作 | 持续时间 | 命中帧 | 能量 | 伤害 | Impact | 基础范围 X/Y |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| 轻攻击 | `0.18 s` | `0.08 s` | `12` | `10` | `Light` | `55 / 35` |
+| 重攻击 | `0.30 s` | `0.18 s` | `25` | `18` | `Heavy` | `72 / 44` |
 
-2. `update_enemy_behaviors(dt)`
-   - 对每类敌人执行不同逻辑：
-     - `Patroller`：在边界内来回移动。
-     - `Ambusher`：玩家靠近后进入 `Ambush` 状态，短暂后攻击。
-     - `Charger`：靠近时触发 `Charge`，短时加速冲撞。
-     - `Ranged`：保持距离攻击，发射投射物。
-     - `Boss`：进入 Boss 战逻辑，按阶段切换动作。
+动作请求只启动攻击，不立即扣除敌人生命。Simulation 在计时跨过命中帧时进行一次碰撞和伤害结算，随后用动作锁阻止重复输入绕过攻击间隔。Boss 因体型更大，命中范围有额外补偿。
 
-3. `update_projectiles(dt)`
-   - 更新投射物位置、重力和命中判定。
-   - 命中后标记为已命中，并生成一次命中事件。
+玩家受击期间不能攻击或跳跃。受击会中断尚未命中的玩家攻击和当前跳跃，并把玩家高度复位到地面。玩家受击无敌时间由 `hurtTimer` 控制，避免同一时间被多个接触攻击重复扣血。
 
-4. `update_pickups(dt)`
-   - 处理道具存在时间、被拾取和消失逻辑。
+### 5.3 能量
 
-5. `collect_combat_events()`
-   - 汇总所有命中、受击、击退、硬直状态，统一写入视图模型层的表现状态。
+- 最大能量：`100`；
+- 自然恢复：`28/s`；
+- 能量不足提示：`0.65 s`；
+- Energy 掉落恢复：`20`。
 
-### 4.3 为 Boss 遭遇和波次设计统一状态
+消耗和恢复都只修改 Simulation 的 `m_playerEnergy`。ViewModel 仅将当前值映射到 HUD。
 
-建议在 [code/viewmodel/GameViewModel.cpp](code/viewmodel/GameViewModel.cpp) 中把当前的 Boss 触发逻辑抽象为统一的 `EncounterState`：
+## 6. 敌人 AI
 
-- `EncounterKind::None`：无遭遇。
-- `EncounterKind::EnemyWave`：普通敌人波次。
-- `EncounterKind::Boss`：Boss 战。
+`simulate_ai()` 只负责所有敌人的公共前置处理和分发。每种敌人的规则位于独立函数中：
 
-- `EncounterPhase::Intro`：显示 Boss 出场或波次提示。
-- `EncounterPhase::Fighting`：正式战斗中。
-- `EncounterPhase::Cleared`：清场完成。
+- `update_patroller()`：在巡逻边界内移动，接近后按命中帧近战；
+- `update_ambusher()`：进入范围后蓄势并向玩家突进；
+- `update_charger()`：经过 windup 后高速冲撞；
+- `update_ranged_enemy()`：进入射程后蓄势并生成投射物；
+- `update_boss()`：追踪玩家并执行伤害更高的冲撞。
 
-输出到 `GameState::encounter` 的字段包括：
+公共逻辑统一处理受击恢复、攻击冷却、朝向和死亡掉落。新增敌人时应增加明确的 `EntityKind`、生成配置、独立更新函数和 ViewModel 的 `ActorKind` 映射，不能继续向某个无关敌人的分支叠加特殊条件。
 
-- `kind`
-- `phase`
-- `currentWave`
-- `totalWaves`
-- `remainingEnemies`
-- `introProgress`
+## 7. 投射物与掉落物
 
-这一步的重点是让 View 能直接看到“当前到底是Boss战还是普通波次”，而不是通过猜测数组内容来判断。
+远程投射物分别保存三个速度分量：
 
-### 4.4 让命中反馈沉淀为公共状态
+- `velocityX`：世界横向速度；
+- `velocityLaneY`：街道纵深速度；
+- `velocityZ`：高度速度。
 
-这是 P0 中最值得优先落地的部分。建议在 ViewModel 内部维护一个“本帧命中事件列表”，然后统一更新角色的状态：
+生成投射物时，Simulation 根据与目标的横向距离计算预计飞行时间，再分别求出 X、laneY 的速度和能够落到目标高度的初始 `velocityZ`。每帧只对 `velocityZ` 应用重力：
 
-- 当角色被命中时：
-  - `impactRevision += 1`
-  - `lastImpact = ImpactLevel::Light/Heavy`
-  - 记录该角色的受击方向或简化反馈类型
+```text
+x     += velocityX * dt
+laneY += velocityLaneY * dt
+z     += velocityZ * dt
+velocityZ -= gravity * dt
+```
 
-- 当角色发动攻击命中目标时：
-  - 目标的 `impactRevision` 增加
-  - `lastImpact` 设置为对应等级
+因此地面弹道可以命中站立玩家，而玩家在弹道发射后跳到足够高度可以规避。laneY 和 z 不共享速度，避免纵深移动被错误当成重力。
 
-该逻辑应在 [code/viewmodel/GameSimulation.cpp](code/viewmodel/GameSimulation.cpp) 中完成，随后由 [code/viewmodel/GameViewModel.cpp](code/viewmodel/GameViewModel.cpp) 转成 `GameState::enemies` 中对应角色的状态。
+普通敌人死亡后掉落 Health，Ranged 掉落 Energy，Boss 同时掉落两种。掉落物有固定生命周期；玩家进入拾取范围后，Simulation 立即应用恢复并移除掉落物。
 
-这样 View 就能用以下逻辑做效果：
+## 8. 波次、门禁与 Boss
 
-- `impactRevision` 变化 → 播放命中粒子或闪光
-- `lastImpact` 决定粒子强度和屏幕震动强度
+关卡包含三个普通波次。每波存活敌人未清空前，玩家的最远 X 位置分别受限于：
 
-### 4.5 增加投射物与补给道具的同步输出
+| 波次 | 右侧门禁 |
+| --- | ---: |
+| 1 | `760` |
+| 2 | `1540` |
+| 3 | `2260` |
 
-当前 [code/common/game_state.h](code/common/game_state.h) 已经提供了 `ProjectileState` 和 `PickupState`，因此 ViewModel 需要把内部模拟结果映射进去：
+清空一波后进入 `1.0 s` 的 Transition，再生成下一波并放开新的区域。第三波完成后允许玩家移动到 `2350`，进入 `2.8 s` 的 Boss Intro。Intro 完成后生成 Boss，并把玩家限制在 `2180..2920` 的 Boss 场地。
 
-- `GameState::projectiles`
-  - 保存当前仍然有效的投射物
-  - 由 ViewModel 中的内部投射物列表生成
+Boss 死亡时 Encounter 立即进入 `Cleared`。死亡展示计时归零后 `boss_victory_ready()` 才变为 true，ViewModel 随后把公共阶段切换为 `Win`。因此 Boss 的死亡帧仍可展示，不会在扣完生命的同一帧直接消失。
 
-- `GameState::pickups`
-  - 保存当前场景中可拾取的道具
-  - 由随机掉落或固定掉落规则生成
+## 9. GameState 映射
 
-建议在 [code/viewmodel/GameSimulation.h](code/viewmodel/GameSimulation.h) 中增加内部字段：
+`sync_state_from_simulation()` 每次从 Simulation 生成一份可绘制快照：
 
-- `std::vector<ProjectileStateVm> m_projectiles`
-- `std::vector<PickupStateVm> m_pickups`
+- 玩家与敌人的公共 `ActorState`；
+- 当前可见的死亡展示；
+- 投射物和掉落物；
+- 玩家、Boss 血条和能量提示；
+- Encounter、关卡进度和相机位置；
+- Game Over 与 Win 结果。
 
-在 [code/viewmodel/GameViewModel.cpp](code/viewmodel/GameViewModel.cpp) 的 `sync_state_from_simulation()` 中，将它们转换为公共状态数组。
+内部 `EntityState` 不通过 `GameViewModel` 暴露。View 只能持有稳定的 `const GameState*`。Snapshot 映射可以包含绘制所需的尺寸、相机和掉落物浮动效果，但不能反向修改 Simulation。
 
-### 4.6 把 HUD 状态变成“可表达 Boss 战与进度”的结构
+## 10. 不变量与扩展要求
 
-当前 [code/common/game_state.h](code/common/game_state.h) 已经有 `HudState`，建议在 ViewModel 中把它扩展为：
+维护或扩展规则时必须保持以下不变量：
 
-- `playerHealth`：由玩家当前 HP 生成
-- `playerEnergy`：由当前能量值生成
-- `bossHealth`：Boss 存活时显示；Boss 消失则清空
-- `showBossHealth`：Boss 战存在时为 `true`
-- `playerExhausted`：能量耗尽时为 `true`
+1. `entities().front()` 始终是玩家，实体 ID 在一次游戏中唯一；
+2. `alive == false` 的实体不能再移动、攻击或受伤；
+3. 一次攻击最多结算一次命中；
+4. 玩家规则状态只由 Simulation 写入；
+5. 无效 `dt` 不改变任何规则状态；
+6. 普通波次未完成时不能触发 Boss；
+7. ViewModel 不提供可变实体入口，不允许调用方绕过规则修改生命或计时器；
+8. 内部 Vm 类型只映射一次到 Common，不能重新引入同步镜像。
 
-同时，当前 `GameState::progressRatio` 继续由玩家 X 轴位置映射，保持和当前关卡进度条的使用方式一致。
-
----
-
-## 5. 推荐的落地顺序
-
-### 第一阶段（P0，优先级最高）
-
-1. 把内部实体类型扩成 5 类敌人，并让 `GameSimulation` 能区分敌人行为。
-2. 增加遇到 Boss 的统一 `EncounterState`，实现 `Intro -> Fighting -> Cleared` 的简化流程。
-3. 为命中/受击/硬直增加 `impactRevision` 和 `lastImpact` 的更新逻辑。
-4. 把 Boss 血条、进度条和当前遭遇信息写到 `GameState::hud` / `GameState::encounter`。
-
-### 第二阶段（P1，后续扩展）
-
-5. 增加远程投射物与补给道具的内部逻辑。
-6. 增加波次生成与普通敌人波次的触发器。
-7. 为标题页和结算页预留更清晰的阶段状态切换。
-
----
-
-## 6. 具体实现文件清单
-
-建议按以下文件逐步改造：
-
-- [code/viewmodel/SimulationTypes.h](code/viewmodel/SimulationTypes.h)
-  - 扩展内部状态结构。
-
-- [code/viewmodel/GameSimulation.h](code/viewmodel/GameSimulation.h)
-  - 增加敌人、投射物、补给道具、遭遇状态字段。
-
-- [code/viewmodel/GameSimulation.cpp](code/viewmodel/GameSimulation.cpp)
-  - 实现敌人行为、Boss 遭遇、命中反馈、投射物和道具逻辑。
-
-- [code/viewmodel/GameViewModel.h](code/viewmodel/GameViewModel.h)
-  - 增加必要的内部状态管理字段。
-
-- [code/viewmodel/GameViewModel.cpp](code/viewmodel/GameViewModel.cpp)
-  - 把内部仿真状态映射到 `GameState`。
-
----
-
-## 7. 审核时重点关注的问题
-
-你在审核时，建议重点看下面 4 个点：
-
-1. `GameState` 是否已经能完整表达当前遭遇和 Boss 状态，而不是依赖 UI 自己猜测。
-2. `impactRevision` / `lastImpact` 是否已经能稳定支持后续粒子和震动效果。
-3. 新敌人行为是否足够“可扩展”，后续新增敌人时能沿用同一套状态机。
-4. `GameSimulation` 是否仍保持“内部规则”，而没有把 View 相关表现逻辑泄漏进来。
-
-如果你认可这套方案，我下一步就开始按这个设计把代码真正落地。
+测试必须通过公开命令和只读状态到达场景。禁止使用 `const_cast`、friend 或测试专用生产接口伪造 `hp == 0 && alive == true` 等不可达状态。复杂流程应使用有最大步数的确定性推进 helper，失败时明确报告未达到的业务状态。
