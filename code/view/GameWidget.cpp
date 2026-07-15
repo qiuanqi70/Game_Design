@@ -1,4 +1,5 @@
 #include "GameWidget.h"
+#include "SoundManager.h"
 
 #include <QKeyEvent>
 #include <QPainter>
@@ -49,6 +50,7 @@ GameWidget::GameWidget(QWidget* parent)
             m_lastPlayerImpactRev = m_gameState->player.impactRevision;
             if (m_gameState->player.lastImpact != ImpactLevel::None) {
                 m_screenShakeTimer = (m_gameState->player.lastImpact == ImpactLevel::Heavy) ? 0.15f : 0.06f;
+                SoundManager::play("player_hurt");
             }
         }
         if (m_screenShakeTimer > 0.0f) {
@@ -64,6 +66,7 @@ GameWidget::GameWidget(QWidget* parent)
             if (bossVisible && !m_bossSeen) {
                 m_bossSeen = true;
                 m_bossIntroAnimTimer = 0.0f;
+                SoundManager::play("boss_intro");
             }
             if (m_bossIntroAnimTimer < 2.0f) {
                 m_bossIntroAnimTimer += clampedDt;
@@ -76,6 +79,9 @@ GameWidget::GameWidget(QWidget* parent)
     // 启动定时器
     m_elapsed.start();
     m_timer.start(16); // ~60 FPS
+
+    // 音效初始化
+    SoundManager::init("assets/sfx/");
 }
 
 void GameWidget::set_game_state(const GameState* state) noexcept
@@ -197,13 +203,13 @@ void GameWidget::keyPressEvent(QKeyEvent* event)
 
     switch (key) {
     case Qt::Key_J: case Qt::Key_Z:
-        if (m_primaryActionCommand) m_primaryActionCommand();
+        if (m_primaryActionCommand) { m_primaryActionCommand(); SoundManager::play("hit_light"); }
         break;
     case Qt::Key_K: case Qt::Key_X:
-        if (m_secondaryActionCommand) m_secondaryActionCommand();
+        if (m_secondaryActionCommand) { m_secondaryActionCommand(); SoundManager::play("hit_heavy"); }
         break;
     case Qt::Key_Space:
-        if (m_stateToggleCommand) m_stateToggleCommand();
+        if (m_stateToggleCommand) { m_stateToggleCommand(); SoundManager::play("jump"); }
         break;
     case Qt::Key_R:
         if (m_resetCommand) m_resetCommand();
@@ -1024,6 +1030,8 @@ void GameWidget::drawOverlay(QPainter& p)
                    Qt::AlignCenter, "Press P or ESC to Resume");
 
     } else if (phase == GamePhase::GameOver) {
+        static bool gameOverSounded = false;
+        if (!gameOverSounded) { SoundManager::play("gameover"); gameOverSounded = true; }
         // ---- 游戏结束 ----
         QFont goFont("Arial", 42, QFont::Bold);
         p.setFont(goFont);
@@ -1058,6 +1066,8 @@ void GameWidget::drawOverlay(QPainter& p)
         }
 
     } else if (phase == GamePhase::Win) {
+        static bool winSounded = false;
+        if (!winSounded) { SoundManager::play("win"); winSounded = true; }
         // ---- 胜利 ----
         QFont winFont("Arial", 42, QFont::Bold);
         p.setFont(winFont);
