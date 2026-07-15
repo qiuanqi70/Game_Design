@@ -55,12 +55,19 @@ GameWidget::GameWidget(QWidget* parent)
             m_screenShakeTimer = std::max(0.0f, m_screenShakeTimer - clampedDt);
         }
 
-        // Boss 出场动画计时
-        if (m_gameState && m_gameState->encounter.kind == EncounterKind::Boss &&
-            m_gameState->encounter.phase == EncounterPhase::Intro) {
-            m_bossIntroAnimTimer += clampedDt;
-        } else if (m_gameState && m_gameState->encounter.phase != EncounterPhase::Intro) {
-            m_bossIntroAnimTimer = 0.0f;
+        // Boss 出场动画计时：View 侧检测 Boss 首次出现
+        if (m_gameState) {
+            bool bossVisible = false;
+            for (const auto& e : m_gameState->enemies) {
+                if (e.kind == ActorKind::Boss && e.visible) { bossVisible = true; break; }
+            }
+            if (bossVisible && !m_bossSeen) {
+                m_bossSeen = true;
+                m_bossIntroAnimTimer = 0.0f;
+            }
+            if (m_bossIntroAnimTimer < 2.0f) {
+                m_bossIntroAnimTimer += clampedDt;
+            }
         }
 
         if (m_tickCommand) m_tickCommand(clampedDt, m_frameIndex);
@@ -73,8 +80,13 @@ GameWidget::GameWidget(QWidget* parent)
 
 void GameWidget::set_game_state(const GameState* state) noexcept
 {
+    // 检测游戏重开，重置 Boss 出场标记
+    if (m_gameState && state && m_gameState->phase != GamePhase::Title && state->phase == GamePhase::Title) {
+        m_bossSeen = false;
+        m_bossIntroAnimTimer = 99.0f;
+    }
     m_gameState = state;
-    update(); //qt的内置函数，触发 paintEvent
+    update();
 }
 
 const GameState& GameWidget::game_state() const noexcept
@@ -450,6 +462,15 @@ void GameWidget::drawBuildings(QPainter& p)
 
         // 建筑主体
         p.fillRect(QRectF(screenX, screenY, screenW, screenH), b.color);
+        // 简单结构线：楼顶 + 几层横线
+        p.setPen(QPen(b.color.lighter(130), 1.0f * m_scaleX));
+        p.drawLine(QPointF(screenX, screenY), QPointF(screenX + screenW, screenY));
+        const int floors = static_cast<int>(screenH / (20.0f * m_scaleY));
+        for (int fi = 1; fi <= floors && fi <= 4; ++fi) {
+            const float fy = screenY + fi * 20.0f * m_scaleY;
+            p.drawLine(QPointF(screenX + 2.0f * m_scaleX, fy),
+                       QPointF(screenX + screenW - 2.0f * m_scaleX, fy));
+        }
     }
 }
 
@@ -662,12 +683,13 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
         const float t = game_state().elapsedSeconds * 10.0f;
         const float stride = std::sin(t) * 6.0f * m_scaleX;
         const float kneeBend = std::abs(std::cos(t)) * 3.0f * m_scaleY;
-        p.fillRect(QRectF(-legW - legGap * 0.5f + stride, legTop + kneeBend, legW, legH - kneeBend), pantsColor);
-        p.fillRect(QRectF(legGap * 0.5f - stride, legTop - kneeBend * 0.5f, legW, legH + kneeBend * 0.5f), pantsColor);
+        // 两腿交替：一前一后
+        p.fillRect(QRectF(-legW * 0.35f + stride, legTop + kneeBend, legW, legH - kneeBend), pantsColor);
+        p.fillRect(QRectF(-legW * 0.35f - stride, legTop - kneeBend * 0.5f, legW, legH + kneeBend * 0.5f), pantsColor);
         // 鞋
-        p.fillRect(QRectF(-legW - legGap * 0.5f + stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(-legW * 0.35f + stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
-        p.fillRect(QRectF(legGap * 0.5f - stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(-legW * 0.35f - stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
     } else {
         p.fillRect(QRectF(-legW - legGap * 0.5f, legTop, legW, legH), pantsColor);
@@ -1079,29 +1101,13 @@ void GameWidget::drawOverlay(QPainter& p)
 
 void GameWidget::drawEncounterOverlay(QPainter& p)
 {
-    const auto& enc = game_state().encounter;
-    if (enc.phase == EncounterPhase::None || enc.phase == EncounterPhase::Cleared) {
-        return;
-    }
-
     const float vpW = game_state().map.viewportWidth > 0.0f
                           ? game_state().map.viewportWidth : 960.0f;
     const float vpH = game_state().map.viewportHeight > 0.0f
                           ? game_state().map.viewportHeight : 540.0f;
 
-    // 锁屏边框
-    if (enc.phase == EncounterPhase::Fighting || enc.phase == EncounterPhase::Intro) {
-        const float edgeW = 6.0f * m_scaleX;
-        QColor edgeColor(200, 30, 30, 180);
-        if (enc.kind == EncounterKind::Boss) {
-            const float pulse = 0.7f + 0.3f * std::sin(m_goBlinkTimer * 4.0f);
-            edgeColor = QColor(220, 50, 30, static_cast<int>(200 * pulse));
-        }
-        p.fillRect(QRectF(0, 0, vpW * m_scaleX, edgeW), edgeColor);
-        p.fillRect(QRectF(0, vpH * m_scaleY - edgeW, vpW * m_scaleX, edgeW), edgeColor);
-    }
-
-    // 敌人剩余计数
+    // 敌人剩余计数（普通遭遇战）
+    const auto& enc = game_state().encounter;
     if (enc.remainingEnemies > 0 && enc.phase == EncounterPhase::Fighting) {
         p.setPen(QColor(255, 200, 100));
         p.setFont(QFont("Arial", 12, QFont::Bold));
@@ -1112,36 +1118,51 @@ void GameWidget::drawEncounterOverlay(QPainter& p)
                    QString("Enemies: %1").arg(enc.remainingEnemies));
     }
 
-    // Boss 出场动画
-    if (enc.kind == EncounterKind::Boss && enc.phase == EncounterPhase::Intro) {
-        const float cx = vpW * m_scaleX * 0.5f;
-        const float cy = vpH * m_scaleY * 0.3f;
+    // Boss 出场动画（View 侧检测 Boss 首次出现，不依赖 ViewModel 的 encounter.phase）
+    if (m_bossIntroAnimTimer > 1.8f) return;
 
-        // 黑边收缩
-        const float reveal = std::min(1.0f, m_bossIntroAnimTimer / 1.2f);
-        const float barH = vpH * m_scaleY * 0.5f * (1.0f - reveal);
-        p.fillRect(QRectF(0, 0, vpW * m_scaleX, barH), QColor(0, 0, 0, 220));
-        p.fillRect(QRectF(0, vpH * m_scaleY - barH, vpW * m_scaleX, barH), QColor(0, 0, 0, 220));
+    const float cx = vpW * m_scaleX * 0.5f;
+    const float cy = vpH * m_scaleY * 0.35f;
 
-        // WARNING 文字
-        if (reveal < 1.0f) {
-            const float warnPulse = 0.6f + 0.4f * std::sin(m_goBlinkTimer * 10.0f);
-            p.setPen(QColor(255, 60, 30, static_cast<int>(255 * warnPulse)));
-            p.setFont(QFont("Arial", 32, QFont::Bold));
-            p.drawText(QRectF(cx - 160.0f * m_scaleX, cy - 30.0f * m_scaleY,
-                              320.0f * m_scaleX, 60.0f * m_scaleY),
-                       Qt::AlignCenter, "WARNING");
-        }
+    // 阶段 0~0.4s：屏幕全黑 + WARNING 闪烁
+    if (m_bossIntroAnimTimer < 0.5f) {
+        p.fillRect(QRectF(0, 0, vpW * m_scaleX, vpH * m_scaleY), QColor(0, 0, 0, 200));
+        const float warnPulse = 0.5f + 0.5f * std::sin(m_goBlinkTimer * 12.0f);
+        p.setPen(QColor(255, 40, 20, static_cast<int>(220 * warnPulse)));
+        p.setFont(QFont("Arial", 36, QFont::Bold));
+        p.drawText(QRectF(cx - 200.0f * m_scaleX, cy - 30.0f * m_scaleY,
+                          400.0f * m_scaleX, 60.0f * m_scaleY),
+                   Qt::AlignCenter, "!! WARNING !!");
+        return;
+    }
 
-        // Boss 名称
-        if (reveal > 0.4f) {
-            const float nameAlpha = (reveal - 0.4f) / 0.6f;
-            p.setPen(QColor(255, 180, 80, static_cast<int>(255 * nameAlpha)));
-            p.setFont(QFont("Arial", 18, QFont::Bold));
-            p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 35.0f * m_scaleY,
-                              300.0f * m_scaleX, 35.0f * m_scaleY),
-                       Qt::AlignCenter, "BOSS APPROACHING");
-        }
+    // 阶段 0.5~1.2s：黑幕收缩 + 名称渐显
+    const float reveal = std::min(1.0f, (m_bossIntroAnimTimer - 0.5f) / 0.7f);
+    const float barH = vpH * m_scaleY * 0.45f * (1.0f - reveal);
+    p.fillRect(QRectF(0, 0, vpW * m_scaleX, barH), QColor(0, 0, 0, 230));
+    p.fillRect(QRectF(0, vpH * m_scaleY - barH, vpW * m_scaleX, barH), QColor(0, 0, 0, 230));
+
+    // Boss 名称从上方飞入
+    const float nameAlpha = reveal;
+    const float nameY = cy + (1.0f - reveal) * (-100.0f * m_scaleY);
+    p.setPen(QColor(255, 180, 60, static_cast<int>(255 * nameAlpha)));
+    p.setFont(QFont("Arial", 22, QFont::Bold));
+    p.drawText(QRectF(cx - 200.0f * m_scaleX, nameY - 20.0f * m_scaleY,
+                      400.0f * m_scaleX, 40.0f * m_scaleY),
+               Qt::AlignCenter, "BOSS");
+    p.setPen(QColor(255, 100, 40, static_cast<int>(200 * nameAlpha)));
+    p.setFont(QFont("Arial", 14, QFont::Bold));
+    p.drawText(QRectF(cx - 200.0f * m_scaleX, nameY + 22.0f * m_scaleY,
+                      400.0f * m_scaleX, 25.0f * m_scaleY),
+               Qt::AlignCenter, "THE EXECUTIONER");
+
+    // 阶段 1.2~1.8s：红边脉冲边框
+    if (reveal >= 1.0f) {
+        const float edgeW = 8.0f * m_scaleX;
+        const float pulse = 0.5f + 0.5f * std::sin(m_goBlinkTimer * 6.0f);
+        const QColor edgeColor(220, 30, 20, static_cast<int>(180 * pulse));
+        p.fillRect(QRectF(0, 0, vpW * m_scaleX, edgeW), edgeColor);
+        p.fillRect(QRectF(0, vpH * m_scaleY - edgeW, vpW * m_scaleX, edgeW), edgeColor);
     }
 }
 

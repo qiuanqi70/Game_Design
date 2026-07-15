@@ -130,7 +130,8 @@ private:
     std::uint32_t m_lastPlayerImpactRev = 0;
     mutable std::vector<QPointF> m_stars;
     bool m_starsGenerated = false;
-    float m_bossIntroAnimTimer = 0.0f;
+    float m_bossIntroAnimTimer = 99.0f;
+    bool m_bossSeen = false;
 
     // 视口缩放
     float m_scaleX = 1.0f;
