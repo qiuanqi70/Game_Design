@@ -70,6 +70,7 @@ struct EntityState {
     float hurtTimer = 0.0f;
     std::uint32_t impactRevision = 0;
     alleyfist::ImpactLevel lastImpact = alleyfist::ImpactLevel::None;
+    bool pickupDropped = false;
 };
 
 using EntityList = std::vector<EntityState>;

@@ -1,5 +1,6 @@
 #include "GameSimulation.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace alleyfist::viewmodel {
@@ -64,12 +65,17 @@ void GameSimulation::step(float deltaSeconds)
     if (!m_running) return;
 
     m_elapsedSeconds += deltaSeconds;
+    update_wave_progression(deltaSeconds);
     update_encounter_state(deltaSeconds);
     spawn_boss_if_needed();
     simulate_ai(deltaSeconds);
     update_projectiles(deltaSeconds);
     update_pickups(deltaSeconds);
     update_boss_state();
+    if (m_bossSpawned && m_encounterTimer >= kEncounterIntroSeconds) {
+        m_encounter.phase = EncounterPhase::Fighting;
+        m_encounter.introProgress = 1.0f;
+    }
     sync_shared_state();
 
     notify_tick(deltaSeconds);
@@ -96,7 +102,10 @@ void GameSimulation::populate_initial_state()
     m_nextPickupId = 1;
     m_elapsedSeconds = 0.0f;
     m_encounterTimer = 0.0f;
+    m_playerEnergy = 100.0f;
     m_encounter = {};
+    m_currentWave = 0;
+    m_waveTransitionTimer = 0.0f;
 
     EntityState player;
     player.id = m_nextId++;
@@ -108,29 +117,101 @@ void GameSimulation::populate_initial_state()
     player.alive = true;
     m_entities.push_back(player);
 
-    for (int i = 0; i < 3; ++i) {
+    spawn_wave_enemies(0);
+
+    sync_shared_state();
+}
+
+void GameSimulation::spawn_wave_enemies(std::uint32_t waveIndex)
+{
+    if (waveIndex > 2) return;
+
+    constexpr std::array<std::array<EntityKind, 4>, 3> kWaveEnemies = {{
+        {EntityKind::Patroller, EntityKind::Patroller, EntityKind::Patroller, EntityKind::Patroller},
+        {EntityKind::Ambusher, EntityKind::Charger, EntityKind::Ranged, EntityKind::Patroller},
+        {EntityKind::Ambusher, EntityKind::Charger, EntityKind::Ranged, EntityKind::Ambusher}
+    }};
+
+    constexpr std::array<std::array<float, 4>, 3> kWaveEnemyX = {{
+        {320.0f, 420.0f, 520.0f, 620.0f},
+        {350.0f, 450.0f, 550.0f, 650.0f},
+        {380.0f, 480.0f, 580.0f, 680.0f}
+    }};
+
+    constexpr std::array<std::array<float, 4>, 3> kWaveEnemyY = {{
+        {380.0f, 420.0f, 390.0f, 430.0f},
+        {370.0f, 430.0f, 400.0f, 420.0f},
+        {380.0f, 420.0f, 390.0f, 430.0f}
+    }};
+
+    const auto& waveKinds = kWaveEnemies[waveIndex];
+    const auto& waveX = kWaveEnemyX[waveIndex];
+    const auto& waveY = kWaveEnemyY[waveIndex];
+
+    for (std::size_t i = 0; i < waveKinds.size(); ++i) {
         EntityState e;
         e.id = m_nextId++;
-        e.kind = EntityKind::Patroller;
-        e.enemyType = EnemyType::Patroller;
-        e.behaviorState = EnemyBehaviorState::Patrol;
-        e.hp = 20;
-        e.maxHp = 20;
-        e.pos.x = 320.0f + i * 80.0f;
-        e.pos.laneY = (i % 2 == 0) ? 380.0f : 420.0f;
+        e.kind = waveKinds[i];
+        e.enemyType = [kind = e.kind]() {
+            switch (kind) {
+            case EntityKind::Ambusher:
+                return EnemyType::Ambusher;
+            case EntityKind::Charger:
+                return EnemyType::Charger;
+            case EntityKind::Ranged:
+                return EnemyType::Ranged;
+            case EntityKind::Boss:
+                return EnemyType::Boss;
+            case EntityKind::Patroller:
+            case EntityKind::Player:
+            default:
+                return EnemyType::Patroller;
+            }
+        }();
+        e.behaviorState = (e.kind == EntityKind::Patroller) ? EnemyBehaviorState::Patrol : EnemyBehaviorState::Idle;
+        e.hp = 20 + waveIndex * 5;
+        e.maxHp = e.hp;
+        e.pos.x = waveX[i];
+        e.pos.laneY = waveY[i];
         e.patrolRangeLeft = e.pos.x - 110.0f;
         e.patrolRangeRight = e.pos.x + 110.0f;
         e.alive = true;
         m_entities.push_back(e);
     }
+}
 
-    sync_shared_state();
+void GameSimulation::update_wave_progression(float dt)
+{
+    if (m_bossSpawned || m_bossDefeated || m_entities.empty()) {
+        return;
+    }
+
+    const auto& player = m_entities.front();
+    if (player.pos.x >= kBossTriggerX) {
+        return;
+    }
+
+    std::uint32_t aliveEnemyCount = 0;
+    for (std::size_t i = 1; i < m_entities.size(); ++i) {
+        if (m_entities[i].alive && m_entities[i].kind != EntityKind::Player) {
+            ++aliveEnemyCount;
+        }
+    }
+
+    if (aliveEnemyCount == 0 && m_currentWave < 2) {
+        m_waveTransitionTimer += dt;
+        if (m_waveTransitionTimer >= 1.0f) {
+            m_currentWave++;
+            m_waveTransitionTimer = 0.0f;
+            spawn_wave_enemies(m_currentWave);
+        }
+    }
 }
 
 void GameSimulation::update_encounter_state(float dt)
 {
     if (m_bossDefeated) {
-        m_encounter.kind = EncounterKind::None;
+        m_encounter.kind = m_bossSpawned ? EncounterKind::Boss : EncounterKind::EnemyWave;
         m_encounter.phase = EncounterPhase::Cleared;
         m_encounter.currentWave = 0;
         m_encounter.totalWaves = 0;
@@ -140,17 +221,28 @@ void GameSimulation::update_encounter_state(float dt)
     }
 
     if (m_bossSpawned) {
+        const bool introCompleted = m_encounterTimer >= kEncounterIntroSeconds;
         m_encounter.kind = EncounterKind::Boss;
-        m_encounter.phase = EncounterPhase::Fighting;
+        m_encounter.phase = introCompleted ? EncounterPhase::Fighting : EncounterPhase::Intro;
         m_encounter.currentWave = 1;
         m_encounter.totalWaves = 1;
         m_encounter.remainingEnemies = 1;
-        m_encounter.introProgress = 1.0f;
+        m_encounter.introProgress = std::clamp(m_encounterTimer / kEncounterIntroSeconds, 0.0f, 1.0f);
+        if (introCompleted) {
+            m_encounterTimer = kEncounterIntroSeconds;
+        }
         return;
     }
 
     if (m_entities.empty()) {
         return;
+    }
+
+    std::uint32_t remainingEnemies = 0;
+    for (std::size_t i = 1; i < m_entities.size(); ++i) {
+        if (m_entities[i].alive) {
+            ++remainingEnemies;
+        }
     }
 
     const auto& player = m_entities.front();
@@ -160,14 +252,33 @@ void GameSimulation::update_encounter_state(float dt)
         m_encounter.phase = EncounterPhase::Intro;
         m_encounter.currentWave = 1;
         m_encounter.totalWaves = 1;
-        m_encounter.remainingEnemies = 1;
+        m_encounter.remainingEnemies = remainingEnemies;
         m_encounter.introProgress = std::clamp(m_encounterTimer / kEncounterIntroSeconds, 0.0f, 1.0f);
+        return;
+    }
+
+    if (remainingEnemies == 0) {
+        if (m_currentWave < 2 && m_waveTransitionTimer > 0.0f) {
+            m_encounter.kind = EncounterKind::EnemyWave;
+            m_encounter.phase = EncounterPhase::Intro;
+            m_encounter.currentWave = m_currentWave + 2;
+            m_encounter.totalWaves = 3;
+            m_encounter.remainingEnemies = 0;
+            m_encounter.introProgress = std::clamp(m_waveTransitionTimer / 1.0f, 0.0f, 1.0f);
+        } else {
+            m_encounter.kind = EncounterKind::EnemyWave;
+            m_encounter.phase = EncounterPhase::Cleared;
+            m_encounter.currentWave = m_currentWave + 1;
+            m_encounter.totalWaves = 3;
+            m_encounter.remainingEnemies = 0;
+            m_encounter.introProgress = 1.0f;
+        }
     } else {
         m_encounter.kind = EncounterKind::EnemyWave;
         m_encounter.phase = EncounterPhase::Fighting;
-        m_encounter.currentWave = 1;
-        m_encounter.totalWaves = 1;
-        m_encounter.remainingEnemies = static_cast<std::uint32_t>(std::max<int>(0, static_cast<int>(m_entities.size()) - 1));
+        m_encounter.currentWave = m_currentWave + 1;
+        m_encounter.totalWaves = 3;
+        m_encounter.remainingEnemies = remainingEnemies;
         m_encounter.introProgress = 1.0f;
     }
 }
@@ -270,10 +381,16 @@ void GameSimulation::simulate_ai(float dt)
     }
 
     for (auto& e : m_entities) {
-        if (e.hp <= 0) {
+        if (e.hp <= 0 && e.alive) {
             e.alive = false;
-            if (e.kind != EntityKind::Boss) {
+            if (e.kind != EntityKind::Boss && !e.pickupDropped) {
+                const bool dropEnergy = (e.enemyType == EnemyType::Ranged);
+                spawn_pickup(e.pos, dropEnergy ? PickupKind::Energy : PickupKind::Health);
+                e.pickupDropped = true;
+            } else if (e.kind == EntityKind::Boss && !e.pickupDropped) {
                 spawn_pickup(e.pos, PickupKind::Health);
+                spawn_pickup(e.pos, PickupKind::Energy);
+                e.pickupDropped = true;
             }
         }
     }
@@ -322,9 +439,32 @@ void GameSimulation::update_pickups(float dt)
 {
     for (auto& pickup : m_pickups) {
         pickup.lifeSeconds -= dt;
-        pickup.position.z = std::sin(m_elapsedSeconds * 2.2f + pickup.id * 0.6f) * 8.0f;
         if (pickup.lifeSeconds <= 0.0f) {
             pickup.active = false;
+            continue;
+        }
+
+        if (m_entities.empty()) {
+            continue;
+        }
+
+        auto& player = m_entities.front();
+        if (!player.alive) {
+            continue;
+        }
+
+        const bool collected = std::abs(pickup.position.x - player.pos.x) < 36.0f && std::abs(pickup.position.laneY - player.pos.laneY) < 24.0f;
+        if (!collected) {
+            continue;
+        }
+
+        pickup.active = false;
+        if (pickup.kind == PickupKind::Health) {
+            player.hp = std::min(player.maxHp, player.hp + 20);
+            player.impactRevision += 1;
+            player.lastImpact = ImpactLevel::Light;
+        } else if (pickup.kind == PickupKind::Energy) {
+            m_playerEnergy = std::clamp(m_playerEnergy + 20.0f, 0.0f, 100.0f);
         }
     }
 
@@ -374,6 +514,10 @@ void GameSimulation::spawn_boss_if_needed()
         return;
     }
 
+    if (m_encounterTimer < kEncounterIntroSeconds) {
+        return;
+    }
+
     EntityState boss;
     boss.id = m_nextId++;
     boss.kind = EntityKind::Boss;
@@ -386,7 +530,6 @@ void GameSimulation::spawn_boss_if_needed()
     boss.alive = true;
     m_entities.push_back(boss);
     m_bossSpawned = true;
-    m_encounterTimer = 0.0f;
 }
 
 void GameSimulation::update_boss_state() noexcept
@@ -399,6 +542,11 @@ void GameSimulation::update_boss_state() noexcept
         return entity.kind == EntityKind::Boss && entity.alive && entity.hp > 0;
     });
     m_bossDefeated = !bossAlive;
+}
+
+void GameSimulation::set_player_energy(float energy) noexcept
+{
+    m_playerEnergy = std::clamp(energy, 0.0f, 100.0f);
 }
 
 void GameSimulation::apply_damage(EntityState& target, int amount, alleyfist::ImpactLevel impact, int sourceId)

@@ -31,6 +31,8 @@ public:
     const EncounterState& encounter_state() const noexcept { return m_encounter; }
     const std::vector<ProjectileState>& projectiles() const noexcept { return m_projectileStates; }
     const std::vector<PickupState>& pickups() const noexcept { return m_pickupStates; }
+    float player_energy() const noexcept { return m_playerEnergy; }
+    void set_player_energy(float energy) noexcept;
 
     // 控制接口（由 ViewModel 的命令绑定）
     void player_move(float dx, float dy) noexcept;
@@ -52,11 +54,16 @@ private:
     std::uint32_t m_nextPickupId = 1;
     float m_elapsedSeconds = 0.0f;
     float m_encounterTimer = 0.0f;
+    float m_playerEnergy = 100.0f;
     EncounterState m_encounter;
+    std::uint32_t m_currentWave = 0;
+    float m_waveTransitionTimer = 0.0f;
 
     void notify_tick(float dt);
     void populate_initial_state();
     void update_encounter_state(float dt);
+    void update_wave_progression(float dt);
+    void spawn_wave_enemies(std::uint32_t waveIndex);
     void simulate_ai(float dt);
     void update_projectiles(float dt);
     void update_pickups(float dt);

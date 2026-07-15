@@ -8,6 +8,63 @@ namespace alleyfist::viewmodel {
 namespace {
 
 constexpr float kMoveSpeed = 220.0f;
+
+alleyfist::ActorKind to_actor_kind(alleyfist::viewmodel::EntityKind kind)
+{
+    switch (kind) {
+    case alleyfist::viewmodel::EntityKind::Player:
+        return alleyfist::ActorKind::Player;
+    case alleyfist::viewmodel::EntityKind::Patroller:
+        return alleyfist::ActorKind::Patroller;
+    case alleyfist::viewmodel::EntityKind::Ambusher:
+        return alleyfist::ActorKind::Ambusher;
+    case alleyfist::viewmodel::EntityKind::Charger:
+        return alleyfist::ActorKind::Charger;
+    case alleyfist::viewmodel::EntityKind::Ranged:
+        return alleyfist::ActorKind::Ranged;
+    case alleyfist::viewmodel::EntityKind::Boss:
+        return alleyfist::ActorKind::Boss;
+    }
+    return alleyfist::ActorKind::Player;
+}
+
+alleyfist::ActorActionState to_actor_action_state(const alleyfist::viewmodel::EntityState& entity)
+{
+    if (!entity.alive) {
+        return alleyfist::ActorActionState::Dead;
+    }
+
+    if (entity.kind == alleyfist::viewmodel::EntityKind::Boss) {
+        return entity.behaviorState == alleyfist::viewmodel::EnemyBehaviorState::Hurt ? alleyfist::ActorActionState::Hurt
+                                                                                     : alleyfist::ActorActionState::Charge;
+    }
+
+    switch (entity.behaviorState) {
+    case alleyfist::viewmodel::EnemyBehaviorState::Hurt:
+        return alleyfist::ActorActionState::Hurt;
+    case alleyfist::viewmodel::EnemyBehaviorState::Ambush:
+        return alleyfist::ActorActionState::Ambush;
+    case alleyfist::viewmodel::EnemyBehaviorState::Charge:
+        return alleyfist::ActorActionState::Charge;
+    case alleyfist::viewmodel::EnemyBehaviorState::RangedAttack:
+        return alleyfist::ActorActionState::RangedAttack;
+    case alleyfist::viewmodel::EnemyBehaviorState::Idle:
+    case alleyfist::viewmodel::EnemyBehaviorState::Patrol:
+    default:
+        return alleyfist::ActorActionState::Walk;
+    }
+}
+
+alleyfist::ProjectileState to_projectile_state(const alleyfist::ProjectileState& projectile)
+{
+    return projectile;
+}
+
+alleyfist::PickupState to_pickup_state(const alleyfist::PickupState& pickup)
+{
+    return pickup;
+}
+
 constexpr float kWorldWidth = 3000.0f;
 constexpr float kViewportWidth = 960.0f;
 constexpr float kViewportHeight = 540.0f;
@@ -221,15 +278,18 @@ void GameViewModel::sync_state_from_simulation()
                                         : ActorActionState::Dead;
     m_state.player.position.z = 0.0f;
 
-    if (player.alive && m_jumpActive) {
+    if (player.alive && (player.hurtTimer > 0.0f || player.behaviorState == EnemyBehaviorState::Hurt)) {
+        m_state.player.actionState = ActorActionState::Hurt;
+    } else if (player.alive && m_jumpActive) {
         const float progress = std::clamp(m_jumpElapsed / kJumpSeconds, 0.0f, 1.0f);
         m_state.player.position.z = kJumpHeight * std::sin(kPi * progress);
         m_state.player.actionState = ActorActionState::Jump;
-    }
-
-    if (player.alive && m_attackTimer > 0.0f) {
+    } else if (player.alive && m_attackTimer > 0.0f) {
         m_state.player.actionState = m_jumpActive ? ActorActionState::AirAttack : m_attackState;
     }
+
+    m_state.player.impactRevision = player.impactRevision;
+    m_state.player.lastImpact = player.lastImpact;
 
     if (m_moveLeft && !m_moveRight) {
         m_state.player.facing = Facing::Left;
@@ -255,15 +315,13 @@ void GameViewModel::sync_state_from_simulation()
 
         ActorState actor;
         actor.id = static_cast<std::uint32_t>(entity.id);
-        actor.kind = isBoss ? ActorKind::Boss : static_cast<ActorKind>(entity.kind);
+        actor.kind = isBoss ? ActorKind::Boss : to_actor_kind(entity.kind);
         actor.team = Team::Enemy;
         actor.position = entity.pos;
         actor.position.laneY = std::clamp(actor.position.laneY, kStreetTop, kStreetBottom);
         actor.drawSize = isBoss ? alleyfist::Size{88.0f, 128.0f} : alleyfist::Size{48.0f, 72.0f};
         actor.health = {std::max(0, entity.hp), entity.maxHp > 0 ? entity.maxHp : fallbackMaxHealth};
-        actor.actionState = entity.alive ? (entity.behaviorState == EnemyBehaviorState::Hurt ? ActorActionState::Hurt : (
-            entity.kind == EntityKind::Boss ? ActorActionState::Charge : ActorActionState::Walk))
-                                        : ActorActionState::Dead;
+        actor.actionState = entity.alive ? to_actor_action_state(entity) : ActorActionState::Dead;
         actor.visible = entity.alive;
         actor.facing = actor.position.x < m_state.player.position.x ? Facing::Right : Facing::Left;
         actor.impactRevision = entity.impactRevision;
@@ -280,24 +338,20 @@ void GameViewModel::sync_state_from_simulation()
     }
 
     for (const auto& projectile : m_sim->projectiles()) {
-        ProjectileState state;
-        state.id = projectile.id;
-        state.kind = ProjectileKind::ThrownObject;
-        state.team = Team::Enemy;
-        state.position = projectile.position;
-        state.facing = projectile.facing;
-        m_state.projectiles.push_back(state);
+        m_state.projectiles.push_back(to_projectile_state(projectile));
     }
 
     for (const auto& pickup : m_sim->pickups()) {
-        PickupState state;
-        state.kind = pickup.kind;
-        state.id = pickup.id;
-        state.position = pickup.position;
+        auto state = to_pickup_state(pickup);
+        state.position.z = pickup.position.z + std::sin(m_state.elapsedSeconds * 2.2f + static_cast<float>(pickup.id) * 0.6f) * 8.0f;
         m_state.pickups.push_back(state);
     }
 
     m_state.encounter = m_sim->encounter_state();
+    if (m_state.encounter.phase == EncounterPhase::Cleared && m_state.encounter.kind == EncounterKind::Boss) {
+        m_state.encounter.kind = EncounterKind::Boss;
+    }
+    m_playerEnergy = m_sim->player_energy();
     m_state.hud.playerHealth = m_state.player.health;
     m_state.hud.playerEnergy = {static_cast<int>(std::lround(m_playerEnergy)), static_cast<int>(kMaxPlayerEnergy)};
     m_state.hud.playerExhausted = m_exhaustedWarningTimer > 0.0f;
@@ -357,6 +411,9 @@ void GameViewModel::reset_actions() noexcept
     m_jumpElapsed = 0.0f;
     m_attackTimer = 0.0f;
     m_playerEnergy = kMaxPlayerEnergy;
+    if (m_sim) {
+        m_sim->set_player_energy(kMaxPlayerEnergy);
+    }
     m_exhaustedWarningTimer = 0.0f;
     m_attackState = ActorActionState::Idle;
     m_moveLeft = false;
@@ -368,6 +425,9 @@ void GameViewModel::reset_actions() noexcept
 void GameViewModel::update_action_timers(float dt)
 {
     m_playerEnergy = std::clamp(m_playerEnergy + kEnergyRegenPerSecond * dt, 0.0f, kMaxPlayerEnergy);
+    if (m_sim) {
+        m_sim->set_player_energy(m_playerEnergy);
+    }
     m_exhaustedWarningTimer = std::max(0.0f, m_exhaustedWarningTimer - dt);
 
     if (m_jumpActive) {
@@ -394,6 +454,9 @@ bool GameViewModel::try_spend_energy(float cost) noexcept
     }
 
     m_playerEnergy = std::clamp(m_playerEnergy - cost, 0.0f, kMaxPlayerEnergy);
+    if (m_sim) {
+        m_sim->set_player_energy(m_playerEnergy);
+    }
     m_exhaustedWarningTimer = 0.0f;
     return true;
 }
