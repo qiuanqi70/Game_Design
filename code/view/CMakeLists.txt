@@ -13,5 +13,8 @@ target_link_libraries(alleyfist_view
         alleyfist_common
         Qt6::Widgets
         Qt6::Gui
-        winmm
 )
+
+if(WIN32)
+    target_link_libraries(alleyfist_view PRIVATE winmm)
+endif()

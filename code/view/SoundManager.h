@@ -5,8 +5,7 @@
 
 namespace alleyfist {
 
-/// 简单音效管理器，封装 Windows PlaySound。
-/// 异步播放，不阻塞游戏循环。
+/// 简单的跨平台异步音效管理器。
 class SoundManager {
 public:
     /// 初始化，assetsPath 指向 assets/sfx/ 目录。
