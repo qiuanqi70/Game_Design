@@ -238,6 +238,8 @@ void GameViewModel::sync_state_from_simulation()
     }
 
     m_state.enemies.clear();
+    m_state.projectiles.clear();
+    m_state.pickups.clear();
     m_state.hud.showBossHealth = false;
     m_state.hud.bossHealth = {};
 
@@ -253,15 +255,19 @@ void GameViewModel::sync_state_from_simulation()
 
         ActorState actor;
         actor.id = static_cast<std::uint32_t>(entity.id);
-        actor.kind = isBoss ? ActorKind::Boss : ActorKind::Patroller;
+        actor.kind = isBoss ? ActorKind::Boss : static_cast<ActorKind>(entity.kind);
         actor.team = Team::Enemy;
         actor.position = entity.pos;
         actor.position.laneY = std::clamp(actor.position.laneY, kStreetTop, kStreetBottom);
         actor.drawSize = isBoss ? alleyfist::Size{88.0f, 128.0f} : alleyfist::Size{48.0f, 72.0f};
         actor.health = {std::max(0, entity.hp), entity.maxHp > 0 ? entity.maxHp : fallbackMaxHealth};
-        actor.actionState = entity.alive ? ActorActionState::Walk : ActorActionState::Dead;
+        actor.actionState = entity.alive ? (entity.behaviorState == EnemyBehaviorState::Hurt ? ActorActionState::Hurt : (
+            entity.kind == EntityKind::Boss ? ActorActionState::Charge : ActorActionState::Walk))
+                                        : ActorActionState::Dead;
         actor.visible = entity.alive;
         actor.facing = actor.position.x < m_state.player.position.x ? Facing::Right : Facing::Left;
+        actor.impactRevision = entity.impactRevision;
+        actor.lastImpact = entity.lastImpact;
 
         if (isBoss && actor.visible) {
             m_state.hud.showBossHealth = true;
@@ -273,6 +279,25 @@ void GameViewModel::sync_state_from_simulation()
         }
     }
 
+    for (const auto& projectile : m_sim->projectiles()) {
+        ProjectileState state;
+        state.id = projectile.id;
+        state.kind = ProjectileKind::ThrownObject;
+        state.team = Team::Enemy;
+        state.position = projectile.position;
+        state.facing = projectile.facing;
+        m_state.projectiles.push_back(state);
+    }
+
+    for (const auto& pickup : m_sim->pickups()) {
+        PickupState state;
+        state.kind = pickup.kind;
+        state.id = pickup.id;
+        state.position = pickup.position;
+        m_state.pickups.push_back(state);
+    }
+
+    m_state.encounter = m_sim->encounter_state();
     m_state.hud.playerHealth = m_state.player.health;
     m_state.hud.playerEnergy = {static_cast<int>(std::lround(m_playerEnergy)), static_cast<int>(kMaxPlayerEnergy)};
     m_state.hud.playerExhausted = m_exhaustedWarningTimer > 0.0f;

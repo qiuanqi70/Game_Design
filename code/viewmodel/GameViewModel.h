@@ -58,6 +58,7 @@ private:
     float m_playerEnergy = 100.0f;
     float m_exhaustedWarningTimer = 0.0f;
     ActorActionState m_attackState = ActorActionState::Idle;
+    std::uint32_t m_lastImpactRevision = 0;
 
     void tick(float dt);
     void sync_state_from_simulation();

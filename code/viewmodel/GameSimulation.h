@@ -28,6 +28,9 @@ public:
     const EntityList& entities() const noexcept { return m_entities; }
     bool boss_spawned() const noexcept { return m_bossSpawned; }
     bool boss_defeated() const noexcept { return m_bossDefeated; }
+    const EncounterState& encounter_state() const noexcept { return m_encounter; }
+    const std::vector<ProjectileState>& projectiles() const noexcept { return m_projectileStates; }
+    const std::vector<PickupState>& pickups() const noexcept { return m_pickupStates; }
 
     // 控制接口（由 ViewModel 的命令绑定）
     void player_move(float dx, float dy) noexcept;
@@ -37,16 +40,32 @@ public:
 private:
     std::vector<std::function<void(float)>> m_tickListeners;
     EntityList m_entities;
+    std::vector<ProjectileVm> m_projectiles;
+    std::vector<PickupVm> m_pickups;
+    std::vector<ProjectileState> m_projectileStates;
+    std::vector<PickupState> m_pickupStates;
     bool m_running = false;
     bool m_bossSpawned = false;
     bool m_bossDefeated = false;
     int m_nextId = 1;
+    std::uint32_t m_nextProjectileId = 1;
+    std::uint32_t m_nextPickupId = 1;
+    float m_elapsedSeconds = 0.0f;
+    float m_encounterTimer = 0.0f;
+    EncounterState m_encounter;
 
     void notify_tick(float dt);
     void populate_initial_state();
+    void update_encounter_state(float dt);
     void simulate_ai(float dt);
+    void update_projectiles(float dt);
+    void update_pickups(float dt);
     void spawn_boss_if_needed();
     void update_boss_state() noexcept;
+    void apply_damage(EntityState& target, int amount, alleyfist::ImpactLevel impact, int sourceId);
+    void spawn_ranged_projectile(const EntityState& owner);
+    void spawn_pickup(const alleyfist::WorldPosition& position, alleyfist::PickupKind kind);
+    void sync_shared_state();
 };
 
 } // namespace alleyfist::viewmodel
