@@ -132,6 +132,8 @@ private:
     bool m_starsGenerated = false;
     float m_bossIntroAnimTimer = 99.0f;
     bool m_bossSeen = false;
+    bool m_gameOverSounded = false;
+    bool m_winSounded = false;
 
     // 视口缩放
     float m_scaleX = 1.0f;

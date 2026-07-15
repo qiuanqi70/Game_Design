@@ -86,10 +86,13 @@ GameWidget::GameWidget(QWidget* parent)
 
 void GameWidget::set_game_state(const GameState* state) noexcept
 {
-    // 检测游戏重开，重置 Boss 出场标记
-    if (m_gameState && state && m_gameState->phase != GamePhase::Title && state->phase == GamePhase::Title) {
-        m_bossSeen = false;
-        m_bossIntroAnimTimer = 99.0f;
+    if (m_gameState && state && m_gameState->phase != state->phase) {
+        if (state->phase == GamePhase::Title) {
+            m_bossSeen = false;
+            m_bossIntroAnimTimer = 99.0f;
+            m_gameOverSounded = false;
+            m_winSounded = false;
+        }
     }
     m_gameState = state;
     update();
@@ -424,59 +427,76 @@ void GameWidget::drawBuildings(QPainter& p)
     const float streetTop = game_state().map.streetTopY > 0.0f
                                 ? game_state().map.streetTopY : 300.0f;
     const float camX = game_state().map.cameraX;
-
-    // 视差滚动：远景移动速度为镜头的 0.3 倍
     const float parallaxFactor = 0.3f;
 
-    // 绘制一系列建筑
     struct Building {
-        float x;
-        float width;
-        float height;
-        QColor color;
+        float x, width, height;
+        QColor body, windowLit, windowDark, roof;
     };
 
-    // 固定建筑布局
     const Building buildings[] = {
-        { 100.0f,  120.0f, 180.0f, QColor(50, 45, 55)  },
-        { 280.0f,  90.0f,  140.0f, QColor(55, 50, 60)  },
-        { 450.0f,  150.0f, 200.0f, QColor(45, 40, 50)  },
-        { 680.0f,  100.0f, 160.0f, QColor(52, 47, 57)  },
-        { 850.0f,  130.0f, 190.0f, QColor(48, 43, 53)  },
-        { 1050.0f, 110.0f, 150.0f, QColor(55, 48, 58)  },
-        { 1250.0f, 140.0f, 210.0f, QColor(42, 38, 48)  },
-        { 1480.0f, 100.0f, 170.0f, QColor(50, 45, 55)  },
-        { 1680.0f, 160.0f, 195.0f, QColor(47, 42, 52)  },
-        { 1900.0f, 120.0f, 155.0f, QColor(53, 48, 58)  },
-        { 2100.0f, 135.0f, 185.0f, QColor(44, 40, 50)  },
-        { 2350.0f, 145.0f, 205.0f, QColor(49, 44, 54)  },
-        { 2600.0f, 115.0f, 165.0f, QColor(51, 46, 56)  },
-        { 2800.0f, 125.0f, 175.0f, QColor(46, 41, 51)  },
+        { 100, 120, 180, QColor(45,42,60),   QColor(255,235,170), QColor(35,30,50),   QColor(35,32,48) },
+        { 280,  90, 140, QColor(55,48,62),   QColor(255,220,130), QColor(40,35,50),   QColor(45,38,52) },
+        { 450, 150, 210, QColor(42,40,58),   QColor(255,240,180), QColor(30,28,45),   QColor(32,30,48) },
+        { 680, 105, 160, QColor(50,44,60),   QColor(255,230,160), QColor(38,32,48),   QColor(40,34,50) },
+        { 850, 130, 190, QColor(48,43,65),   QColor(255,225,150), QColor(35,30,52),   QColor(38,33,52) },
+        { 1050,110, 155, QColor(52,46,58),   QColor(255,235,165), QColor(40,35,46),   QColor(42,36,48) },
+        { 1250,140, 215, QColor(40,38,56),   QColor(255,240,175), QColor(28,26,44),   QColor(30,27,45) },
+        { 1480,100, 170, QColor(47,41,59),   QColor(255,230,155), QColor(35,30,48),   QColor(37,32,49) },
+        { 1680,155, 200, QColor(44,40,62),   QColor(255,220,140), QColor(32,28,50),   QColor(34,30,52) },
+        { 1900,120, 160, QColor(51,45,57),   QColor(255,235,170), QColor(39,34,45),   QColor(41,36,47) },
+        { 2100,135, 190, QColor(43,39,63),   QColor(255,225,148), QColor(31,27,50),   QColor(33,29,53) },
+        { 2350,145, 210, QColor(46,41,61),   QColor(255,240,185), QColor(34,29,49),   QColor(36,31,51) },
+        { 2600,115, 168, QColor(49,43,56),   QColor(255,230,160), QColor(37,32,44),   QColor(39,34,46) },
+        { 2800,125, 178, QColor(44,40,60),   QColor(255,220,145), QColor(32,28,48),   QColor(34,30,50) },
     };
 
     for (const auto& b : buildings) {
-        // 视差位置
-        const float parallaxX = b.x - camX * parallaxFactor;
-        const float screenX = parallaxX * m_scaleX;
-        const float screenW = b.width * m_scaleX;
+        const float sx = (b.x - camX * parallaxFactor) * m_scaleX;
+        const float sw = b.width * m_scaleX;
         const float bottomY = streetTop * m_scaleY;
-        const float screenH = b.height * m_scaleY;
-        const float screenY = bottomY - screenH;
-
-        // 裁剪：只画在屏幕内的建筑
-        if (screenX + screenW < 0 || screenX > width()) continue;
+        const float sh = b.height * m_scaleY;
+        const float sy = bottomY - sh;
+        if (sx + sw < 0 || sx > width()) continue;
 
         // 建筑主体
-        p.fillRect(QRectF(screenX, screenY, screenW, screenH), b.color);
-        // 简单结构线：楼顶 + 几层横线
-        p.setPen(QPen(b.color.lighter(130), 1.0f * m_scaleX));
-        p.drawLine(QPointF(screenX, screenY), QPointF(screenX + screenW, screenY));
-        const int floors = static_cast<int>(screenH / (20.0f * m_scaleY));
-        for (int fi = 1; fi <= floors && fi <= 4; ++fi) {
-            const float fy = screenY + fi * 20.0f * m_scaleY;
-            p.drawLine(QPointF(screenX + 2.0f * m_scaleX, fy),
-                       QPointF(screenX + screenW - 2.0f * m_scaleX, fy));
+        p.fillRect(QRectF(sx, sy, sw, sh), b.body);
+
+        // 楼顶装饰线
+        p.fillRect(QRectF(sx, sy, sw, 4.0f * m_scaleY), b.roof.lighter(140));
+
+        // 大窗户（2列 x 3行）
+        const float winW = 14.0f * m_scaleX;
+        const float winH = 16.0f * m_scaleY;
+        const float marginX = 10.0f * m_scaleX;
+        const float gapX = (sw - marginX * 2 - winW * 2) / 1.0f;
+        const float startY = sy + 14.0f * m_scaleY;
+        const float gapY = 22.0f * m_scaleY;
+
+        for (int col = 0; col < 2; ++col) {
+            const float wx = sx + marginX + col * (winW + gapX);
+            for (int row = 0; row < 3; ++row) {
+                const float wy = startY + row * gapY;
+                if (wy + winH > bottomY - 4.0f * m_scaleY) break;
+                const bool lit = (static_cast<int>(wx * 137 + wy * 251 + b.x * 73) % 4) > 0;
+                p.fillRect(QRectF(wx, wy, winW, winH), lit ? b.windowLit : b.windowDark);
+                p.setPen(QPen(b.roof, 0.8f));
+                p.drawRect(QRectF(wx, wy, winW, winH));
+            }
         }
+
+        // 地面入口门
+        const float doorW = 12.0f * m_scaleX;
+        const float doorH = 20.0f * m_scaleY;
+        const float doorX = sx + sw * 0.5f - doorW * 0.5f;
+        const float doorY = bottomY - doorH - 2.0f * m_scaleY;
+        p.fillRect(QRectF(doorX, doorY, doorW, doorH), QColor(25, 20, 30));
+        p.setPen(QPen(b.roof, 1.0f));
+        p.drawRect(QRectF(doorX, doorY, doorW, doorH));
+
+        // 楼顶边缘
+        p.setPen(Qt::NoPen);
+        p.fillRect(QRectF(sx - 1.0f, sy - 2.0f * m_scaleY, sw + 2.0f, 3.0f * m_scaleY), b.roof);
     }
 }
 
@@ -1030,8 +1050,7 @@ void GameWidget::drawOverlay(QPainter& p)
                    Qt::AlignCenter, "Press P or ESC to Resume");
 
     } else if (phase == GamePhase::GameOver) {
-        static bool gameOverSounded = false;
-        if (!gameOverSounded) { SoundManager::play("gameover"); gameOverSounded = true; }
+        if (!m_gameOverSounded) { SoundManager::play("gameover"); m_gameOverSounded = true; }
         // ---- 游戏结束 ----
         QFont goFont("Arial", 42, QFont::Bold);
         p.setFont(goFont);
@@ -1066,8 +1085,7 @@ void GameWidget::drawOverlay(QPainter& p)
         }
 
     } else if (phase == GamePhase::Win) {
-        static bool winSounded = false;
-        if (!winSounded) { SoundManager::play("win"); winSounded = true; }
+        if (!m_winSounded) { SoundManager::play("win"); m_winSounded = true; }
         // ---- 胜利 ----
         QFont winFont("Arial", 42, QFont::Bold);
         p.setFont(winFont);
