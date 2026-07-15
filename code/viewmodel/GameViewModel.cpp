@@ -34,14 +34,11 @@ alleyfist::ActorActionState to_actor_action_state(const alleyfist::viewmodel::En
         return alleyfist::ActorActionState::Dead;
     }
 
-    if (entity.kind == alleyfist::viewmodel::EntityKind::Boss) {
-        return entity.behaviorState == alleyfist::viewmodel::EnemyBehaviorState::Hurt ? alleyfist::ActorActionState::Hurt
-                                                                                     : alleyfist::ActorActionState::Charge;
-    }
-
     switch (entity.behaviorState) {
     case alleyfist::viewmodel::EnemyBehaviorState::Hurt:
         return alleyfist::ActorActionState::Hurt;
+    case alleyfist::viewmodel::EnemyBehaviorState::MeleeAttack:
+        return alleyfist::ActorActionState::LightAttack;
     case alleyfist::viewmodel::EnemyBehaviorState::Ambush:
         return alleyfist::ActorActionState::Ambush;
     case alleyfist::viewmodel::EnemyBehaviorState::Charge:
@@ -49,6 +46,7 @@ alleyfist::ActorActionState to_actor_action_state(const alleyfist::viewmodel::En
     case alleyfist::viewmodel::EnemyBehaviorState::RangedAttack:
         return alleyfist::ActorActionState::RangedAttack;
     case alleyfist::viewmodel::EnemyBehaviorState::Idle:
+        return alleyfist::ActorActionState::Idle;
     case alleyfist::viewmodel::EnemyBehaviorState::Patrol:
     default:
         return alleyfist::ActorActionState::Walk;
@@ -278,14 +276,17 @@ void GameViewModel::sync_state_from_simulation()
                                         : ActorActionState::Dead;
     m_state.player.position.z = 0.0f;
 
-    if (player.alive && (player.hurtTimer > 0.0f || player.behaviorState == EnemyBehaviorState::Hurt)) {
-        m_state.player.actionState = ActorActionState::Hurt;
-    } else if (player.alive && m_jumpActive) {
+    if (player.alive && m_jumpActive) {
         const float progress = std::clamp(m_jumpElapsed / kJumpSeconds, 0.0f, 1.0f);
         m_state.player.position.z = kJumpHeight * std::sin(kPi * progress);
-        m_state.player.actionState = ActorActionState::Jump;
+    }
+
+    if (player.alive && (player.hurtTimer > 0.0f || player.behaviorState == EnemyBehaviorState::Hurt)) {
+        m_state.player.actionState = ActorActionState::Hurt;
     } else if (player.alive && m_attackTimer > 0.0f) {
         m_state.player.actionState = m_jumpActive ? ActorActionState::AirAttack : m_attackState;
+    } else if (player.alive && m_jumpActive) {
+        m_state.player.actionState = ActorActionState::Jump;
     }
 
     m_state.player.impactRevision = player.impactRevision;
@@ -316,18 +317,19 @@ void GameViewModel::sync_state_from_simulation()
         ActorState actor;
         actor.id = static_cast<std::uint32_t>(entity.id);
         actor.kind = isBoss ? ActorKind::Boss : to_actor_kind(entity.kind);
+        actor.visualVariant = entity.visualVariant;
         actor.team = Team::Enemy;
         actor.position = entity.pos;
         actor.position.laneY = std::clamp(actor.position.laneY, kStreetTop, kStreetBottom);
         actor.drawSize = isBoss ? alleyfist::Size{88.0f, 128.0f} : alleyfist::Size{48.0f, 72.0f};
         actor.health = {std::max(0, entity.hp), entity.maxHp > 0 ? entity.maxHp : fallbackMaxHealth};
         actor.actionState = entity.alive ? to_actor_action_state(entity) : ActorActionState::Dead;
-        actor.visible = entity.alive;
-        actor.facing = actor.position.x < m_state.player.position.x ? Facing::Right : Facing::Left;
+        actor.visible = entity.alive || entity.deathTimer > 0.0f;
+        actor.facing = entity.facing;
         actor.impactRevision = entity.impactRevision;
         actor.lastImpact = entity.lastImpact;
 
-        if (isBoss && actor.visible) {
+        if (isBoss && entity.alive) {
             m_state.hud.showBossHealth = true;
             m_state.hud.bossHealth = actor.health;
         }
@@ -365,7 +367,7 @@ void GameViewModel::sync_state_from_simulation()
         m_state.phase = GamePhase::GameOver;
         m_state.result.elapsedSeconds = m_state.elapsedSeconds;
         m_state.screenMessage.clear();
-    } else if (m_sim->boss_defeated()) {
+    } else if (m_sim->boss_victory_ready()) {
         m_state.phase = GamePhase::Win;
         m_state.result.elapsedSeconds = m_state.elapsedSeconds;
         m_state.screenMessage.clear();

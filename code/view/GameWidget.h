@@ -5,12 +5,16 @@
 #include "InputDefs.h"
 
 #include <QElapsedTimer>
+#include <QPixmap>
 #include <QSet>
+#include <QString>
 #include <QTimer>
 #include <QWidget>
 
+#include <array>
 #include <cstdint>
 #include <functional>
+#include <unordered_map>
 #include <utility>
 
 namespace alleyfist {
@@ -71,7 +75,9 @@ private:
     void drawBackground(QPainter& p);
     void drawStreet(QPainter& p);
     void drawBuildings(QPainter& p);
+    void drawForeground(QPainter& p);
     void drawActor(QPainter& p, const ActorState& actor);
+    bool drawActorSprite(QPainter& p, const ActorState& actor);
     void drawCharacterBody(QPainter& p, const ActorState& actor,
                            QColor bodyColor);
     void drawHealthBar(QPainter& p, const ActorState& actor);
@@ -79,6 +85,10 @@ private:
     void drawHUD(QPainter& p);
     void drawOverlay(QPainter& p);
     void drawEncounterOverlay(QPainter& p);
+    void drawInterfacePanel(QPainter& p, const QRectF& rect) const;
+    void drawInterfaceButton(QPainter& p, const QRectF& rect,
+                             const std::array<QPixmap, 6>& art,
+                             bool bright) const;
     void drawProjectile(QPainter& p, const ProjectileState& proj);
     void drawPickup(QPainter& p, const PickupState& pickup);
     void drawParticles(QPainter& p);
@@ -92,8 +102,46 @@ private:
     static QColor actorBodyColor(Team team, ActorKind kind);
     static QColor healthBarColor(float ratio);
     static QColor energyBarColor(float ratio);
+    static std::size_t hudFrameIndex(float elapsed);
+    bool hasActorArt(const ActorState& actor) const;
+    float actorSpriteWidth(const ActorState& actor) const;
+    void updateActorAnimation(const ActorState& actor, float dt);
+    float actorAnimationElapsed(const ActorState& actor) const;
     void drawBar(QPainter& p, float x, float y, float w, float h,
                  float ratio, QColor fillColor, const QString& label);
+
+    struct SpriteClip {
+        QPixmap sheet;
+        int frameCount = 0;
+        float framesPerSecond = 1.0f;
+        bool looping = false;
+    };
+
+    struct ActorArtSet {
+        SpriteClip idle;
+        SpriteClip walk;
+        SpriteClip lightAttack;
+        SpriteClip heavyAttack;
+        SpriteClip rangedAttack;
+        SpriteClip ambush;
+        SpriteClip charge;
+        SpriteClip jump;
+        SpriteClip airAttack;
+        SpriteClip hurt;
+        SpriteClip dead;
+        Facing sourceFacing = Facing::Right;
+        float horizontalPivot = 0.5f;
+    };
+
+    const ActorArtSet* actorArtSet(const ActorState& actor) const;
+    const SpriteClip* actorClip(const ActorState& actor) const;
+
+    struct AnimationClock {
+        ActorActionState state = ActorActionState::Idle;
+        std::uint32_t impactRevision = 0;
+        float elapsed = 0.0f;
+        bool initialized = false;
+    };
 
     // ---- 命令（由 App 经 MainWindow 注入） ----
     std::function<void(float, std::uint64_t)> m_tickCommand;
@@ -130,8 +178,9 @@ private:
     std::uint32_t m_lastPlayerImpactRev = 0;
     mutable std::vector<QPointF> m_stars;
     bool m_starsGenerated = false;
-    float m_bossIntroAnimTimer = 99.0f;
-    bool m_bossWasInList = false;
+    GamePhase m_observedGamePhase = GamePhase::Title;
+    EncounterKind m_observedEncounterKind = EncounterKind::None;
+    EncounterPhase m_observedEncounterPhase = EncounterPhase::None;
     bool m_gameOverSounded = false;
     bool m_winSounded = false;
     std::uint32_t m_attackingEnemyId = 0;
@@ -139,6 +188,39 @@ private:
     int m_prevPlayerHp = 100;
     size_t m_lastPickupCount = 0;
     float m_pickupFxTimer = 0.0f;
+
+    ActorArtSet m_playerArt;
+    ActorArtSet m_patrollerArt;
+    ActorArtSet m_ambusherArt;
+    ActorArtSet m_chargerArt;
+    ActorArtSet m_rangedGunnerArt;
+    ActorArtSet m_rangedRobotArt;
+    ActorArtSet m_bossArt;
+    QPixmap m_actorShadow;
+    QPixmap m_robotProjectile;
+    QPixmap m_robotProjectileAlt;
+    QPixmap m_stageTileset;
+    QPixmap m_stageBack;
+    QPixmap m_stageFore;
+    QPixmap m_stageCar;
+    QPixmap m_stageBarrel;
+    QPixmap m_stageHydrant;
+    std::array<QPixmap, 8> m_healthBarArt;
+    std::array<QPixmap, 8> m_energyBarArt;
+    std::array<QPixmap, 4> m_hudScrollArt;
+    std::array<QPixmap, 9> m_interfaceFrameArt;
+    std::array<QPixmap, 3> m_interfaceLogoArt;
+    std::array<QPixmap, 6> m_redButtonArt;
+    std::array<QPixmap, 6> m_cyanButtonArt;
+    std::array<QPixmap, 6> m_greenButtonArt;
+    QPixmap m_startIcon;
+    QPixmap m_pauseIcon;
+    QPixmap m_bossIcon;
+    QPixmap m_winIcon;
+    QPixmap m_lossIcon;
+    QPixmap m_restartIcon;
+    QString m_interfaceFontFamily = "Arial";
+    std::unordered_map<std::uint32_t, AnimationClock> m_animationClocks;
 
     // 视口缩放
     float m_scaleX = 1.0f;

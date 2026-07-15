@@ -27,6 +27,7 @@ enum class EnemyType {
 enum class EnemyBehaviorState {
     Idle,
     Patrol,
+    MeleeAttack,
     Ambush,
     Charge,
     RangedAttack,
@@ -36,6 +37,7 @@ enum class EnemyBehaviorState {
 struct ProjectileVm {
     std::uint32_t id = 0;
     int ownerId = 0;
+    alleyfist::ActorVisualVariant visualVariant = alleyfist::ActorVisualVariant::Default;
     alleyfist::WorldPosition position;
     alleyfist::Facing facing = alleyfist::Facing::Left;
     float velocityX = 0.0f;
@@ -57,6 +59,8 @@ struct EntityState {
     alleyfist::WorldPosition pos;
     EntityKind kind = EntityKind::Patroller;
     EnemyType enemyType = EnemyType::Patroller;
+    alleyfist::ActorVisualVariant visualVariant = alleyfist::ActorVisualVariant::Default;
+    alleyfist::Facing facing = alleyfist::Facing::Left;
     EnemyBehaviorState behaviorState = EnemyBehaviorState::Patrol;
     int hp = 0;
     int maxHp = 0;
@@ -65,11 +69,14 @@ struct EntityState {
     float patrolRangeLeft = 0.0f;
     float patrolRangeRight = 0.0f;
     float attackCooldown = 0.0f;
+    float attackTimer = 0.0f;
     float chargeTimer = 0.0f;
     float ambushCooldown = 0.0f;
     float hurtTimer = 0.0f;
+    float deathTimer = 0.0f;
     std::uint32_t impactRevision = 0;
     alleyfist::ImpactLevel lastImpact = alleyfist::ImpactLevel::None;
+    bool attackHitApplied = false;
     bool pickupDropped = false;
 };
 

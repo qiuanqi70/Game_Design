@@ -43,6 +43,12 @@ enum class ActorKind {
     Boss
 };
 
+enum class ActorVisualVariant {
+    Default,
+    RangedGunner,
+    RangedRobot
+};
+
 enum class ActorActionState {
     Idle,
     Walk,
@@ -71,6 +77,7 @@ enum class Facing {
 struct ActorState {
     std::uint32_t id = 0;
     ActorKind kind = ActorKind::Player;
+    ActorVisualVariant visualVariant = ActorVisualVariant::Default;
     Team team = Team::Player;
     alleyfist::WorldPosition position;
     alleyfist::Size drawSize;
@@ -89,6 +96,7 @@ enum class ProjectileKind {
 struct ProjectileState {
     std::uint32_t id = 0;
     ProjectileKind kind = ProjectileKind::ThrownObject;
+    ActorVisualVariant visualVariant = ActorVisualVariant::Default;
     Team team = Team::Enemy;
     alleyfist::WorldPosition position;
     Facing facing = Facing::Left;

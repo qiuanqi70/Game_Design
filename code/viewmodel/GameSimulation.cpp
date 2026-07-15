@@ -13,13 +13,47 @@ constexpr float kStreetBottom = 500.0f;
 constexpr float kBossTriggerX = 2350.0f;
 constexpr float kBossSpawnOffsetX = 260.0f;
 constexpr int kBossHealth = 140;
-constexpr float kEncounterIntroSeconds = 1.3f;
+constexpr float kEncounterIntroSeconds = 2.8f;
+constexpr float kMeleeAttackDuration = 0.36f;
+constexpr float kMeleeAttackHitTime = 0.17f;
+constexpr float kMeleeAttackCooldown = 0.9f;
+constexpr float kAttackWindup = 0.14f;
+constexpr float kAmbushDuration = 0.65f;
 constexpr float kRangedAttackCooldown = 1.8f;
+constexpr float kRangedAttackDuration = 0.32f;
 constexpr float kChargeDuration = 0.55f;
+constexpr float kChargeWindup = 0.18f;
+constexpr float kBossChargeCooldown = 1.1f;
 constexpr float kHurtDuration = 0.25f;
+constexpr float kEnemyDeathDisplaySeconds = 0.75f;
 constexpr float kProjectileSpeed = 260.0f;
 constexpr float kProjectileGravity = 80.0f;
 constexpr float kPickupLifetime = 10.0f;
+constexpr float kContactRangeX = 18.0f;
+constexpr float kContactRangeY = 16.0f;
+
+bool overlaps(const EntityState& first, const EntityState& second,
+              float rangeX, float rangeY)
+{
+    return std::abs(first.pos.x - second.pos.x) < rangeX &&
+           std::abs(first.pos.laneY - second.pos.laneY) < rangeY;
+}
+
+EnemyBehaviorState default_behavior_for(EntityKind kind)
+{
+    switch (kind) {
+    case EntityKind::Patroller:
+        return EnemyBehaviorState::Patrol;
+    case EntityKind::Boss:
+        return EnemyBehaviorState::Patrol;
+    case EntityKind::Player:
+    case EntityKind::Ambusher:
+    case EntityKind::Charger:
+    case EntityKind::Ranged:
+        return EnemyBehaviorState::Idle;
+    }
+    return EnemyBehaviorState::Idle;
+}
 
 } // namespace
 
@@ -69,10 +103,13 @@ void GameSimulation::step(float deltaSeconds)
     update_encounter_state(deltaSeconds);
     spawn_boss_if_needed();
     simulate_ai(deltaSeconds);
+    update_death_presentations(deltaSeconds);
     update_projectiles(deltaSeconds);
     update_pickups(deltaSeconds);
     update_boss_state();
-    if (m_bossSpawned && m_encounterTimer >= kEncounterIntroSeconds) {
+    if (m_bossDefeated) {
+        update_encounter_state(0.0f);
+    } else if (m_bossSpawned && m_encounterTimer >= kEncounterIntroSeconds) {
         m_encounter.phase = EncounterPhase::Fighting;
         m_encounter.introProgress = 1.0f;
     }
@@ -97,6 +134,7 @@ void GameSimulation::populate_initial_state()
     m_pickupStates.clear();
     m_bossSpawned = false;
     m_bossDefeated = false;
+    m_bossVictoryReady = false;
     m_nextId = 1;
     m_nextProjectileId = 1;
     m_nextPickupId = 1;
@@ -168,6 +206,10 @@ void GameSimulation::spawn_wave_enemies(std::uint32_t waveIndex)
                 return EnemyType::Patroller;
             }
         }();
+        if (e.kind == EntityKind::Ranged) {
+            e.visualVariant = waveIndex == 1 ? ActorVisualVariant::RangedGunner
+                                             : ActorVisualVariant::RangedRobot;
+        }
         e.behaviorState = (e.kind == EntityKind::Patroller) ? EnemyBehaviorState::Patrol : EnemyBehaviorState::Idle;
         e.hp = 20 + waveIndex * 5;
         e.maxHp = e.hp;
@@ -187,7 +229,7 @@ void GameSimulation::update_wave_progression(float dt)
     }
 
     const auto& player = m_entities.front();
-    if (player.pos.x >= kBossTriggerX) {
+    if (!player.alive || player.pos.x >= kBossTriggerX) {
         return;
     }
 
@@ -288,22 +330,34 @@ void GameSimulation::simulate_ai(float dt)
     if (m_entities.empty()) return;
     auto& player = m_entities[0];
 
+    if (player.hurtTimer > 0.0f) {
+        player.hurtTimer = std::max(0.0f, player.hurtTimer - dt);
+        if (player.hurtTimer <= 0.0f) {
+            player.behaviorState = EnemyBehaviorState::Idle;
+        }
+    }
+
+    const auto hitPlayerOnce = [this, &player](EntityState& enemy,
+                                               int damage,
+                                               ImpactLevel impact) {
+        if (enemy.attackHitApplied ||
+            !overlaps(enemy, player, kContactRangeX, kContactRangeY)) {
+            return;
+        }
+        enemy.attackHitApplied = true;
+        apply_damage(player, damage, impact, enemy.id);
+    };
+
     for (size_t i = 1; i < m_entities.size(); ++i) {
         auto& e = m_entities[i];
         if (!e.alive) continue;
 
         if (e.hurtTimer > 0.0f) {
             e.hurtTimer = std::max(0.0f, e.hurtTimer - dt);
-            if (e.hurtTimer <= 0.0f) {
-                e.behaviorState = EnemyBehaviorState::Patrol;
+            if (e.hurtTimer > 0.0f) {
+                continue;
             }
-        }
-
-        if (e.chargeTimer > 0.0f) {
-            e.chargeTimer = std::max(0.0f, e.chargeTimer - dt);
-            if (e.chargeTimer <= 0.0f) {
-                e.behaviorState = EnemyBehaviorState::Patrol;
-            }
+            e.behaviorState = default_behavior_for(e.kind);
         }
 
         if (e.ambushCooldown > 0.0f) {
@@ -317,45 +371,114 @@ void GameSimulation::simulate_ai(float dt)
         float dx = player.pos.x - e.pos.x;
         float dy = player.pos.laneY - e.pos.laneY;
         float dist = std::sqrt(dx * dx + dy * dy) + 0.0001f;
+        if (std::abs(dx) > 0.001f) {
+            e.facing = dx > 0.0f ? Facing::Right : Facing::Left;
+        }
 
         switch (e.kind) {
         case EntityKind::Patroller: {
+            if (e.behaviorState == EnemyBehaviorState::MeleeAttack) {
+                e.attackTimer = std::max(0.0f, e.attackTimer - dt);
+                if (!e.attackHitApplied && e.attackTimer <= kMeleeAttackHitTime) {
+                    e.attackHitApplied = true;
+                    if (overlaps(e, player, kContactRangeX, kContactRangeY)) {
+                        apply_damage(player, 1, ImpactLevel::Light, e.id);
+                    }
+                }
+                if (e.attackTimer <= 0.0f) {
+                    e.behaviorState = EnemyBehaviorState::Patrol;
+                }
+                break;
+            }
+
             const float moveDir = (e.pos.x < e.patrolRangeLeft + 5.0f) ? 1.0f : (e.pos.x > e.patrolRangeRight - 5.0f ? -1.0f : 0.0f);
             if (moveDir == 0.0f) {
                 e.pos.x += 18.0f * dt * (std::sin(m_elapsedSeconds * 0.9f) >= 0.0f ? 1.0f : -1.0f);
             } else {
                 e.pos.x += 18.0f * dt * moveDir;
             }
+
+            if (e.attackCooldown <= 0.0f &&
+                std::abs(dx) < 34.0f && std::abs(dy) < 24.0f) {
+                e.behaviorState = EnemyBehaviorState::MeleeAttack;
+                e.attackTimer = kMeleeAttackDuration;
+                e.attackCooldown = kMeleeAttackCooldown;
+                e.attackHitApplied = false;
+            }
             break;
         }
         case EntityKind::Ambusher: {
-            if (std::abs(dx) < 220.0f && e.ambushCooldown <= 0.0f) {
+            if (e.behaviorState == EnemyBehaviorState::Ambush) {
+                e.attackTimer = std::max(0.0f, e.attackTimer - dt);
+                if (e.attackTimer <= kAmbushDuration - kAttackWindup &&
+                    e.attackTimer > 0.0f) {
+                    e.pos.x += (dx / dist) * 90.0f * dt;
+                    e.pos.laneY += (dy / dist) * 90.0f * dt;
+                    hitPlayerOnce(e, 1, ImpactLevel::Light);
+                }
+                if (e.attackTimer <= 0.0f) {
+                    e.behaviorState = EnemyBehaviorState::Idle;
+                }
+                break;
+            }
+
+            if (std::abs(dx) < 220.0f && std::abs(dy) < 120.0f &&
+                e.ambushCooldown <= 0.0f) {
                 e.behaviorState = EnemyBehaviorState::Ambush;
                 e.ambushCooldown = 1.8f;
-                e.attackCooldown = 0.35f;
-            }
-            if (e.behaviorState == EnemyBehaviorState::Ambush && e.attackCooldown > 0.0f) {
-                e.pos.x += 90.0f * dt;
+                e.attackTimer = kAmbushDuration;
+                e.attackHitApplied = false;
             }
             break;
         }
         case EntityKind::Charger: {
-            if (std::abs(dx) < 180.0f && e.attackCooldown <= 0.0f) {
+            if (e.behaviorState == EnemyBehaviorState::Charge) {
+                if (e.attackTimer > 0.0f) {
+                    e.attackTimer = std::max(0.0f, e.attackTimer - dt);
+                    break;
+                }
+
+                e.chargeTimer = std::max(0.0f, e.chargeTimer - dt);
+                if (e.chargeTimer > 0.0f) {
+                    e.pos.x += (dx / dist) * 220.0f * dt;
+                    e.pos.laneY += (dy / dist) * 220.0f * dt;
+                    hitPlayerOnce(e, 1, ImpactLevel::Heavy);
+                } else {
+                    e.behaviorState = EnemyBehaviorState::Idle;
+                }
+                break;
+            }
+
+            if (std::abs(dx) < 180.0f && std::abs(dy) < 90.0f &&
+                e.attackCooldown <= 0.0f) {
                 e.behaviorState = EnemyBehaviorState::Charge;
                 e.chargeTimer = kChargeDuration;
+                e.attackTimer = kChargeWindup;
                 e.attackCooldown = 1.4f;
-            }
-            if (e.behaviorState == EnemyBehaviorState::Charge && e.chargeTimer > 0.0f) {
-                e.pos.x += (dx / dist) * 220.0f * dt;
-                e.pos.laneY += (dy / dist) * 220.0f * dt;
+                e.attackHitApplied = false;
             }
             break;
         }
         case EntityKind::Ranged: {
-            if (e.attackCooldown <= 0.0f && std::abs(dx) < 360.0f) {
+            if (e.behaviorState == EnemyBehaviorState::RangedAttack) {
+                e.attackTimer = std::max(0.0f, e.attackTimer - dt);
+                if (!e.attackHitApplied && e.attackTimer <= kRangedAttackDuration - kAttackWindup) {
+                    spawn_ranged_projectile(e);
+                    e.attackHitApplied = true;
+                }
+                if (e.attackTimer <= 0.0f) {
+                    e.behaviorState = EnemyBehaviorState::Idle;
+                }
+                break;
+            }
+
+            if (e.attackCooldown <= 0.0f &&
+                std::abs(dx) < 360.0f && std::abs(dy) < 160.0f) {
                 e.behaviorState = EnemyBehaviorState::RangedAttack;
                 e.attackCooldown = kRangedAttackCooldown;
-                spawn_ranged_projectile(e);
+                e.attackTimer = kRangedAttackDuration;
+                e.attackHitApplied = false;
+                break;
             }
             if (std::abs(dx) > 5.0f) {
                 e.pos.x += (dx / dist) * 18.0f * dt;
@@ -363,10 +486,33 @@ void GameSimulation::simulate_ai(float dt)
             break;
         }
         case EntityKind::Boss: {
-            if (std::abs(dx) < 250.0f) {
-                e.behaviorState = EnemyBehaviorState::Charge;
-                e.chargeTimer = 0.12f;
+            if (e.behaviorState == EnemyBehaviorState::Charge) {
+                if (e.attackTimer > 0.0f) {
+                    e.attackTimer = std::max(0.0f, e.attackTimer - dt);
+                    break;
+                }
+
+                e.chargeTimer = std::max(0.0f, e.chargeTimer - dt);
+                if (e.chargeTimer > 0.0f) {
+                    e.pos.x += (dx / dist) * 180.0f * dt;
+                    e.pos.laneY += (dy / dist) * 180.0f * dt;
+                    hitPlayerOnce(e, 2, ImpactLevel::Heavy);
+                } else {
+                    e.behaviorState = EnemyBehaviorState::Patrol;
+                }
+                break;
             }
+
+            if (std::abs(dx) < 150.0f && std::abs(dy) < 90.0f &&
+                e.attackCooldown <= 0.0f) {
+                e.behaviorState = EnemyBehaviorState::Charge;
+                e.chargeTimer = kChargeDuration;
+                e.attackTimer = kChargeWindup;
+                e.attackCooldown = kBossChargeCooldown;
+                e.attackHitApplied = false;
+                break;
+            }
+
             e.pos.x += (dx / dist) * 40.0f * dt;
             e.pos.laneY += (dy / dist) * 40.0f * dt;
             break;
@@ -374,25 +520,35 @@ void GameSimulation::simulate_ai(float dt)
         default:
             break;
         }
-
-        if (std::abs(e.pos.x - player.pos.x) < 12.0f && std::abs(e.pos.laneY - player.pos.laneY) < 12.0f) {
-            apply_damage(player, e.kind == EntityKind::Boss ? 2 : 1, ImpactLevel::Light, e.id);
-        }
     }
 
     for (auto& e : m_entities) {
-        if (e.hp <= 0 && e.alive) {
-            e.alive = false;
-            if (e.kind != EntityKind::Boss && !e.pickupDropped) {
-                const bool dropEnergy = (e.enemyType == EnemyType::Ranged);
-                spawn_pickup(e.pos, dropEnergy ? PickupKind::Energy : PickupKind::Health);
-                e.pickupDropped = true;
-            } else if (e.kind == EntityKind::Boss && !e.pickupDropped) {
-                spawn_pickup(e.pos, PickupKind::Health);
-                spawn_pickup(e.pos, PickupKind::Energy);
-                e.pickupDropped = true;
-            }
+        if (e.kind == EntityKind::Player || e.hp > 0 || e.pickupDropped) {
+            continue;
         }
+
+        if (e.alive) {
+            e.alive = false;
+            e.deathTimer = kEnemyDeathDisplaySeconds;
+        }
+        if (e.kind == EntityKind::Boss) {
+            spawn_pickup(e.pos, PickupKind::Health);
+            spawn_pickup(e.pos, PickupKind::Energy);
+        } else {
+            const bool dropEnergy = e.enemyType == EnemyType::Ranged;
+            spawn_pickup(e.pos, dropEnergy ? PickupKind::Energy : PickupKind::Health);
+        }
+        e.pickupDropped = true;
+    }
+}
+
+void GameSimulation::update_death_presentations(float dt) noexcept
+{
+    for (auto& entity : m_entities) {
+        if (entity.kind == EntityKind::Player || entity.alive || entity.deathTimer <= 0.0f) {
+            continue;
+        }
+        entity.deathTimer = std::max(0.0f, entity.deathTimer - dt);
     }
 }
 
@@ -461,8 +617,6 @@ void GameSimulation::update_pickups(float dt)
         pickup.active = false;
         if (pickup.kind == PickupKind::Health) {
             player.hp = std::min(player.maxHp, player.hp + 20);
-            player.impactRevision += 1;
-            player.lastImpact = ImpactLevel::Light;
         } else if (pickup.kind == PickupKind::Energy) {
             m_playerEnergy = std::clamp(m_playerEnergy + 20.0f, 0.0f, 100.0f);
         }
@@ -496,6 +650,9 @@ void GameSimulation::player_attack() noexcept
             break;
         }
     }
+
+    update_boss_state();
+    update_encounter_state(0.0f);
 }
 
 void GameSimulation::reset() noexcept
@@ -522,7 +679,7 @@ void GameSimulation::spawn_boss_if_needed()
     boss.id = m_nextId++;
     boss.kind = EntityKind::Boss;
     boss.enemyType = EnemyType::Boss;
-    boss.behaviorState = EnemyBehaviorState::Charge;
+    boss.behaviorState = EnemyBehaviorState::Patrol;
     boss.hp = kBossHealth;
     boss.maxHp = kBossHealth;
     boss.pos.x = std::min(kWorldWidth - 80.0f, player.pos.x + kBossSpawnOffsetX);
@@ -534,14 +691,17 @@ void GameSimulation::spawn_boss_if_needed()
 
 void GameSimulation::update_boss_state() noexcept
 {
-    if (!m_bossSpawned || m_bossDefeated) {
+    if (!m_bossSpawned) {
         return;
     }
 
-    const bool bossAlive = std::any_of(m_entities.begin(), m_entities.end(), [](const EntityState& entity) {
-        return entity.kind == EntityKind::Boss && entity.alive && entity.hp > 0;
+    const auto boss = std::find_if(m_entities.begin(), m_entities.end(), [](const EntityState& entity) {
+        return entity.kind == EntityKind::Boss;
     });
-    m_bossDefeated = !bossAlive;
+    if (boss == m_entities.end()) return;
+
+    m_bossDefeated = !boss->alive || boss->hp <= 0;
+    m_bossVictoryReady = m_bossDefeated && boss->deathTimer <= 0.0f;
 }
 
 void GameSimulation::set_player_energy(float energy) noexcept
@@ -552,19 +712,28 @@ void GameSimulation::set_player_energy(float energy) noexcept
 void GameSimulation::apply_damage(EntityState& target, int amount, alleyfist::ImpactLevel impact, int sourceId)
 {
     (void)sourceId;
-    if (!target.alive) {
+    if (!target.alive || amount <= 0) {
+        return;
+    }
+    if (target.kind == EntityKind::Player && target.hurtTimer > 0.0f) {
         return;
     }
 
     target.hp -= amount;
     target.hurtTimer = kHurtDuration;
     target.behaviorState = EnemyBehaviorState::Hurt;
+    target.attackTimer = 0.0f;
+    target.chargeTimer = 0.0f;
+    target.attackHitApplied = true;
     target.impactRevision += 1;
     target.lastImpact = impact;
 
     if (target.hp <= 0) {
         target.hp = 0;
         target.alive = false;
+        if (target.kind != EntityKind::Player) {
+            target.deathTimer = kEnemyDeathDisplaySeconds;
+        }
     }
 }
 
@@ -577,10 +746,14 @@ void GameSimulation::spawn_ranged_projectile(const EntityState& owner)
     ProjectileVm projectile;
     projectile.id = m_nextProjectileId++;
     projectile.ownerId = owner.id;
-    projectile.position = owner.pos;
-    projectile.position.z = 8.0f;
-    projectile.facing = owner.pos.x < m_entities.front().pos.x ? alleyfist::Facing::Right : alleyfist::Facing::Left;
+    projectile.visualVariant = owner.visualVariant;
     const auto& player = m_entities.front();
+    const float facingDirection = owner.pos.x < player.pos.x ? 1.0f : -1.0f;
+    projectile.position = owner.pos;
+    projectile.position.x += facingDirection * 24.0f;
+    projectile.position.z = 36.0f;
+    projectile.facing = facingDirection > 0.0f ? alleyfist::Facing::Right
+                                               : alleyfist::Facing::Left;
     const float dx = player.pos.x - owner.pos.x;
     const float dy = player.pos.laneY - owner.pos.laneY;
     const float dist = std::sqrt(dx * dx + dy * dy) + 0.0001f;
@@ -608,6 +781,7 @@ void GameSimulation::sync_shared_state()
         ProjectileState state;
         state.id = projectile.id;
         state.kind = ProjectileKind::ThrownObject;
+        state.visualVariant = projectile.visualVariant;
         state.team = Team::Enemy;
         state.position = projectile.position;
         state.facing = projectile.facing;

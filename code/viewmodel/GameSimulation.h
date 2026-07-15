@@ -28,6 +28,7 @@ public:
     const EntityList& entities() const noexcept { return m_entities; }
     bool boss_spawned() const noexcept { return m_bossSpawned; }
     bool boss_defeated() const noexcept { return m_bossDefeated; }
+    bool boss_victory_ready() const noexcept { return m_bossVictoryReady; }
     const EncounterState& encounter_state() const noexcept { return m_encounter; }
     const std::vector<ProjectileState>& projectiles() const noexcept { return m_projectileStates; }
     const std::vector<PickupState>& pickups() const noexcept { return m_pickupStates; }
@@ -49,6 +50,7 @@ private:
     bool m_running = false;
     bool m_bossSpawned = false;
     bool m_bossDefeated = false;
+    bool m_bossVictoryReady = false;
     int m_nextId = 1;
     std::uint32_t m_nextProjectileId = 1;
     std::uint32_t m_nextPickupId = 1;
@@ -65,6 +67,7 @@ private:
     void update_wave_progression(float dt);
     void spawn_wave_enemies(std::uint32_t waveIndex);
     void simulate_ai(float dt);
+    void update_death_presentations(float dt) noexcept;
     void update_projectiles(float dt);
     void update_pickups(float dt);
     void spawn_boss_if_needed();

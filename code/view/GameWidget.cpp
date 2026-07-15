@@ -1,6 +1,7 @@
 #include "GameWidget.h"
 #include "SoundManager.h"
 
+#include <QFontDatabase>
 #include <QKeyEvent>
 #include <QPainter>
 #include <QtMath>
@@ -25,6 +26,136 @@ GameWidget::GameWidget(QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(320, 180);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    const auto clip = [](const char* path, int frames, float fps, bool looping = false) {
+        return SpriteClip{QPixmap(path), frames, fps, looping};
+    };
+
+    m_playerArt.idle = clip(":/art/Spritesheets/Brawler Girl/idle.png", 4, 6.0f, true);
+    m_playerArt.walk = clip(":/art/Spritesheets/Brawler Girl/walk.png", 10, 12.0f, true);
+    m_playerArt.lightAttack = clip(":/art/Spritesheets/Brawler Girl/jab.png", 3, 16.0f);
+    m_playerArt.heavyAttack = clip(":/art/Spritesheets/Brawler Girl/kick.png", 5, 18.0f);
+    m_playerArt.jump = clip(":/art/Spritesheets/Brawler Girl/jump.png", 4, 7.0f);
+    m_playerArt.airAttack = clip(":/art/Spritesheets/Brawler Girl/jump_kick.png", 3, 14.0f);
+    m_playerArt.hurt = clip(":/art/Spritesheets/Brawler Girl/hurt.png", 2, 14.0f);
+    m_playerArt.sourceFacing = Facing::Right;
+
+    m_patrollerArt.idle = clip(":/art/Spritesheets/Enemy Punk/idle.png", 4, 6.0f, true);
+    m_patrollerArt.walk = clip(":/art/Spritesheets/Enemy Punk/walk.png", 4, 8.0f, true);
+    m_patrollerArt.lightAttack = clip(":/art/Spritesheets/Enemy Punk/punch.png", 3, 16.0f);
+    m_patrollerArt.heavyAttack = m_patrollerArt.lightAttack;
+    m_patrollerArt.hurt = clip(":/art/Spritesheets/Enemy Punk/hurt.png", 4, 14.0f);
+    m_patrollerArt.dead = clip(":/art/Spritesheets/Enemy Punk/death.png", 4, 6.0f);
+    m_patrollerArt.sourceFacing = Facing::Left;
+
+    m_ambusherArt.idle = clip(":/art/伏击型飞行敌人/Idle.png", 4, 6.0f, true);
+    m_ambusherArt.walk = clip(":/art/伏击型飞行敌人/Walk.png", 4, 8.0f, true);
+    m_ambusherArt.ambush = clip(":/art/伏击型飞行敌人/Attack.png", 4, 8.0f);
+    m_ambusherArt.hurt = clip(":/art/伏击型飞行敌人/Hurt.png", 2, 14.0f);
+    m_ambusherArt.dead = clip(":/art/伏击型飞行敌人/Death.png", 4, 8.0f);
+    m_ambusherArt.sourceFacing = Facing::Right;
+    m_ambusherArt.horizontalPivot = 1.0f / 3.0f;
+
+    m_chargerArt.idle = clip(":/art/冲撞型敌人/Idle.png", 4, 6.0f, true);
+    m_chargerArt.walk = clip(":/art/冲撞型敌人/Walk.png", 6, 9.0f, true);
+    m_chargerArt.charge = clip(":/art/冲撞型敌人/Attack.png", 4, 8.0f);
+    m_chargerArt.hurt = clip(":/art/冲撞型敌人/Hurt.png", 2, 14.0f);
+    m_chargerArt.dead = clip(":/art/冲撞型敌人/Death.png", 6, 8.0f);
+    m_chargerArt.sourceFacing = Facing::Right;
+    m_chargerArt.horizontalPivot = 1.0f / 3.0f;
+
+    m_rangedGunnerArt.idle = clip(":/art/远程型敌人/Idle.png", 4, 6.0f, true);
+    m_rangedGunnerArt.walk = clip(":/art/远程型敌人/Walk.png", 6, 9.0f, true);
+    m_rangedGunnerArt.rangedAttack = clip(":/art/远程型敌人/Attack.png", 9, 28.0f);
+    m_rangedGunnerArt.hurt = clip(":/art/远程型敌人/Hurt.png", 2, 14.0f);
+    m_rangedGunnerArt.dead = clip(":/art/远程型敌人/Death.png", 6, 8.0f);
+    m_rangedGunnerArt.sourceFacing = Facing::Right;
+    m_rangedGunnerArt.horizontalPivot = 1.0f / 3.0f;
+
+    m_rangedRobotArt.idle = clip(":/art/远程型敌人2（机器人）/Idle.png", 4, 6.0f, true);
+    m_rangedRobotArt.walk = clip(":/art/远程型敌人2（机器人）/Walk.png", 4, 8.0f, true);
+    m_rangedRobotArt.rangedAttack = clip(":/art/远程型敌人2（机器人）/Attack.png", 4, 14.0f);
+    m_rangedRobotArt.hurt = clip(":/art/远程型敌人2（机器人）/Hurt.png", 2, 14.0f);
+    m_rangedRobotArt.dead = clip(":/art/远程型敌人2（机器人）/Death.png", 4, 6.0f);
+    m_rangedRobotArt.sourceFacing = Facing::Right;
+    m_rangedRobotArt.horizontalPivot = 1.0f / 3.0f;
+
+    m_bossArt.idle = clip(":/art/Boss/Idle.png", 4, 5.0f, true);
+    m_bossArt.walk = clip(":/art/Boss/Walk.png", 6, 9.0f, true);
+    m_bossArt.lightAttack = clip(":/art/Boss/Attack1.png", 8, 12.0f);
+    m_bossArt.heavyAttack = clip(":/art/Boss/Attack2.png", 6, 10.0f);
+    m_bossArt.rangedAttack = clip(":/art/Boss/Attack3.png", 4, 8.0f);
+    m_bossArt.charge = m_bossArt.heavyAttack;
+    m_bossArt.airAttack = clip(":/art/Boss/Attack4.png", 6, 10.0f);
+    m_bossArt.ambush = clip(":/art/Boss/Sneer.png", 6, 8.0f);
+    m_bossArt.hurt = clip(":/art/Boss/Hurt.png", 2, 14.0f);
+    m_bossArt.dead = clip(":/art/Boss/Death.png", 6, 8.0f);
+    m_bossArt.sourceFacing = Facing::Right;
+
+    m_actorShadow = QPixmap(":/art/Sprites/shadow.png");
+    m_robotProjectile = QPixmap(":/art/远程型敌人2（机器人）/Ball1.png");
+    m_robotProjectileAlt = QPixmap(":/art/远程型敌人2（机器人）/Ball2.png");
+    m_stageTileset = QPixmap(":/art/Stage Layers/tileset.png");
+    m_stageBack = QPixmap(":/art/Stage Layers/back.png");
+    m_stageFore = QPixmap(":/art/Stage Layers/fore.png");
+    m_stageCar = QPixmap(":/art/Stage Layers/props/car.png");
+    m_stageBarrel = QPixmap(":/art/Stage Layers/props/barrel.png");
+    m_stageHydrant = QPixmap(":/art/Stage Layers/props/hydrant.png");
+
+    for (std::size_t i = 0; i < m_healthBarArt.size(); ++i) {
+        const auto suffix = QString::number(static_cast<int>(i + 1));
+        m_healthBarArt[i] = QPixmap(":/art/HUD/HealthBar" + suffix + ".png");
+        m_energyBarArt[i] = QPixmap(":/art/HUD/EnergyBar" + suffix + ".png");
+    }
+    for (std::size_t i = 0; i < m_hudScrollArt.size(); ++i) {
+        const auto suffix = QString::number(static_cast<int>(i + 1));
+        m_hudScrollArt[i] = QPixmap(":/art/HUD/Scrolling" + suffix + ".png");
+    }
+
+    m_interfaceFrameArt = {
+        QPixmap(":/art/界面图/1 Frames/Frame_01.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_02.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_03.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_10.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_11.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_12.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_19.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_20.png"),
+        QPixmap(":/art/界面图/1 Frames/Frame_21.png"),
+    };
+    m_interfaceLogoArt = {
+        QPixmap(":/art/界面图/5 Logo/Logo1.png"),
+        QPixmap(":/art/界面图/5 Logo/Logo2.png"),
+        QPixmap(":/art/界面图/5 Logo/Logo3.png"),
+    };
+
+    const auto loadButton = [](const QString& set) {
+        std::array<QPixmap, 6> art;
+        constexpr const char* suffixes[] = {"01", "02", "03", "05", "06", "07"};
+        for (std::size_t i = 0; i < art.size(); ++i) {
+            art[i] = QPixmap(QString(":/art/界面图/6 Buttons/%1/%1_%2.png")
+                                 .arg(set)
+                                 .arg(suffixes[i]));
+        }
+        return art;
+    };
+    m_redButtonArt = loadButton("1");
+    m_cyanButtonArt = loadButton("2");
+    m_greenButtonArt = loadButton("7");
+
+    m_startIcon = QPixmap(":/art/界面图/9 Other/3 Skill icons/Skillicon7_20.png");
+    m_pauseIcon = QPixmap(":/art/界面图/9 Other/3 Skill icons/Skillicon7_05.png");
+    m_bossIcon = QPixmap(":/art/界面图/9 Other/3 Skill icons/Skillicon7_10.png");
+    m_winIcon = QPixmap(":/art/界面图/9 Other/3 Skill icons/Skillicon7_02.png");
+    m_lossIcon = QPixmap(":/art/界面图/9 Other/3 Skill icons/Skillicon7_19.png");
+    m_restartIcon = QPixmap(":/art/界面图/9 Other/3 Skill icons/Skillicon7_17.png");
+
+    const int fontId = QFontDatabase::addApplicationFont(
+        ":/art/界面图/10 Font/CyberpunkCraftpixPixel.otf");
+    if (fontId >= 0) {
+        const auto families = QFontDatabase::applicationFontFamilies(fontId);
+        if (!families.isEmpty()) m_interfaceFontFamily = families.front();
+    }
 
     // 游戏循环定时器 ~60 FPS
     m_timer.setTimerType(Qt::PreciseTimer);
@@ -55,12 +186,6 @@ GameWidget::GameWidget(QWidget* parent)
         }
         if (m_screenShakeTimer > 0.0f) {
             m_screenShakeTimer = std::max(0.0f, m_screenShakeTimer - clampedDt);
-        }
-
-        // 胜利音效（在定时器里检测比在 paintEvent 里更可靠）
-        if (m_gameState && m_gameState->phase == GamePhase::Win && !m_winSounded) {
-            SoundManager::play("win");
-            m_winSounded = true;
         }
 
         // 拾取检测：pickup 数量减少即被捡走
@@ -99,22 +224,25 @@ GameWidget::GameWidget(QWidget* parent)
         }
         if (m_gameState) m_prevPlayerHp = m_gameState->player.health.current;
 
-        // Boss 出场检测 + 重开重置：追踪敌人列表中 Boss 的出现/消失
+        if (m_tickCommand) m_tickCommand(clampedDt, m_frameIndex);
+
         if (m_gameState) {
-            bool bossInList = false;
-            for (const auto& e : m_gameState->enemies) {
-                if (e.kind == ActorKind::Boss && e.visible) { bossInList = true; break; }
+            const auto phase = m_gameState->phase;
+            if (phase != m_observedGamePhase) {
+                if (phase == GamePhase::GameOver && !m_gameOverSounded) {
+                    SoundManager::play("gameover");
+                    m_gameOverSounded = true;
+                } else if (phase == GamePhase::Win && !m_winSounded) {
+                    SoundManager::play("win");
+                    m_winSounded = true;
+                }
             }
-
-            // Boss 从无到有 → 播出场动画
-            if (bossInList && !m_bossWasInList) {
-                m_bossIntroAnimTimer = 0.0f;
-                SoundManager::play("boss_intro");
-            }
-
-            // Boss 从有到无 → 游戏结束/重开，重置标记
-            if (!bossInList && m_bossWasInList) {
-                m_bossIntroAnimTimer = 99.0f;
+            const bool startingRound = phase == GamePhase::Playing &&
+                                       (m_observedGamePhase == GamePhase::Title ||
+                                        m_observedGamePhase == GamePhase::GameOver ||
+                                        m_observedGamePhase == GamePhase::Win);
+            if (startingRound) {
+                m_animationClocks.clear();
                 m_gameOverSounded = false;
                 m_winSounded = false;
                 m_attackingEnemyId = 0;
@@ -122,16 +250,25 @@ GameWidget::GameWidget(QWidget* parent)
                 m_prevPlayerHp = 100;
                 m_lastPickupCount = 0;
                 m_pickupFxTimer = 0.0f;
+                m_displayHealthRatio = 1.0f;
+                m_lastPlayerImpactRev = 0;
             }
+            m_observedGamePhase = phase;
 
-            m_bossWasInList = bossInList;
+            const auto& encounter = m_gameState->encounter;
+            const bool enteringBossIntro = encounter.kind == EncounterKind::Boss &&
+                                           encounter.phase == EncounterPhase::Intro &&
+                                           (m_observedEncounterKind != EncounterKind::Boss ||
+                                            m_observedEncounterPhase != EncounterPhase::Intro);
+            if (enteringBossIntro) SoundManager::play("boss_intro");
+            m_observedEncounterKind = encounter.kind;
+            m_observedEncounterPhase = encounter.phase;
 
-            if (m_bossIntroAnimTimer < 2.0f) {
-                m_bossIntroAnimTimer += clampedDt;
+            updateActorAnimation(m_gameState->player, clampedDt);
+            for (const auto& enemy : m_gameState->enemies) {
+                updateActorAnimation(enemy, clampedDt);
             }
         }
-
-        if (m_tickCommand) m_tickCommand(clampedDt, m_frameIndex);
     });
 
     // 启动定时器
@@ -144,7 +281,13 @@ GameWidget::GameWidget(QWidget* parent)
 
 void GameWidget::set_game_state(const GameState* state) noexcept
 {
+    const bool firstBinding = m_gameState == nullptr;
     m_gameState = state;
+    if (firstBinding && state != nullptr) {
+        m_observedGamePhase = state->phase;
+        m_observedEncounterKind = state->encounter.kind;
+        m_observedEncounterPhase = state->encounter.phase;
+    }
     update();
 }
 
@@ -352,11 +495,15 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
 
     // ---- 标题画面 ----
     if (phase == GamePhase::Title) {
+        drawBackground(p);
+        drawStreet(p);
+        drawForeground(p);
         drawOverlay(p);
         return;
     }
 
     // ---- 屏幕震动偏移 ----
+    p.save();
     float shakeX = 0.0f, shakeY = 0.0f;
     if (m_screenShakeTimer > 0.0f) {
         const float intensity = m_screenShakeTimer * 20.0f * m_scaleX;
@@ -396,6 +543,8 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
         drawActor(p, *actor);
     }
 
+    drawForeground(p);
+
     // ---- 飞行道具 ----
     for (const auto& proj : game_state().projectiles) {
         drawProjectile(p, proj);
@@ -409,12 +558,6 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
     // ---- 粒子特效 ----
     drawParticles(p);
 
-    // ---- 遭遇战锁屏/出场动画 ----
-    drawEncounterOverlay(p);
-
-    // ---- HUD ----
-    drawHUD(p);
-
     // ---- 拾取特效：飘字 ----
     if (m_pickupFxTimer > 0.0f) {
         const float px = worldToScreenX(game_state().player.position.x);
@@ -427,6 +570,11 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
                           60.0f * m_scaleX, 30.0f * m_scaleY),
                    Qt::AlignCenter, "+");
     }
+    p.restore();
+
+    // ---- HUD 与遭遇页面不跟随世界震动 ----
+    drawHUD(p);
+    drawEncounterOverlay(p);
 
     // ---- 覆盖层（暂停 / 结算 / 胜利） ----
     if (phase == GamePhase::Paused   ||
@@ -448,6 +596,28 @@ void GameWidget::drawBackground(QPainter& p)
                           ? game_state().map.viewportHeight : 540.0f;
     const float streetTop = game_state().map.streetTopY > 0.0f
                                 ? game_state().map.streetTopY : 300.0f;
+
+    if (!m_stageTileset.isNull()) {
+        p.fillRect(QRectF(0, 0, vpW * m_scaleX, vpH * m_scaleY),
+                   QColor(8, 11, 16));
+
+        if (!m_stageBack.isNull()) {
+            p.save();
+            p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+            const float tileW = 192.0f * m_scaleX;
+            const float tileH = 160.0f * m_scaleY;
+            const float parallaxOffset = std::fmod(game_state().map.cameraX * 0.15f * m_scaleX,
+                                                   tileW);
+            for (float x = -parallaxOffset - tileW; x < width() + tileW; x += tileW) {
+                p.drawPixmap(QRectF(x, 8.0f * m_scaleY, tileW, tileH),
+                             m_stageBack, QRectF(m_stageBack.rect()));
+            }
+            p.restore();
+        }
+
+        drawBuildings(p);
+        return;
+    }
 
     // 天空渐变
     QLinearGradient skyGrad(0, 0, 0, streetTop * m_scaleY);
@@ -491,6 +661,37 @@ void GameWidget::drawBuildings(QPainter& p)
                                 ? game_state().map.streetTopY : 300.0f;
     const float camX = game_state().map.cameraX;
     const float parallaxFactor = 0.3f;
+
+    if (!m_stageTileset.isNull()) {
+        const QRect shopfronts[] = {
+            QRect(0, 0, 224, 96),
+            QRect(288, 0, 224, 96),
+        };
+
+        p.save();
+        p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        p.fillRect(QRectF(0, 55.0f * m_scaleY,
+                          width(), 165.0f * m_scaleY),
+                   QColor(18, 20, 23));
+
+        float worldX = 0.0f;
+        int segmentIndex = 0;
+        while (worldX < 3400.0f) {
+            const QRect source = shopfronts[segmentIndex % 2];
+            const float worldW = source.width() * 2.0f;
+            const float screenX = (worldX - camX) * m_scaleX;
+            const QRectF target(screenX, 28.0f * m_scaleY,
+                                worldW * m_scaleX, 192.0f * m_scaleY);
+            if (target.right() >= 0.0f && target.left() <= width()) {
+                p.drawPixmap(target, m_stageTileset, QRectF(source));
+            }
+            worldX += worldW;
+            ++segmentIndex;
+        }
+
+        p.restore();
+        return;
+    }
 
     struct Building {
         float x, width, height;
@@ -575,6 +776,56 @@ void GameWidget::drawStreet(QPainter& p)
                                    ? game_state().map.streetBottomY : 500.0f;
     const float camX = game_state().map.cameraX;
 
+    if (!m_stageTileset.isNull()) {
+        const QRect streetSource(48, 224, 112, 144);
+        constexpr float tileWorldHeight = 320.0f;
+        constexpr float tileWorldWidth = 112.0f * tileWorldHeight / 144.0f;
+        constexpr float streetWorldY = 220.0f;
+
+        p.save();
+        p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        p.fillRect(QRectF(0, streetWorldY * m_scaleY,
+                          vpW * m_scaleX, (vpH - streetWorldY) * m_scaleY),
+                   QColor(24, 42, 50));
+
+        const float firstTileX = std::floor(camX / tileWorldWidth) * tileWorldWidth
+                               - tileWorldWidth;
+        for (float worldX = firstTileX;
+             worldX < camX + vpW + tileWorldWidth;
+             worldX += tileWorldWidth) {
+            const float screenX = (worldX - camX) * m_scaleX;
+            p.drawPixmap(QRectF(screenX, streetWorldY * m_scaleY,
+                                tileWorldWidth * m_scaleX,
+                                tileWorldHeight * m_scaleY),
+                         m_stageTileset, QRectF(streetSource));
+        }
+
+        const auto drawProp = [&](const QPixmap& pixmap, float worldX,
+                                  float bottomY, float artScale) {
+            if (pixmap.isNull()) return;
+            const float targetW = pixmap.width() * artScale;
+            const float targetH = pixmap.height() * artScale;
+            const float screenX = (worldX - camX) * m_scaleX;
+            const QRectF target(screenX, (bottomY - targetH) * m_scaleY,
+                                targetW * m_scaleX, targetH * m_scaleY);
+            if (target.right() >= 0.0f && target.left() <= width()) {
+                p.drawPixmap(target, pixmap, QRectF(pixmap.rect()));
+            }
+        };
+
+        drawProp(m_stageHydrant, 250.0f, 330.0f, 2.0f);
+        drawProp(m_stageBarrel, 560.0f, 340.0f, 2.0f);
+        drawProp(m_stageCar, 780.0f, 305.0f, 2.0f);
+        drawProp(m_stageHydrant, 1320.0f, 330.0f, 2.0f);
+        drawProp(m_stageBarrel, 1650.0f, 340.0f, 2.0f);
+        drawProp(m_stageCar, 2150.0f, 305.0f, 2.0f);
+        drawProp(m_stageHydrant, 2470.0f, 330.0f, 2.0f);
+        drawProp(m_stageBarrel, 2760.0f, 340.0f, 2.0f);
+
+        p.restore();
+        return;
+    }
+
     const float sy0 = streetTop * m_scaleY;
     const float sy1 = streetBottom * m_scaleY;
     const float streetH = sy1 - sy0;
@@ -618,6 +869,30 @@ void GameWidget::drawStreet(QPainter& p)
                QColor(40, 38, 35));
 }
 
+void GameWidget::drawForeground(QPainter& p)
+{
+    if (m_stageFore.isNull()) return;
+
+    const float vpH = game_state().map.viewportHeight > 0.0f
+                          ? game_state().map.viewportHeight : 540.0f;
+    const float camX = game_state().map.cameraX;
+    const float targetW = m_stageFore.width() * 2.0f;
+    const float targetH = m_stageFore.height() * 2.0f;
+    const float positions[] = {620.0f, 1800.0f, 2920.0f};
+
+    p.save();
+    p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    for (const float worldX : positions) {
+        const float screenX = (worldX - camX) * m_scaleX;
+        const QRectF target(screenX, (vpH - targetH) * m_scaleY,
+                            targetW * m_scaleX, targetH * m_scaleY);
+        if (target.right() >= 0.0f && target.left() <= width()) {
+            p.drawPixmap(target, m_stageFore, QRectF(m_stageFore.rect()));
+        }
+    }
+    p.restore();
+}
+
 // ============================================================================
 // 角色绘制
 // ============================================================================
@@ -654,6 +929,13 @@ QColor GameWidget::energyBarColor(float ratio)
     return QColor(60, 140, 240); // 蓝色
 }
 
+std::size_t GameWidget::hudFrameIndex(float elapsed)
+{
+    const auto frame = static_cast<std::size_t>(
+        std::floor(std::max(0.0f, elapsed) * 8.0f));
+    return frame % 4u;
+}
+
 void GameWidget::drawBar(QPainter& p, float x, float y, float w, float h,
                          float ratio, QColor fillColor, const QString& label)
 {
@@ -675,6 +957,135 @@ void GameWidget::drawBar(QPainter& p, float x, float y, float w, float h,
     }
 }
 
+bool GameWidget::hasActorArt(const ActorState& actor) const
+{
+    const auto* clip = actorClip(actor);
+    return clip != nullptr && !clip->sheet.isNull() && clip->frameCount > 0;
+}
+
+const GameWidget::ActorArtSet* GameWidget::actorArtSet(const ActorState& actor) const
+{
+    if (actor.team == Team::Player) return &m_playerArt;
+
+    switch (actor.kind) {
+    case ActorKind::Patroller:
+        return &m_patrollerArt;
+    case ActorKind::Ambusher:
+        return &m_ambusherArt;
+    case ActorKind::Charger:
+        return &m_chargerArt;
+    case ActorKind::Ranged:
+        return actor.visualVariant == ActorVisualVariant::RangedRobot
+                   ? &m_rangedRobotArt
+                   : &m_rangedGunnerArt;
+    case ActorKind::Boss:
+        return &m_bossArt;
+    case ActorKind::Player:
+        return &m_playerArt;
+    }
+    return nullptr;
+}
+
+const GameWidget::SpriteClip* GameWidget::actorClip(const ActorState& actor) const
+{
+    const auto* art = actorArtSet(actor);
+    if (art == nullptr) return nullptr;
+
+    switch (actor.actionState) {
+    case ActorActionState::Idle:         return &art->idle;
+    case ActorActionState::Walk:         return &art->walk;
+    case ActorActionState::LightAttack:  return &art->lightAttack;
+    case ActorActionState::HeavyAttack:  return &art->heavyAttack;
+    case ActorActionState::RangedAttack: return &art->rangedAttack;
+    case ActorActionState::Ambush:       return &art->ambush;
+    case ActorActionState::Charge:       return &art->charge;
+    case ActorActionState::Jump:         return &art->jump;
+    case ActorActionState::AirAttack:    return &art->airAttack;
+    case ActorActionState::Hurt:         return &art->hurt;
+    case ActorActionState::Dead:         return &art->dead;
+    }
+    return nullptr;
+}
+
+float GameWidget::actorSpriteWidth(const ActorState& actor) const
+{
+    const auto* clip = actorClip(actor);
+    if (clip == nullptr || clip->sheet.isNull() || clip->frameCount <= 0 ||
+        clip->sheet.height() <= 0) {
+        return actor.drawSize.width * m_scaleX;
+    }
+
+    const float frameWidth = static_cast<float>(clip->sheet.width()) /
+                             static_cast<float>(clip->frameCount);
+    return actor.drawSize.height * frameWidth /
+           static_cast<float>(clip->sheet.height()) * m_scaleX;
+}
+
+void GameWidget::updateActorAnimation(const ActorState& actor, float dt)
+{
+    if (!hasActorArt(actor)) return;
+
+    auto& clock = m_animationClocks[actor.id];
+    if (!clock.initialized || clock.state != actor.actionState ||
+        clock.impactRevision != actor.impactRevision) {
+        clock.state = actor.actionState;
+        clock.impactRevision = actor.impactRevision;
+        clock.elapsed = 0.0f;
+        clock.initialized = true;
+        return;
+    }
+
+    clock.elapsed += dt;
+}
+
+float GameWidget::actorAnimationElapsed(const ActorState& actor) const
+{
+    const auto it = m_animationClocks.find(actor.id);
+    return it != m_animationClocks.end()
+               ? it->second.elapsed
+               : game_state().elapsedSeconds;
+}
+
+bool GameWidget::drawActorSprite(QPainter& p, const ActorState& actor)
+{
+    const auto* art = actorArtSet(actor);
+    const auto* clip = actorClip(actor);
+    if (art == nullptr || clip == nullptr || clip->sheet.isNull() ||
+        clip->frameCount <= 0) {
+        return false;
+    }
+
+    const float elapsed = actorAnimationElapsed(actor);
+    int frameIndex = static_cast<int>(elapsed * clip->framesPerSecond);
+    frameIndex = clip->looping ? frameIndex % clip->frameCount
+                               : std::min(frameIndex, clip->frameCount - 1);
+    frameIndex = std::max(frameIndex, 0);
+
+    const int frameWidth = clip->sheet.width() / clip->frameCount;
+    const int frameHeight = clip->sheet.height();
+    const QRect source(frameIndex * frameWidth, 0, frameWidth, frameHeight);
+    const float targetHeight = actor.drawSize.height * m_scaleY;
+    const float targetWidth = actor.drawSize.height *
+                              static_cast<float>(frameWidth) /
+                              static_cast<float>(frameHeight) * m_scaleX;
+
+    p.save();
+    p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    const bool flipHorizontally = actor.facing != art->sourceFacing;
+    if (flipHorizontally) {
+        p.scale(-1.0f, 1.0f);
+    }
+    if (actor.actionState == ActorActionState::Hurt) {
+        const float blink = 0.62f + 0.38f * std::abs(std::sin(m_goBlinkTimer * 24.0f));
+        p.setOpacity(blink);
+    }
+    p.drawPixmap(QRectF(-targetWidth * art->horizontalPivot, 0.0f,
+                        targetWidth, targetHeight),
+                 clip->sheet, QRectF(source));
+    p.restore();
+    return true;
+}
+
 void GameWidget::drawActor(QPainter& p, const ActorState& actor)
 {
     const float screenX = worldToScreenX(actor.position.x);
@@ -687,34 +1098,52 @@ void GameWidget::drawActor(QPainter& p, const ActorState& actor)
     const float cx = screenX;
     const float cy = screenY - h; // 脚底 = laneY，头顶 = laneY - drawSize.height
 
+    const bool useActorArt = hasActorArt(actor);
+    const float cullWidth = useActorArt ? actorSpriteWidth(actor) : w;
+
     // 裁剪：不在屏幕内的跳过
-    if (cx + w / 2 < -50 || cx - w / 2 > width() + 50 ||
+    if (cx + cullWidth / 2 < -50 || cx - cullWidth / 2 > width() + 50 ||
         cy + h < -50 || cy > height() + 50) {
         return;
     }
 
     const QColor bodyColor = actorBodyColor(actor.team, actor.kind);
 
+    if (useActorArt && !m_actorShadow.isNull()) {
+        const float groundY = worldToScreenY(actor.position.laneY, 0.0f);
+        const float shadowWorldW = actor.drawSize.width * 0.85f;
+        const float shadowWorldH = shadowWorldW * 0.16f;
+        const float shadowOpacity = std::clamp(0.68f - actor.position.z / 220.0f,
+                                               0.22f, 0.68f);
+        p.save();
+        p.setOpacity(shadowOpacity);
+        p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        p.drawPixmap(QRectF(screenX - shadowWorldW * m_scaleX * 0.5f,
+                            groundY - shadowWorldH * m_scaleY * 0.5f,
+                            shadowWorldW * m_scaleX,
+                            shadowWorldH * m_scaleY),
+                     m_actorShadow, QRectF(m_actorShadow.rect()));
+        p.restore();
+    }
+
     p.save();
     p.translate(cx, cy);
 
-    // 根据 facing 翻转
-    if (actor.facing == Facing::Left) {
-        p.scale(-1.0f, 1.0f);
+    if (!drawActorSprite(p, actor)) {
+        if (actor.facing == Facing::Left) {
+            p.scale(-1.0f, 1.0f);
+        }
+        if (actor.actionState == ActorActionState::Hurt) {
+            p.fillRect(QRectF(-w * 0.5f, 0, w, h), QColor(255, 255, 255, 140));
+        }
+        drawCharacterBody(p, actor, bodyColor);
     }
-
-    // 受击闪白（仅在 Hurt 状态瞬间显示）
-    if (actor.actionState == ActorActionState::Hurt) {
-        p.fillRect(QRectF(-w * 0.5f, 0, w, h), QColor(255, 255, 255, 140));
-    }
-
-    // 根据状态绘制不同姿势
-    drawCharacterBody(p, actor, bodyColor);
 
     p.restore();
 
     // 血条（敌人和 Boss 头顶）
-    if (actor.team == Team::Enemy && actor.health.maximum > 0) {
+    if (actor.team == Team::Enemy && actor.health.maximum > 0 &&
+        actor.actionState != ActorActionState::Dead) {
         drawHealthBar(p, actor);
     }
 
@@ -895,69 +1324,123 @@ void GameWidget::drawPlayerStatus(QPainter& p)
 void GameWidget::drawHUD(QPainter& p)
 {
     const auto& hud = game_state().hud;
-    const float margin = 12.0f;
-    const float barW = 200.0f * m_scaleX;
-    const float barH = 16.0f * m_scaleY;
-    const float gap = 6.0f * m_scaleY;
+    const float uiScale = std::clamp(std::min(m_scaleX, m_scaleY), 0.45f, 1.5f);
+    const float margin = 12.0f * uiScale;
+    const auto phase = hudFrameIndex(m_goBlinkTimer);
 
-    // ---- 血量条 (左上) ----
-    const float hpX = margin * m_scaleX;
-    const float hpY = margin * m_scaleY;
+    const auto drawMeter = [&p, phase](const std::array<QPixmap, 8>& frames,
+                                       const QRectF& target,
+                                       int sourceCapWidth,
+                                       float ratio,
+                                       float delayedRatio) {
+        if (frames[phase].isNull() || frames[phase + 4u].isNull()) return false;
 
-    // 标签
-    p.setPen(QColor(255, 255, 255));
-    QFont labelFont("Arial", 10, QFont::Bold);
-    p.setFont(labelFont);
-    p.drawText(QPointF(hpX, hpY + barH * 0.8f), "HP");
+        const float real = std::clamp(ratio, 0.0f, 1.0f);
+        const float delayed = std::clamp(std::max(delayedRatio, real), 0.0f, 1.0f);
+        const auto drawStretchedFrame = [&p, &target, sourceCapWidth](const QPixmap& frame) {
+            const float sourceW = static_cast<float>(frame.width());
+            const float sourceH = static_cast<float>(frame.height());
+            const float sourceCap = std::min(static_cast<float>(sourceCapWidth), sourceW * 0.5f);
+            const float targetCap = std::min(
+                static_cast<float>(target.width() * 0.5),
+                std::round(sourceCap * static_cast<float>(target.height()) / sourceH));
+            const float sourceMiddleW = std::max(0.0f, sourceW - 2.0f * sourceCap);
+            const float targetMiddleW = std::max(
+                0.0f, static_cast<float>(target.width()) - 2.0f * targetCap);
 
-    const float barStartX = hpX + 28.0f * m_scaleX;
-    // 延迟血条（背景追尾）
-    p.fillRect(QRectF(barStartX, hpY, barW, barH), QColor(30, 30, 30, 200));
-    p.fillRect(QRectF(barStartX, hpY, barW * m_displayHealthRatio, barH), QColor(180, 180, 180, 120));
-    const float realRatio = hud.playerHealth.ratio();
-    p.fillRect(QRectF(barStartX, hpY, barW * realRatio, barH), healthBarColor(realRatio));
-    p.setPen(QPen(QColor(200, 200, 200), 1.0f));
-    p.drawRect(QRectF(barStartX, hpY, barW, barH));
-    p.setPen(QColor(255, 255, 255));
-    p.setFont(QFont("Arial", 9));
-    p.drawText(QRectF(barStartX, hpY, barW, barH), Qt::AlignCenter,
-               QString("%1 / %2").arg(hud.playerHealth.current).arg(hud.playerHealth.maximum));
+            p.drawPixmap(QRectF(target.x(), target.y(), targetCap, target.height()),
+                         frame, QRectF(0.0f, 0.0f, sourceCap, sourceH));
+            p.drawPixmap(QRectF(target.x() + targetCap, target.y(),
+                                targetMiddleW, target.height()),
+                         frame, QRectF(sourceCap, 0.0f, sourceMiddleW, sourceH));
+            p.drawPixmap(QRectF(target.right() - targetCap, target.y(),
+                                targetCap, target.height()),
+                         frame, QRectF(sourceW - sourceCap, 0.0f, sourceCap, sourceH));
+        };
+        const auto drawActiveLayer = [&](float fill, float opacity) {
+            if (fill <= 0.0f) return;
+            p.save();
+            p.setOpacity(opacity);
+            p.setClipRect(QRectF(target.x(), target.y(),
+                                 target.width() * fill, target.height()),
+                          Qt::IntersectClip);
+            drawStretchedFrame(frames[phase]);
+            p.restore();
+        };
 
-    // ---- 精力条 (HP 下方) ----
-    const float enY = hpY + barH + gap;
-    p.drawText(QPointF(hpX, enY + barH * 0.8f), "EN");
+        p.save();
+        p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        drawStretchedFrame(frames[phase + 4u]);
+        drawActiveLayer(delayed, 0.42f);
+        drawActiveLayer(real, 1.0f);
+        p.restore();
+        return true;
+    };
 
-    drawBar(p, barStartX, enY, barW, barH, hud.playerEnergy.ratio(),
-            energyBarColor(hud.playerEnergy.ratio()),
-            QString("%1 / %2").arg(hud.playerEnergy.current).arg(hud.playerEnergy.maximum));
-
-    // ---- 精力耗尽警告 ----
-    if (hud.playerExhausted) {
-        const float warnY = enY + barH + gap;
-        p.setPen(QColor(255, 80, 80));
-        QFont warnFont("Arial", 11, QFont::Bold);
-        p.setFont(warnFont);
-        p.drawText(QPointF(barStartX, warnY + barH * 0.8f),
-                   QString::fromUtf8("EXHAUSTED"));
+    // ---- 玩家 HUD（左上） ----
+    const QRectF scrollRect(margin - 18.0f * uiScale, margin,
+                            40.0f * uiScale, 40.0f * uiScale);
+    if (!m_hudScrollArt[phase].isNull()) {
+        p.save();
+        p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        p.drawPixmap(scrollRect, m_hudScrollArt[phase],
+                     QRectF(m_hudScrollArt[phase].rect()));
+        p.restore();
     }
+
+    const QRectF healthRect(margin + 20.0f * uiScale, margin,
+                            210.0f * uiScale, 34.0f * uiScale);
+    const float realRatio = hud.playerHealth.ratio();
+    if (!drawMeter(m_healthBarArt, healthRect, 4, realRatio,
+                   m_displayHealthRatio)) {
+        drawBar(p, healthRect.x(), healthRect.y(), healthRect.width(),
+                healthRect.height(), realRatio, healthBarColor(realRatio), {});
+    }
+
+    const QRectF energyRect(healthRect.x() + 10.0f * uiScale,
+                            healthRect.y() + 29.0f * uiScale,
+                            160.0f * uiScale, 14.0f * uiScale);
+    const float energyRatio = hud.playerEnergy.ratio();
+    if (!drawMeter(m_energyBarArt, energyRect, 3, energyRatio, energyRatio)) {
+        drawBar(p, energyRect.x(), energyRect.y(), energyRect.width(),
+                energyRect.height(), energyRatio,
+                energyBarColor(energyRatio), {});
+    }
+
+    const int hudFontPx = std::max(7, static_cast<int>(std::lround(9.0f * uiScale)));
+    p.setPen(QColor(255, 255, 255));
+    QFont hudFont("Arial", hudFontPx, QFont::Bold);
+    hudFont.setPixelSize(hudFontPx);
+    p.setFont(hudFont);
+    const QRectF valueRect(healthRect.right() + 6.0f * uiScale,
+                           healthRect.y(), 86.0f * uiScale, 36.0f * uiScale);
+    const QRectF healthValueRect(valueRect.x(), valueRect.y(),
+                                 valueRect.width(), valueRect.height() * 0.5f);
+    const QRectF energyValueRect(valueRect.x(), healthValueRect.bottom(),
+                                 valueRect.width(), valueRect.height() * 0.5f);
+    p.drawText(healthValueRect, Qt::AlignLeft | Qt::AlignVCenter,
+               QString("HP %1/%2")
+                   .arg(hud.playerHealth.current)
+                   .arg(hud.playerHealth.maximum));
+    p.setPen(hud.playerExhausted ? QColor(255, 80, 80) : QColor(255, 255, 255));
+    p.drawText(energyValueRect, Qt::AlignLeft | Qt::AlignVCenter,
+               hud.playerExhausted
+                   ? QStringLiteral("EN EXHAUSTED")
+                   : QString("EN %1/%2")
+                         .arg(hud.playerEnergy.current)
+                         .arg(hud.playerEnergy.maximum));
 
     // ---- Boss 血条 (上方居中) ----
     if (hud.showBossHealth) {
         const float bossBarW = 280.0f * m_scaleX;
         const float bossBarH = 20.0f * m_scaleY;
         const float bossX = (game_state().map.viewportWidth * m_scaleX) / 2.0f - bossBarW / 2;
-        const float bossY = margin * m_scaleY - 4.0f * m_scaleY;
+        const float bossY = 8.0f * m_scaleY;
 
         // 背景框
         p.fillRect(QRectF(bossX - 2, bossY - 2, bossBarW + 4, bossBarH + 4), QColor(0, 0, 0, 200));
         p.setPen(QPen(QColor(200, 180, 100), 2.0f));
         p.drawRect(QRectF(bossX - 1, bossY - 1, bossBarW + 2, bossBarH + 2));
-
-        // Boss 名字
-        p.setPen(QColor(255, 200, 100));
-        QFont bossFont("Arial", 11, QFont::Bold);
-        p.setFont(bossFont);
-        p.drawText(QPointF(bossX, bossY - 6.0f * m_scaleY), "BOSS");
 
         // 渐变血量条
         const float bossRatio = hud.bossHealth.ratio();
@@ -979,7 +1462,9 @@ void GameWidget::drawHUD(QPainter& p)
         p.setPen(QColor(255, 255, 255));
         p.setFont(QFont("Arial", 9, QFont::Bold));
         p.drawText(QRectF(bossX, bossY, bossBarW, bossBarH), Qt::AlignCenter,
-                   QString("%1 / %2").arg(hud.bossHealth.current).arg(hud.bossHealth.maximum));
+                   QString("BOSS  %1 / %2")
+                       .arg(hud.bossHealth.current)
+                       .arg(hud.bossHealth.maximum));
     }
 
     // ---- 屏幕消息 ----
@@ -1014,187 +1499,205 @@ void GameWidget::drawHUD(QPainter& p)
 // 覆盖层（标题 / 暂停 / 结算 / 胜利）
 // ============================================================================
 
+void GameWidget::drawInterfacePanel(QPainter& p, const QRectF& rect) const
+{
+    if (std::any_of(m_interfaceFrameArt.begin(), m_interfaceFrameArt.end(),
+                    [](const QPixmap& pixmap) { return pixmap.isNull(); })) {
+        p.fillRect(rect, QColor(20, 30, 58, 235));
+        p.setPen(QPen(QColor(65, 205, 220), 2.0f));
+        p.drawRect(rect);
+        return;
+    }
+
+    const float corner = std::min({32.0f,
+                                   static_cast<float>(rect.width() * 0.5),
+                                   static_cast<float>(rect.height() * 0.5)});
+    const float middleW = std::max(0.0f, static_cast<float>(rect.width()) - 2.0f * corner);
+    const float middleH = std::max(0.0f, static_cast<float>(rect.height()) - 2.0f * corner);
+    const auto drawTile = [&p, this](const QRectF& target, std::size_t index) {
+        p.drawPixmap(target, m_interfaceFrameArt[index],
+                     QRectF(m_interfaceFrameArt[index].rect()));
+    };
+
+    p.save();
+    p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    drawTile(QRectF(rect.x() + corner, rect.y() + corner, middleW, middleH), 4);
+    drawTile(QRectF(rect.x() + corner, rect.y(), middleW, corner), 1);
+    drawTile(QRectF(rect.x() + corner, rect.bottom() - corner, middleW, corner), 7);
+    drawTile(QRectF(rect.x(), rect.y() + corner, corner, middleH), 3);
+    drawTile(QRectF(rect.right() - corner, rect.y() + corner, corner, middleH), 5);
+    drawTile(QRectF(rect.x(), rect.y(), corner, corner), 0);
+    drawTile(QRectF(rect.right() - corner, rect.y(), corner, corner), 2);
+    drawTile(QRectF(rect.x(), rect.bottom() - corner, corner, corner), 6);
+    drawTile(QRectF(rect.right() - corner, rect.bottom() - corner, corner, corner), 8);
+    p.restore();
+}
+
+void GameWidget::drawInterfaceButton(QPainter& p, const QRectF& rect,
+                                     const std::array<QPixmap, 6>& art,
+                                     bool bright) const
+{
+    const std::size_t offset = bright ? 0u : 3u;
+    if (art[offset].isNull() || art[offset + 1u].isNull() ||
+        art[offset + 2u].isNull()) {
+        p.fillRect(rect, bright ? QColor(30, 170, 130) : QColor(35, 65, 85));
+        return;
+    }
+
+    const float cap = std::min(static_cast<float>(rect.height()),
+                               static_cast<float>(rect.width() * 0.5));
+    const float middleW = std::max(0.0f, static_cast<float>(rect.width()) - 2.0f * cap);
+    p.save();
+    p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    p.drawPixmap(QRectF(rect.x(), rect.y(), cap, rect.height()),
+                 art[offset], QRectF(art[offset].rect()));
+    p.drawPixmap(QRectF(rect.x() + cap, rect.y(), middleW, rect.height()),
+                 art[offset + 1u], QRectF(art[offset + 1u].rect()));
+    p.drawPixmap(QRectF(rect.right() - cap, rect.y(), cap, rect.height()),
+                 art[offset + 2u], QRectF(art[offset + 2u].rect()));
+    p.restore();
+}
+
 void GameWidget::drawOverlay(QPainter& p)
 {
     const float vpW = game_state().map.viewportWidth > 0.0f
                           ? game_state().map.viewportWidth : 960.0f;
     const float vpH = game_state().map.viewportHeight > 0.0f
                           ? game_state().map.viewportHeight : 540.0f;
-
-    // 半透明黑色遮罩
-    p.fillRect(QRectF(0, 0, vpW * m_scaleX, vpH * m_scaleY),
-               QColor(0, 0, 0, 180));
-
-    const float cx = vpW * m_scaleX / 2.0f;
-    const float cy = vpH * m_scaleY / 2.0f;
-
     const GamePhase phase = game_state().phase;
+    p.fillRect(rect(), QColor(2, 5, 12, phase == GamePhase::Title ? 155 : 205));
+
+    const float uniformScale = std::max(0.001f,
+        std::min(static_cast<float>(width()) / vpW,
+                 static_cast<float>(height()) / vpH));
+    const float offsetX = (static_cast<float>(width()) - vpW * uniformScale) * 0.5f;
+    const float offsetY = (static_cast<float>(height()) - vpH * uniformScale) * 0.5f;
+    const float cx = vpW * 0.5f;
+    const float cy = vpH * 0.5f;
+    const bool bright = std::fmod(m_goBlinkTimer, 1.2f) < 0.78f;
+
+    const auto uiFont = [this](int pixels, QFont::Weight weight) {
+        QFont font(m_interfaceFontFamily);
+        font.setPixelSize(pixels);
+        font.setWeight(weight);
+        font.setLetterSpacing(QFont::AbsoluteSpacing, 0.0);
+        return font;
+    };
+    const auto drawPixmap = [&p](const QPixmap& pixmap, const QRectF& target) {
+        if (!pixmap.isNull()) p.drawPixmap(target, pixmap, QRectF(pixmap.rect()));
+    };
+    const auto drawSlotText = [&p](const QRectF& slot, const QString& text) {
+        p.save();
+        p.setClipRect(slot);
+        p.drawText(slot, Qt::AlignCenter | Qt::TextSingleLine, text);
+        p.restore();
+    };
+
+    p.save();
+    p.translate(offsetX, offsetY);
+    p.scale(uniformScale, uniformScale);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    p.setRenderHint(QPainter::TextAntialiasing, false);
 
     if (phase == GamePhase::Title) {
-        // ---- 标题画面 ----
-        // 标题背景
-        QLinearGradient titleBg(0, 0, 0, vpH * m_scaleY);
-        titleBg.setColorAt(0.0, QColor(20, 15, 40));
-        titleBg.setColorAt(0.5, QColor(40, 25, 60));
-        titleBg.setColorAt(1.0, QColor(15, 10, 30));
-        p.fillRect(QRectF(0, 0, vpW * m_scaleX, vpH * m_scaleY), titleBg);
+        const float bannerW = std::min(540.0f, vpW - 72.0f);
+        const float bannerH = bannerW * 115.0f / 413.0f;
+        const QRectF banner(cx - bannerW * 0.5f, 54.0f, bannerW, bannerH);
+        drawPixmap(m_interfaceLogoArt[2], banner);
 
-        // 游戏标题
-        QFont titleFont("Arial", 48, QFont::Bold);
-        p.setFont(titleFont);
-
-        // 文字阴影
-        p.setPen(QColor(0, 0, 0, 150));
-        p.drawText(QRectF(cx - 250.0f * m_scaleX + 3.0f, cy - 100.0f * m_scaleY + 3.0f,
-                          500.0f * m_scaleX, 80.0f * m_scaleY),
+        p.setFont(uiFont(46, QFont::ExtraBold));
+        p.setPen(QColor(246, 239, 211));
+        p.drawText(QRectF(banner.x() + 34.0f, banner.y() + 8.0f,
+                          banner.width() - 68.0f, banner.height() * 0.58f),
                    Qt::AlignCenter, "ALLEY FIST");
+        p.setFont(uiFont(10, QFont::Bold));
+        p.setPen(QColor(69, 222, 226));
+        drawSlotText(QRectF(banner.x() + 46.0f,
+                            banner.y() + banner.height() * (91.0f / 115.0f),
+                            banner.width() - 92.0f,
+                            banner.height() * (20.0f / 115.0f)),
+                     QStringLiteral("NEON STREET BRAWLER"));
 
-        // 渐变文字
-        QLinearGradient textGrad(cx - 200, cy - 100, cx + 200, cy - 20);
-        textGrad.setColorAt(0.0, QColor(255, 200, 50));
-        textGrad.setColorAt(0.5, QColor(255, 140, 30));
-        textGrad.setColorAt(1.0, QColor(255, 80, 20));
-        p.setPen(QPen(textGrad, 1.0f));
-        p.drawText(QRectF(cx - 250.0f * m_scaleX, cy - 100.0f * m_scaleY,
-                          500.0f * m_scaleX, 80.0f * m_scaleY),
-                   Qt::AlignCenter, "ALLEY FIST");
+        p.setFont(uiFont(13, QFont::Bold));
+        p.setPen(QColor(171, 192, 206));
+        p.drawText(QRectF(cx - 180.0f, 330.0f, 360.0f, 28.0f),
+                   Qt::AlignCenter, "STAGE 01  //  NIGHT DISTRICT");
 
-        // 副标题
-        QFont subFont("Arial", 16);
-        p.setFont(subFont);
-        p.setPen(QColor(200, 180, 150));
-        p.drawText(QRectF(cx - 200.0f * m_scaleX, cy - 30.0f * m_scaleY,
-                          400.0f * m_scaleX, 30.0f * m_scaleY),
-                   Qt::AlignCenter, QString::fromUtf8("— 巷战双截龙 —"));
-
-        // 操作说明
-        QFont ctrlFont("Arial", 10);
-        p.setFont(ctrlFont);
-        p.setPen(QColor(180, 180, 180));
-        const float infoY = cy + 30.0f * m_scaleY;
-
-        struct CtrlInfo {
-            QString key;
-            QString action;
-        };
-        const CtrlInfo ctrls[] = {
-            {"← ↑ ↓ → / WASD", QString::fromUtf8("移动")},
-            {"J / Z", QString::fromUtf8("轻攻击")},
-            {"K / X", QString::fromUtf8("重攻击")},
-            {"Space", QString::fromUtf8("跳跃")},
-            {"P / Esc", QString::fromUtf8("暂停")},
-        };
-
-        for (int i = 0; i < 5; ++i) {
-            const float lineY = infoY + i * 22.0f * m_scaleY;
-            p.setPen(QColor(255, 220, 180));
-            p.drawText(QRectF(cx - 180.0f * m_scaleX, lineY,
-                              160.0f * m_scaleX, 20.0f * m_scaleY),
-                       Qt::AlignRight, ctrls[i].key);
-            p.setPen(QColor(180, 180, 180));
-            p.drawText(QRectF(cx + 20.0f * m_scaleX, lineY,
-                              160.0f * m_scaleX, 20.0f * m_scaleY),
-                       Qt::AlignLeft, ctrls[i].action);
-        }
-
-        // 闪烁 "Press Enter"
-        const float blinkCycle = std::fmod(m_goBlinkTimer, 1.2f);
-        if (blinkCycle < 0.8f) {
-            QFont startFont("Arial", 18, QFont::Bold);
-            p.setFont(startFont);
-            p.setPen(QColor(255, 255, 200));
-            p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 140.0f * m_scaleY,
-                              300.0f * m_scaleX, 30.0f * m_scaleY),
-                       Qt::AlignCenter, "Press ENTER to Start");
-        }
-
+        const QRectF startButton(cx - 145.0f, 394.0f, 290.0f, 48.0f);
+        drawInterfaceButton(p, startButton, m_greenButtonArt, bright);
+        drawPixmap(m_startIcon, QRectF(startButton.x() + 12.0f,
+                                       startButton.y() + 8.0f, 32.0f, 32.0f));
+        p.setFont(uiFont(19, QFont::ExtraBold));
+        p.setPen(QColor(244, 250, 231));
+        p.drawText(startButton.adjusted(48.0f, 0.0f, -12.0f, 0.0f),
+                   Qt::AlignCenter, "START");
     } else if (phase == GamePhase::Paused) {
-        // ---- 暂停 ----
-        QFont pauseFont("Arial", 36, QFont::Bold);
-        p.setFont(pauseFont);
-        p.setPen(QColor(255, 255, 255));
-        p.drawText(QRectF(cx - 150.0f * m_scaleX, cy - 40.0f * m_scaleY,
-                          300.0f * m_scaleX, 50.0f * m_scaleY),
+        const QRectF panel(cx - 210.0f, cy - 132.0f, 420.0f, 264.0f);
+        drawInterfacePanel(p, panel);
+        const QRectF banner(cx - 142.5f, cy - 105.0f, 285.0f, 115.0f);
+        drawPixmap(m_interfaceLogoArt[0], banner);
+        drawPixmap(m_pauseIcon, QRectF(banner.x() + 22.0f,
+                                       banner.y() + 24.0f, 38.0f, 38.0f));
+        p.setFont(uiFont(32, QFont::ExtraBold));
+        p.setPen(QColor(242, 246, 232));
+        p.drawText(QRectF(banner.x() + 58.0f, banner.y() + 8.0f,
+                          banner.width() - 76.0f, 64.0f),
                    Qt::AlignCenter, "PAUSED");
+        p.setFont(uiFont(9, QFont::Bold));
+        p.setPen(QColor(76, 213, 224));
+        drawSlotText(QRectF(banner.x() + 34.0f, banner.y() + 91.0f,
+                            banner.width() - 68.0f, 20.0f),
+                     QStringLiteral("SESSION SUSPENDED"));
 
-        QFont hintFont("Arial", 14);
-        p.setFont(hintFont);
-        p.setPen(QColor(200, 200, 200));
-        p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 10.0f * m_scaleY,
-                          300.0f * m_scaleX, 30.0f * m_scaleY),
-                   Qt::AlignCenter, "Press P or ESC to Resume");
-
-    } else if (phase == GamePhase::GameOver) {
-        if (!m_gameOverSounded) { SoundManager::play("gameover"); m_gameOverSounded = true; }
-        // ---- 游戏结束 ----
-        QFont goFont("Arial", 42, QFont::Bold);
-        p.setFont(goFont);
-        p.setPen(QColor(220, 40, 40));
-        p.drawText(QRectF(cx - 200.0f * m_scaleX, cy - 80.0f * m_scaleY,
-                          400.0f * m_scaleX, 60.0f * m_scaleY),
-                   Qt::AlignCenter, "GAME OVER");
-
-        // 统计信息
+        const QRectF resumeButton(cx - 120.0f, cy + 68.0f, 240.0f, 44.0f);
+        drawInterfaceButton(p, resumeButton, m_cyanButtonArt, bright);
+        p.setFont(uiFont(17, QFont::ExtraBold));
+        p.setPen(QColor(241, 250, 240));
+        p.drawText(resumeButton, Qt::AlignCenter, "RESUME");
+    } else if (phase == GamePhase::GameOver || phase == GamePhase::Win) {
+        const bool won = phase == GamePhase::Win;
         const auto& result = game_state().result;
-        QFont statFont("Arial", 13);
-        p.setFont(statFont);
-        p.setPen(QColor(220, 220, 220));
-        p.drawText(QRectF(cx - 150.0f * m_scaleX, cy - 10.0f * m_scaleY,
-                          300.0f * m_scaleX, 25.0f * m_scaleY),
-                   Qt::AlignCenter,
-                   QString("Survived: %1s").arg(result.elapsedSeconds, 0, 'f', 1));
-        p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 15.0f * m_scaleY,
-                          300.0f * m_scaleX, 25.0f * m_scaleY),
-                   Qt::AlignCenter,
-                   QString("Defeated: %1").arg(result.defeatedEnemies));
+        const QRectF panel(cx - 235.0f, cy - 155.0f, 470.0f, 310.0f);
+        drawInterfacePanel(p, panel);
 
-        // 闪烁提示
-        const float blinkCycle = std::fmod(m_goBlinkTimer, 1.0f);
-        if (blinkCycle < 0.6f) {
-            QFont restartFont("Arial", 16, QFont::Bold);
-            p.setFont(restartFont);
-            p.setPen(QColor(255, 220, 100));
-            p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 50.0f * m_scaleY,
-                              300.0f * m_scaleX, 30.0f * m_scaleY),
-                       Qt::AlignCenter, "Press R to Restart");
-        }
+        const QRectF banner(cx - 174.5f, cy - 133.0f, 349.0f, 115.0f);
+        drawPixmap(m_interfaceLogoArt[1], banner);
+        const QPixmap& resultIcon = won ? m_winIcon : m_lossIcon;
+        drawPixmap(resultIcon, QRectF(banner.x() + 24.0f,
+                                      banner.y() + 23.0f, 42.0f, 42.0f));
+        p.setFont(uiFont(30, QFont::ExtraBold));
+        p.setPen(won ? QColor(239, 216, 79) : QColor(255, 93, 75));
+        p.drawText(QRectF(banner.x() + 64.0f, banner.y() + 8.0f,
+                          banner.width() - 84.0f, 64.0f),
+                   Qt::AlignCenter, won ? "VICTORY" : "GAME OVER");
+        p.setFont(uiFont(9, QFont::Bold));
+        p.setPen(QColor(75, 216, 224));
+        drawSlotText(QRectF(banner.x() + 42.0f, banner.y() + 91.0f,
+                            banner.width() - 84.0f, 20.0f),
+                     won ? QStringLiteral("MISSION COMPLETE")
+                         : QStringLiteral("RUN TERMINATED"));
 
-    } else if (phase == GamePhase::Win) {
-        // ---- 胜利 ----
-        QFont winFont("Arial", 42, QFont::Bold);
-        p.setFont(winFont);
-        QLinearGradient winGrad(cx - 150, cy - 80, cx + 150, cy - 20);
-        winGrad.setColorAt(0.0, QColor(255, 220, 50));
-        winGrad.setColorAt(1.0, QColor(255, 160, 20));
-        p.setPen(QPen(winGrad, 1.0f));
-        p.drawText(QRectF(cx - 200.0f * m_scaleX, cy - 80.0f * m_scaleY,
-                          400.0f * m_scaleX, 60.0f * m_scaleY),
-                   Qt::AlignCenter, "YOU WIN!");
-
-        // 统计信息
-        const auto& result = game_state().result;
-        QFont statFont("Arial", 13);
-        p.setFont(statFont);
-        p.setPen(QColor(220, 220, 220));
-        p.drawText(QRectF(cx - 150.0f * m_scaleX, cy - 5.0f * m_scaleY,
-                          300.0f * m_scaleX, 25.0f * m_scaleY),
+        p.setFont(uiFont(15, QFont::Bold));
+        p.setPen(QColor(221, 230, 224));
+        p.drawText(QRectF(cx - 160.0f, cy + 2.0f, 320.0f, 28.0f),
                    Qt::AlignCenter,
-                   QString("Time: %1s").arg(result.elapsedSeconds, 0, 'f', 1));
-        p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 20.0f * m_scaleY,
-                          300.0f * m_scaleX, 25.0f * m_scaleY),
+                   QString("TIME  %1 SEC").arg(result.elapsedSeconds, 0, 'f', 1));
+        p.drawText(QRectF(cx - 160.0f, cy + 34.0f, 320.0f, 28.0f),
                    Qt::AlignCenter,
-                   QString("Enemies Defeated: %1").arg(result.defeatedEnemies));
+                   QString("DEFEATED  %1").arg(result.defeatedEnemies));
 
-        const float blinkCycle = std::fmod(m_goBlinkTimer, 1.0f);
-        if (blinkCycle < 0.6f) {
-            QFont restartFont("Arial", 16, QFont::Bold);
-            p.setFont(restartFont);
-            p.setPen(QColor(255, 220, 100));
-            p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 55.0f * m_scaleY,
-                              300.0f * m_scaleX, 30.0f * m_scaleY),
-                       Qt::AlignCenter, "Press R to Restart");
-        }
+        const QRectF restartButton(cx - 122.0f, cy + 88.0f, 244.0f, 44.0f);
+        drawInterfaceButton(p, restartButton,
+                            won ? m_greenButtonArt : m_redButtonArt, bright);
+        drawPixmap(m_restartIcon, QRectF(restartButton.x() + 9.0f,
+                                         restartButton.y() + 6.0f, 32.0f, 32.0f));
+        p.setFont(uiFont(16, QFont::ExtraBold));
+        p.setPen(QColor(247, 246, 231));
+        p.drawText(restartButton.adjusted(42.0f, 0.0f, -8.0f, 0.0f),
+                   Qt::AlignCenter, "RESTART");
     }
+
+    p.restore();
 }
 
 // ============================================================================
@@ -1207,65 +1710,97 @@ void GameWidget::drawEncounterOverlay(QPainter& p)
                           ? game_state().map.viewportWidth : 960.0f;
     const float vpH = game_state().map.viewportHeight > 0.0f
                           ? game_state().map.viewportHeight : 540.0f;
-
-    // 敌人剩余计数（普通遭遇战）
     const auto& enc = game_state().encounter;
-    if (enc.remainingEnemies > 0 && enc.phase == EncounterPhase::Fighting) {
+    const float uniformScale = std::max(0.001f,
+        std::min(static_cast<float>(width()) / vpW,
+                 static_cast<float>(height()) / vpH));
+    const float offsetX = (static_cast<float>(width()) - vpW * uniformScale) * 0.5f;
+    const float offsetY = (static_cast<float>(height()) - vpH * uniformScale) * 0.5f;
+    const float cx = vpW * 0.5f;
+
+    const auto uiFont = [this](int pixels, QFont::Weight weight) {
+        QFont font(m_interfaceFontFamily);
+        font.setPixelSize(pixels);
+        font.setWeight(weight);
+        font.setLetterSpacing(QFont::AbsoluteSpacing, 0.0);
+        return font;
+    };
+    const auto drawPixmap = [&p](const QPixmap& pixmap, const QRectF& target) {
+        if (!pixmap.isNull()) p.drawPixmap(target, pixmap, QRectF(pixmap.rect()));
+    };
+
+    p.save();
+    p.translate(offsetX, offsetY);
+    p.scale(uniformScale, uniformScale);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    p.setRenderHint(QPainter::TextAntialiasing, false);
+
+    if (enc.kind == EncounterKind::EnemyWave && enc.remainingEnemies > 0 &&
+        enc.phase == EncounterPhase::Fighting) {
         p.setPen(QColor(255, 200, 100));
-        p.setFont(QFont("Arial", 12, QFont::Bold));
-        p.drawText(QRectF(vpW * m_scaleX * 0.5f - 80.0f * m_scaleX,
-                          vpH * m_scaleY - 28.0f * m_scaleY,
-                          160.0f * m_scaleX, 22.0f * m_scaleY),
+        p.setFont(uiFont(12, QFont::Bold));
+        p.drawText(QRectF(cx - 90.0f, vpH - 30.0f, 180.0f, 22.0f),
                    Qt::AlignCenter,
-                   QString("Enemies: %1").arg(enc.remainingEnemies));
+                   QString("ENEMIES  %1").arg(enc.remainingEnemies));
     }
 
-    // Boss 出场动画（View 侧检测 Boss 首次出现，不依赖 ViewModel 的 encounter.phase）
-    if (m_bossIntroAnimTimer > 1.8f) return;
-
-    const float cx = vpW * m_scaleX * 0.5f;
-    const float cy = vpH * m_scaleY * 0.35f;
-
-    // 阶段 0~0.4s：屏幕全黑 + WARNING 闪烁
-    if (m_bossIntroAnimTimer < 0.5f) {
-        p.fillRect(QRectF(0, 0, vpW * m_scaleX, vpH * m_scaleY), QColor(0, 0, 0, 200));
-        const float warnPulse = 0.5f + 0.5f * std::sin(m_goBlinkTimer * 12.0f);
-        p.setPen(QColor(255, 40, 20, static_cast<int>(220 * warnPulse)));
-        p.setFont(QFont("Arial", 36, QFont::Bold));
-        p.drawText(QRectF(cx - 200.0f * m_scaleX, cy - 30.0f * m_scaleY,
-                          400.0f * m_scaleX, 60.0f * m_scaleY),
-                   Qt::AlignCenter, "!! WARNING !!");
+    if (enc.kind != EncounterKind::Boss || enc.phase != EncounterPhase::Intro) {
+        p.restore();
         return;
     }
 
-    // 阶段 0.5~1.2s：黑幕收缩 + 名称渐显
-    const float reveal = std::min(1.0f, (m_bossIntroAnimTimer - 0.5f) / 0.7f);
-    const float barH = vpH * m_scaleY * 0.45f * (1.0f - reveal);
-    p.fillRect(QRectF(0, 0, vpW * m_scaleX, barH), QColor(0, 0, 0, 230));
-    p.fillRect(QRectF(0, vpH * m_scaleY - barH, vpW * m_scaleX, barH), QColor(0, 0, 0, 230));
+    const float introProgress = std::clamp(enc.introProgress, 0.0f, 1.0f);
+    constexpr float warningEnd = 0.38f;
+    constexpr float revealEnd = 0.92f;
+    const float reveal = std::clamp((introProgress - warningEnd) /
+                                        (revealEnd - warningEnd),
+                                    0.0f, 1.0f);
+    const bool initialWarning = introProgress < warningEnd;
+    const float barH = vpH * 0.44f * (initialWarning ? 1.0f : 1.0f - reveal);
+    p.fillRect(QRectF(0.0f, 0.0f, vpW, barH), QColor(0, 0, 0, 228));
+    p.fillRect(QRectF(0.0f, vpH - barH, vpW, barH), QColor(0, 0, 0, 228));
 
-    // Boss 名称从上方飞入
-    const float nameAlpha = reveal;
-    const float nameY = cy + (1.0f - reveal) * (-100.0f * m_scaleY);
-    p.setPen(QColor(255, 180, 60, static_cast<int>(255 * nameAlpha)));
-    p.setFont(QFont("Arial", 22, QFont::Bold));
-    p.drawText(QRectF(cx - 200.0f * m_scaleX, nameY - 20.0f * m_scaleY,
-                      400.0f * m_scaleX, 40.0f * m_scaleY),
-               Qt::AlignCenter, "BOSS");
-    p.setPen(QColor(255, 100, 40, static_cast<int>(200 * nameAlpha)));
-    p.setFont(QFont("Arial", 14, QFont::Bold));
-    p.drawText(QRectF(cx - 200.0f * m_scaleX, nameY + 22.0f * m_scaleY,
-                      400.0f * m_scaleX, 25.0f * m_scaleY),
-               Qt::AlignCenter, "THE EXECUTIONER");
+    const float bannerW = 540.0f;
+    const float bannerH = bannerW * 115.0f / 413.0f;
+    const float bannerY = 166.0f + (initialWarning ? 0.0f : (1.0f - reveal) * -72.0f);
+    const QRectF banner(cx - bannerW * 0.5f, bannerY, bannerW, bannerH);
+    const float pulse = 0.72f + 0.28f * std::abs(std::sin(m_goBlinkTimer * 10.0f));
 
-    // 阶段 1.2~1.8s：红边脉冲边框
+    p.save();
+    p.setOpacity(initialWarning ? pulse : std::max(0.35f, reveal));
+    drawPixmap(m_interfaceLogoArt[2], banner);
+    drawPixmap(m_bossIcon, QRectF(banner.x() + 22.0f,
+                                  banner.y() + 24.0f, 42.0f, 42.0f));
+    drawPixmap(m_bossIcon, QRectF(banner.right() - 64.0f,
+                                  banner.y() + 24.0f, 42.0f, 42.0f));
+    p.setFont(uiFont(initialWarning ? 36 : 28, QFont::ExtraBold));
+    p.setPen(initialWarning ? QColor(255, 80, 58) : QColor(247, 222, 107));
+    p.drawText(QRectF(banner.x() + 68.0f, banner.y() + 8.0f,
+                      banner.width() - 136.0f, 64.0f),
+               Qt::AlignCenter,
+               initialWarning ? "WARNING" : "THE EXECUTIONER");
+    p.setFont(uiFont(10, QFont::Bold));
+    p.setPen(QColor(71, 222, 225));
+    const QRectF statusSlot(banner.x() + 52.0f,
+                            banner.y() + banner.height() * (91.0f / 115.0f),
+                            banner.width() - 104.0f,
+                            banner.height() * (20.0f / 115.0f));
+    p.save();
+    p.setClipRect(statusSlot);
+    p.drawText(statusSlot, Qt::AlignCenter | Qt::TextSingleLine,
+               initialWarning ? QStringLiteral("HOSTILE SIGNAL DETECTED")
+                              : QStringLiteral("BOSS APPROACHING"));
+    p.restore();
+    p.restore();
+
     if (reveal >= 1.0f) {
-        const float edgeW = 8.0f * m_scaleX;
-        const float pulse = 0.5f + 0.5f * std::sin(m_goBlinkTimer * 6.0f);
-        const QColor edgeColor(220, 30, 20, static_cast<int>(180 * pulse));
-        p.fillRect(QRectF(0, 0, vpW * m_scaleX, edgeW), edgeColor);
-        p.fillRect(QRectF(0, vpH * m_scaleY - edgeW, vpW * m_scaleX, edgeW), edgeColor);
+        const float edgePulse = 0.5f + 0.5f * std::sin(m_goBlinkTimer * 6.0f);
+        const QColor edgeColor(235, 44, 32, static_cast<int>(190 * edgePulse));
+        p.fillRect(QRectF(0.0f, 0.0f, vpW, 8.0f), edgeColor);
+        p.fillRect(QRectF(0.0f, vpH - 8.0f, vpW, 8.0f), edgeColor);
     }
+
+    p.restore();
 }
 
 // ============================================================================
@@ -1275,14 +1810,43 @@ void GameWidget::drawEncounterOverlay(QPainter& p)
 void GameWidget::drawProjectile(QPainter& p, const ProjectileState& proj)
 {
     const float sx = worldToScreenX(proj.position.x);
-    const float sy = worldToScreenY(proj.position.laneY, 0);
+    const float sy = worldToScreenY(proj.position.laneY, proj.position.z);
+
+    if (proj.visualVariant == ActorVisualVariant::RangedRobot &&
+        !m_robotProjectile.isNull()) {
+        const float projectileW = 22.0f * m_scaleX;
+        const float projectileH = 8.0f * m_scaleY;
+        const float direction = proj.facing == Facing::Right ? 1.0f : -1.0f;
+
+        p.save();
+        p.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        p.translate(sx, sy);
+        if (direction < 0.0f) p.scale(-1.0f, 1.0f);
+        p.drawPixmap(QRectF(-projectileW * 0.5f, -projectileH * 0.5f,
+                            projectileW, projectileH),
+                     m_robotProjectile, QRectF(m_robotProjectile.rect()));
+        if (!m_robotProjectileAlt.isNull()) {
+            const float sparkSize = 8.0f * std::min(m_scaleX, m_scaleY);
+            const float pulse = 0.55f + 0.45f * std::abs(std::sin(m_goBlinkTimer * 18.0f));
+            p.setOpacity(pulse);
+            p.drawPixmap(QRectF(-projectileW * 0.75f, -sparkSize * 0.5f,
+                                sparkSize, sparkSize),
+                         m_robotProjectileAlt,
+                         QRectF(m_robotProjectileAlt.rect()));
+        }
+        p.restore();
+        return;
+    }
+
     const float r = 5.0f * m_scaleX;
 
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(200, 180, 60));
-    p.drawEllipse(QPointF(sx, sy), r, r);
-    p.setBrush(QColor(255, 240, 100, 150));
-    p.drawEllipse(QPointF(sx, sy), r * 1.6f, r * 1.6f);
+    p.setBrush(QColor(255, 221, 70));
+    p.drawRect(QRectF(sx - r * 1.6f, sy - r * 0.4f,
+                      r * 3.2f, r * 0.8f));
+    p.setBrush(QColor(255, 245, 180, 150));
+    p.drawRect(QRectF(sx - r * 0.8f, sy - r * 0.7f,
+                      r * 1.6f, r * 1.4f));
 }
 
 // ============================================================================
