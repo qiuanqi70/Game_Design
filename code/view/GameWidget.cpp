@@ -32,12 +32,36 @@ GameWidget::GameWidget(QWidget* parent)
             m_elapsed.start();
         }
         const float dt = static_cast<float>(m_elapsed.restart()) / 1000.0f;
-        // 防止跳帧过大（例如断点调试返回后）
         const float clampedDt = std::min(dt, 0.1f);
         ++m_frameIndex;
 
-        // GO 闪烁计时
         m_goBlinkTimer += clampedDt;
+
+        // 血量延迟条：追赶实际血量
+        if (m_gameState && m_gameState->player.health.maximum > 0) {
+            const float targetRatio = static_cast<float>(m_gameState->player.health.current) /
+                                      static_cast<float>(m_gameState->player.health.maximum);
+            m_displayHealthRatio += (targetRatio - m_displayHealthRatio) * clampedDt * 4.0f;
+        }
+
+        // 屏幕震动计时
+        if (m_gameState && m_gameState->player.impactRevision != m_lastPlayerImpactRev) {
+            m_lastPlayerImpactRev = m_gameState->player.impactRevision;
+            if (m_gameState->player.lastImpact != ImpactLevel::None) {
+                m_screenShakeTimer = (m_gameState->player.lastImpact == ImpactLevel::Heavy) ? 0.15f : 0.06f;
+            }
+        }
+        if (m_screenShakeTimer > 0.0f) {
+            m_screenShakeTimer = std::max(0.0f, m_screenShakeTimer - clampedDt);
+        }
+
+        // Boss 出场动画计时
+        if (m_gameState && m_gameState->encounter.kind == EncounterKind::Boss &&
+            m_gameState->encounter.phase == EncounterPhase::Intro) {
+            m_bossIntroAnimTimer += clampedDt;
+        } else if (m_gameState && m_gameState->encounter.phase != EncounterPhase::Intro) {
+            m_bossIntroAnimTimer = 0.0f;
+        }
 
         if (m_tickCommand) m_tickCommand(clampedDt, m_frameIndex);
     });
@@ -261,6 +285,15 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
         return;
     }
 
+    // ---- 屏幕震动偏移 ----
+    float shakeX = 0.0f, shakeY = 0.0f;
+    if (m_screenShakeTimer > 0.0f) {
+        const float intensity = m_screenShakeTimer * 20.0f * m_scaleX;
+        shakeX = std::sin(m_goBlinkTimer * 60.0f) * intensity;
+        shakeY = std::cos(m_goBlinkTimer * 53.0f) * intensity * 0.5f;
+        p.translate(shakeX, shakeY);
+    }
+
     // ---- 游戏画面 ----
     drawBackground(p);
     drawStreet(p);
@@ -292,6 +325,22 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
         drawActor(p, *actor);
     }
 
+    // ---- 飞行道具 ----
+    for (const auto& proj : game_state().projectiles) {
+        drawProjectile(p, proj);
+    }
+
+    // ---- 掉落物 ----
+    for (const auto& pkp : game_state().pickups) {
+        drawPickup(p, pkp);
+    }
+
+    // ---- 粒子特效 ----
+    drawParticles(p);
+
+    // ---- 遭遇战锁屏/出场动画 ----
+    drawEncounterOverlay(p);
+
     // ---- HUD ----
     drawHUD(p);
 
@@ -318,10 +367,35 @@ void GameWidget::drawBackground(QPainter& p)
 
     // 天空渐变
     QLinearGradient skyGrad(0, 0, 0, streetTop * m_scaleY);
-    skyGrad.setColorAt(0.0, QColor(30, 40, 80));     // 深蓝夜空
+    skyGrad.setColorAt(0.0, QColor(30, 40, 80));
     skyGrad.setColorAt(0.6, QColor(60, 80, 140));
-    skyGrad.setColorAt(1.0, QColor(120, 150, 200));  // 地平线亮色
+    skyGrad.setColorAt(1.0, QColor(120, 150, 200));
     p.fillRect(QRectF(0, 0, vpW * m_scaleX, streetTop * m_scaleY), skyGrad);
+
+    // 星星与月亮
+    if (!m_starsGenerated) {
+        m_stars.clear();
+        for (int i = 0; i < 35; ++i) {
+            m_stars.push_back(QPointF(
+                static_cast<float>(std::rand() % static_cast<int>(vpW)),
+                static_cast<float>(std::rand() % static_cast<int>(streetTop * 0.7f))));
+        }
+        m_starsGenerated = true;
+    }
+    p.setPen(Qt::NoPen);
+    for (const auto& star : m_stars) {
+        const float twinkle = 0.5f + 0.5f * std::sin(m_goBlinkTimer * 3.0f + star.x() * 0.1f);
+        p.setBrush(QColor(255, 255, 240, static_cast<int>(120 * twinkle + 60)));
+        p.drawEllipse(star.x() * m_scaleX, star.y() * m_scaleY, 2.0f * m_scaleX, 2.0f * m_scaleY);
+    }
+    // 月亮
+    p.setBrush(QColor(255, 250, 210, 180));
+    const float moonX = 720.0f * m_scaleX;
+    const float moonY = 55.0f * m_scaleY;
+    const float moonR = 28.0f * m_scaleX;
+    p.drawEllipse(QPointF(moonX, moonY), moonR, moonR);
+    p.setBrush(QColor(30, 40, 80));
+    p.drawEllipse(QPointF(moonX + moonR * 0.35f, moonY - moonR * 0.1f), moonR * 0.85f, moonR * 0.85f);
 
     // 远景建筑
     drawBuildings(p);
@@ -462,14 +536,18 @@ QColor GameWidget::actorBodyColor(Team team, ActorKind kind)
 {
     switch (team) {
     case Team::Player:
-        return QColor(50, 100, 220);   // 蓝色 — 玩家
+        return QColor(50, 100, 220);
     case Team::Enemy:
-        if (kind == ActorKind::Boss) {
-            return QColor(180, 40, 40); // 深红 — Boss
+        switch (kind) {
+        case ActorKind::Boss:     return QColor(180, 40, 40);
+        case ActorKind::Patroller: return QColor(200, 70, 50);
+        case ActorKind::Ambusher:  return QColor(160, 60, 140);
+        case ActorKind::Charger:   return QColor(200, 130, 30);
+        case ActorKind::Ranged:    return QColor(60, 150, 80);
+        default:                   return QColor(200, 70, 50);
         }
-        return QColor(200, 70, 50);    // 红 — 普通小怪
     default:
-        return QColor(150, 150, 150);  // 灰 — 中立/道具/特效
+        return QColor(150, 150, 150);
     }
 }
 
@@ -535,6 +613,11 @@ void GameWidget::drawActor(QPainter& p, const ActorState& actor)
         p.scale(-1.0f, 1.0f);
     }
 
+    // 受击闪白（仅在 Hurt 状态瞬间显示）
+    if (actor.actionState == ActorActionState::Hurt) {
+        p.fillRect(QRectF(-w * 0.5f, 0, w, h), QColor(255, 255, 255, 140));
+    }
+
     // 根据状态绘制不同姿势
     drawCharacterBody(p, actor, bodyColor);
 
@@ -573,25 +656,38 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
 
     const ActorActionState actionState = actor.actionState;
 
+    // ---- Idle 呼吸微动 ----
+    if (actionState == ActorActionState::Idle) {
+        const float breathe = std::sin(game_state().elapsedSeconds * 3.0f) * 2.0f * m_scaleY;
+        p.translate(0, breathe);
+    }
+
     // ---- 阴影（地面上椭圆） ----
     p.setPen(Qt::NoPen);
     p.fillRect(QRectF(-w * 0.35f, h - 4.0f * m_scaleY, w * 0.7f, 4.0f * m_scaleY),
                QColor(0, 0, 0, 60));
 
+    // ---- 行走身体上下摆动 ----
+    if (actionState == ActorActionState::Walk) {
+        const float bob = std::abs(std::sin(game_state().elapsedSeconds * 10.0f)) * 3.0f * m_scaleY;
+        p.translate(0, -bob);
+    }
+
     // ---- 腿 ----
     if (actionState == ActorActionState::Jump || actionState == ActorActionState::AirAttack) {
-        // 跳跃中腿收起
         p.fillRect(QRectF(-legW * 0.5f, legTop, legW, legH * 0.5f), pantsColor);
         p.fillRect(QRectF(legW * 0.3f, legTop, legW, legH * 0.5f), pantsColor);
     } else if (actionState == ActorActionState::Walk) {
-        // 行走时前后腿
-        const float stride = std::sin(game_state().elapsedSeconds * 10.0f) * 6.0f * m_scaleX;
-        p.fillRect(QRectF(-legW - stride, legTop, legW, legH), pantsColor);
-        p.fillRect(QRectF(stride, legTop, legW, legH), pantsColor);
+        const float t = game_state().elapsedSeconds * 10.0f;
+        const float stride = std::sin(t) * 7.0f * m_scaleX;
+        const float kneeBend = std::abs(std::cos(t)) * 3.0f * m_scaleY;
+        // 前后腿（交替）
+        p.fillRect(QRectF(stride - legW * 0.5f, legTop + kneeBend, legW, legH - kneeBend), pantsColor);
+        p.fillRect(QRectF(-stride + legW * 0.3f, legTop - kneeBend * 0.5f, legW, legH + kneeBend * 0.5f), pantsColor);
         // 鞋子
-        p.fillRect(QRectF(-legW - stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(stride - legW * 0.5f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
-        p.fillRect(QRectF(stride - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
+        p.fillRect(QRectF(-stride + legW * 0.3f - 2.0f * m_scaleX, legTop + legH - 5.0f * m_scaleY,
                           legW + 4.0f * m_scaleX, 5.0f * m_scaleY), shoeColor);
     } else {
         p.fillRect(QRectF(-legW * 0.5f, legTop, legW, legH), pantsColor);
@@ -612,23 +708,25 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
 
     // ---- 手臂 ----
     if (actionState == ActorActionState::LightAttack || actionState == ActorActionState::HeavyAttack) {
-        // 攻击时手臂伸出（向 facing 方向 = 向右）
         const float extend = (actionState == ActorActionState::HeavyAttack) ? armW * 3.0f : armW * 2.0f;
         p.fillRect(QRectF(bodyW * 0.2f, bodyTop + bodyH * 0.15f, extend, armH * 0.5f),
                    skinColor);
-        // 拳头
         p.fillRect(QRectF(bodyW * 0.2f + extend - 4.0f * m_scaleX,
                           bodyTop + bodyH * 0.15f - 3.0f * m_scaleY,
                           8.0f * m_scaleX, armH * 0.5f + 6.0f * m_scaleY),
                    skinColor.darker(120));
-        // 另一只手稍后
         p.fillRect(QRectF(-bodyW * 0.5f, bodyTop + bodyH * 0.3f, armW, armH * 0.45f), skinColor);
     } else if (actionState == ActorActionState::AirAttack) {
-        // 飞踢：腿伸出
         p.fillRect(QRectF(bodyW * 0.1f, legTop, legW * 2.5f, legH * 0.4f), pantsColor);
         p.fillRect(QRectF(-bodyW * 0.5f, bodyTop + bodyH * 0.25f, armW, armH * 0.4f), skinColor);
+    } else if (actionState == ActorActionState::Walk) {
+        // 行走摆臂：与腿反相
+        const float t = game_state().elapsedSeconds * 10.0f;
+        const float swingFront = std::sin(t) * 4.0f * m_scaleX;
+        const float swingRear  = std::sin(t + 3.14159f) * 4.0f * m_scaleX;
+        p.fillRect(QRectF(bodyW * 0.3f + swingFront, bodyTop + bodyH * 0.15f, armW, armH), skinColor);
+        p.fillRect(QRectF(-bodyW * 0.3f - armW + swingRear, bodyTop + bodyH * 0.15f, armW, armH), skinColor);
     } else {
-        // 正常手臂
         p.fillRect(QRectF(bodyW * 0.3f, bodyTop + bodyH * 0.15f, armW, armH), skinColor);
         p.fillRect(QRectF(-bodyW * 0.3f - armW, bodyTop + bodyH * 0.15f, armW, armH), skinColor);
     }
@@ -710,9 +808,17 @@ void GameWidget::drawHUD(QPainter& p)
     p.drawText(QPointF(hpX, hpY + barH * 0.8f), "HP");
 
     const float barStartX = hpX + 28.0f * m_scaleX;
-    drawBar(p, barStartX, hpY, barW, barH, hud.playerHealth.ratio(),
-            healthBarColor(hud.playerHealth.ratio()),
-            QString("%1 / %2").arg(hud.playerHealth.current).arg(hud.playerHealth.maximum));
+    // 延迟血条（背景追尾）
+    p.fillRect(QRectF(barStartX, hpY, barW, barH), QColor(30, 30, 30, 200));
+    p.fillRect(QRectF(barStartX, hpY, barW * m_displayHealthRatio, barH), QColor(180, 180, 180, 120));
+    const float realRatio = hud.playerHealth.ratio();
+    p.fillRect(QRectF(barStartX, hpY, barW * realRatio, barH), healthBarColor(realRatio));
+    p.setPen(QPen(QColor(200, 200, 200), 1.0f));
+    p.drawRect(QRectF(barStartX, hpY, barW, barH));
+    p.setPen(QColor(255, 255, 255));
+    p.setFont(QFont("Arial", 9));
+    p.drawText(QRectF(barStartX, hpY, barW, barH), Qt::AlignCenter,
+               QString("%1 / %2").arg(hud.playerHealth.current).arg(hud.playerHealth.maximum));
 
     // ---- 精力条 (HP 下方) ----
     const float enY = hpY + barH + gap;
@@ -732,21 +838,45 @@ void GameWidget::drawHUD(QPainter& p)
                    QString::fromUtf8("EXHAUSTED"));
     }
 
-    // ---- Boss 血条 (上方居中偏右) ----
+    // ---- Boss 血条 (上方居中) ----
     if (hud.showBossHealth) {
-        const float bossBarW = 250.0f * m_scaleX;
+        const float bossBarW = 280.0f * m_scaleX;
+        const float bossBarH = 20.0f * m_scaleY;
         const float bossX = (game_state().map.viewportWidth * m_scaleX) / 2.0f - bossBarW / 2;
-        const float bossY = margin * m_scaleY;
+        const float bossY = margin * m_scaleY - 4.0f * m_scaleY;
 
+        // 背景框
+        p.fillRect(QRectF(bossX - 2, bossY - 2, bossBarW + 4, bossBarH + 4), QColor(0, 0, 0, 200));
+        p.setPen(QPen(QColor(200, 180, 100), 2.0f));
+        p.drawRect(QRectF(bossX - 1, bossY - 1, bossBarW + 2, bossBarH + 2));
+
+        // Boss 名字
         p.setPen(QColor(255, 200, 100));
         QFont bossFont("Arial", 11, QFont::Bold);
         p.setFont(bossFont);
-        p.drawText(QPointF(bossX, bossY + barH * 0.8f), "BOSS");
+        p.drawText(QPointF(bossX, bossY - 6.0f * m_scaleY), "BOSS");
 
-        drawBar(p, bossX + 45.0f * m_scaleX, bossY, bossBarW, barH,
-                hud.bossHealth.ratio(),
-                QColor(200, 40, 40),
-                QString("%1 / %2").arg(hud.bossHealth.current).arg(hud.bossHealth.maximum));
+        // 渐变血量条
+        const float bossRatio = hud.bossHealth.ratio();
+        QLinearGradient bossGrad(bossX, 0, bossX + bossBarW, 0);
+        bossGrad.setColorAt(0.0, QColor(220, 50, 30));
+        bossGrad.setColorAt(0.5, QColor(240, 100, 40));
+        bossGrad.setColorAt(1.0, QColor(180, 20, 20));
+        p.fillRect(QRectF(bossX, bossY, bossBarW, bossBarH), QColor(30, 30, 30, 220));
+        p.fillRect(QRectF(bossX, bossY, bossBarW * bossRatio, bossBarH), bossGrad);
+
+        // 低血量脉冲
+        if (bossRatio < 0.3f) {
+            const float pulse = 0.6f + 0.4f * std::sin(m_goBlinkTimer * 8.0f);
+            p.fillRect(QRectF(bossX, bossY, bossBarW * bossRatio, bossBarH),
+                       QColor(255, 60, 40, static_cast<int>(60 * pulse)));
+        }
+
+        // 数值
+        p.setPen(QColor(255, 255, 255));
+        p.setFont(QFont("Arial", 9, QFont::Bold));
+        p.drawText(QRectF(bossX, bossY, bossBarW, bossBarH), Qt::AlignCenter,
+                   QString("%1 / %2").arg(hud.bossHealth.current).arg(hud.bossHealth.maximum));
     }
 
     // ---- 屏幕消息 ----
@@ -959,6 +1089,149 @@ void GameWidget::drawOverlay(QPainter& p)
             p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 55.0f * m_scaleY,
                               300.0f * m_scaleX, 30.0f * m_scaleY),
                        Qt::AlignCenter, "Press R to Restart");
+        }
+    }
+}
+
+// ============================================================================
+// 遭遇战锁屏与 Boss 出场动画
+// ============================================================================
+
+void GameWidget::drawEncounterOverlay(QPainter& p)
+{
+    const auto& enc = game_state().encounter;
+    if (enc.phase == EncounterPhase::None || enc.phase == EncounterPhase::Cleared) {
+        return;
+    }
+
+    const float vpW = game_state().map.viewportWidth > 0.0f
+                          ? game_state().map.viewportWidth : 960.0f;
+    const float vpH = game_state().map.viewportHeight > 0.0f
+                          ? game_state().map.viewportHeight : 540.0f;
+
+    // 锁屏边框
+    if (enc.phase == EncounterPhase::Fighting || enc.phase == EncounterPhase::Intro) {
+        const float edgeW = 6.0f * m_scaleX;
+        QColor edgeColor(200, 30, 30, 180);
+        if (enc.kind == EncounterKind::Boss) {
+            const float pulse = 0.7f + 0.3f * std::sin(m_goBlinkTimer * 4.0f);
+            edgeColor = QColor(220, 50, 30, static_cast<int>(200 * pulse));
+        }
+        p.fillRect(QRectF(0, 0, vpW * m_scaleX, edgeW), edgeColor);
+        p.fillRect(QRectF(0, vpH * m_scaleY - edgeW, vpW * m_scaleX, edgeW), edgeColor);
+    }
+
+    // 敌人剩余计数
+    if (enc.remainingEnemies > 0 && enc.phase == EncounterPhase::Fighting) {
+        p.setPen(QColor(255, 200, 100));
+        p.setFont(QFont("Arial", 12, QFont::Bold));
+        p.drawText(QRectF(vpW * m_scaleX * 0.5f - 80.0f * m_scaleX,
+                          vpH * m_scaleY - 28.0f * m_scaleY,
+                          160.0f * m_scaleX, 22.0f * m_scaleY),
+                   Qt::AlignCenter,
+                   QString("Enemies: %1").arg(enc.remainingEnemies));
+    }
+
+    // Boss 出场动画
+    if (enc.kind == EncounterKind::Boss && enc.phase == EncounterPhase::Intro) {
+        const float cx = vpW * m_scaleX * 0.5f;
+        const float cy = vpH * m_scaleY * 0.3f;
+
+        // 黑边收缩
+        const float reveal = std::min(1.0f, m_bossIntroAnimTimer / 1.2f);
+        const float barH = vpH * m_scaleY * 0.5f * (1.0f - reveal);
+        p.fillRect(QRectF(0, 0, vpW * m_scaleX, barH), QColor(0, 0, 0, 220));
+        p.fillRect(QRectF(0, vpH * m_scaleY - barH, vpW * m_scaleX, barH), QColor(0, 0, 0, 220));
+
+        // WARNING 文字
+        if (reveal < 1.0f) {
+            const float warnPulse = 0.6f + 0.4f * std::sin(m_goBlinkTimer * 10.0f);
+            p.setPen(QColor(255, 60, 30, static_cast<int>(255 * warnPulse)));
+            p.setFont(QFont("Arial", 32, QFont::Bold));
+            p.drawText(QRectF(cx - 160.0f * m_scaleX, cy - 30.0f * m_scaleY,
+                              320.0f * m_scaleX, 60.0f * m_scaleY),
+                       Qt::AlignCenter, "WARNING");
+        }
+
+        // Boss 名称
+        if (reveal > 0.4f) {
+            const float nameAlpha = (reveal - 0.4f) / 0.6f;
+            p.setPen(QColor(255, 180, 80, static_cast<int>(255 * nameAlpha)));
+            p.setFont(QFont("Arial", 18, QFont::Bold));
+            p.drawText(QRectF(cx - 150.0f * m_scaleX, cy + 35.0f * m_scaleY,
+                              300.0f * m_scaleX, 35.0f * m_scaleY),
+                       Qt::AlignCenter, "BOSS APPROACHING");
+        }
+    }
+}
+
+// ============================================================================
+// 飞行道具
+// ============================================================================
+
+void GameWidget::drawProjectile(QPainter& p, const ProjectileState& proj)
+{
+    const float sx = worldToScreenX(proj.position.x);
+    const float sy = worldToScreenY(proj.position.laneY, 0);
+    const float r = 5.0f * m_scaleX;
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(200, 180, 60));
+    p.drawEllipse(QPointF(sx, sy), r, r);
+    p.setBrush(QColor(255, 240, 100, 150));
+    p.drawEllipse(QPointF(sx, sy), r * 1.6f, r * 1.6f);
+}
+
+// ============================================================================
+// 掉落物
+// ============================================================================
+
+void GameWidget::drawPickup(QPainter& p, const PickupState& pickup)
+{
+    const float sx = worldToScreenX(pickup.position.x);
+    const float sy = worldToScreenY(pickup.position.laneY, 20.0f);
+    const float r = 8.0f * m_scaleX;
+    const float bob = std::sin(game_state().elapsedSeconds * 5.0f + pickup.id * 1.3f) * 3.0f * m_scaleY;
+
+    p.setPen(QPen(QColor(255, 255, 255, 150), 1.5f));
+    if (pickup.kind == PickupKind::Health) {
+        p.setBrush(QColor(220, 50, 50, 200));
+        p.drawEllipse(QPointF(sx, sy + bob), r, r);
+        p.setPen(QColor(255, 255, 255));
+        p.setFont(QFont("Arial", 8, QFont::Bold));
+        p.drawText(QRectF(sx - r, sy + bob - r, r * 2, r * 2), Qt::AlignCenter, "+");
+    } else {
+        p.setBrush(QColor(50, 120, 220, 200));
+        p.drawEllipse(QPointF(sx, sy + bob), r, r);
+        p.setPen(QColor(255, 255, 255));
+        p.setFont(QFont("Arial", 8, QFont::Bold));
+        p.drawText(QRectF(sx - r, sy + bob - r, r * 2, r * 2), Qt::AlignCenter, "E");
+    }
+}
+
+// ============================================================================
+// 粒子特效
+// ============================================================================
+
+void GameWidget::drawParticles(QPainter& p)
+{
+    // 敌人受击时生成打击粒子（仅在 Hurt 状态瞬间）
+    for (const auto& enemy : game_state().enemies) {
+        if (enemy.actionState == ActorActionState::Hurt) {
+            const float sx = worldToScreenX(enemy.position.x);
+            const float sy = worldToScreenY(enemy.position.laneY, 0);
+            const int count = (enemy.lastImpact == ImpactLevel::Heavy) ? 6 : 3;
+
+            p.setPen(Qt::NoPen);
+            for (int i = 0; i < count; ++i) {
+                const float angle = static_cast<float>(i) / static_cast<float>(count) * 6.28f + m_goBlinkTimer;
+                const float dist = (8.0f + i * 3.0f) * m_scaleX;
+                const float px = sx + std::cos(angle) * dist;
+                const float py = sy - 20.0f * m_scaleY + std::sin(angle) * dist;
+                const float pr = 2.5f * m_scaleX;
+                p.setBrush(QColor(255, 220, 60, 180));
+                p.drawEllipse(QPointF(px, py), pr, pr);
+            }
         }
     }
 }

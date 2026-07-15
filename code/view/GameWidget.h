@@ -78,6 +78,10 @@ private:
     void drawPlayerStatus(QPainter& p);
     void drawHUD(QPainter& p);
     void drawOverlay(QPainter& p);
+    void drawEncounterOverlay(QPainter& p);
+    void drawProjectile(QPainter& p, const ProjectileState& proj);
+    void drawPickup(QPainter& p, const PickupState& pickup);
+    void drawParticles(QPainter& p);
 
     // ---- 坐标转换 ----
     float worldToScreenX(float worldX) const;
@@ -119,6 +123,14 @@ private:
 
     // GO 闪烁
     mutable float m_goBlinkTimer = 0.0f;
+
+    // 视觉特效状态（纯 View 内部，不从 ViewModel 获取）
+    float m_displayHealthRatio = 1.0f;
+    float m_screenShakeTimer = 0.0f;
+    std::uint32_t m_lastPlayerImpactRev = 0;
+    mutable std::vector<QPointF> m_stars;
+    bool m_starsGenerated = false;
+    float m_bossIntroAnimTimer = 0.0f;
 
     // 视口缩放
     float m_scaleX = 1.0f;
