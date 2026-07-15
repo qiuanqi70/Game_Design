@@ -134,6 +134,9 @@ private:
     bool m_bossSeen = false;
     bool m_gameOverSounded = false;
     bool m_winSounded = false;
+    std::uint32_t m_attackingEnemyId = 0;
+    float m_attackingEnemyTimer = 0.0f;
+    int m_prevPlayerHp = 100;
 
     // 视口缩放
     float m_scaleX = 1.0f;

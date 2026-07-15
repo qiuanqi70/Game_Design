@@ -57,6 +57,27 @@ GameWidget::GameWidget(QWidget* parent)
             m_screenShakeTimer = std::max(0.0f, m_screenShakeTimer - clampedDt);
         }
 
+        // 敌人攻击动画检测：玩家扣血时找最近的敌人
+        if (m_gameState && m_gameState->player.health.current < m_prevPlayerHp) {
+            float minDist = 9999.0f;
+            std::uint32_t closestId = 0;
+            for (const auto& e : m_gameState->enemies) {
+                if (!e.visible || e.actionState == ActorActionState::Dead) continue;
+                float dx = e.position.x - m_gameState->player.position.x;
+                float dy = e.position.laneY - m_gameState->player.position.laneY;
+                float dist = dx * dx + dy * dy;
+                if (dist < minDist) { minDist = dist; closestId = e.id; }
+            }
+            if (closestId != 0) {
+                m_attackingEnemyId = closestId;
+                m_attackingEnemyTimer = 0.25f;
+            }
+        }
+        if (m_attackingEnemyTimer > 0.0f) {
+            m_attackingEnemyTimer = std::max(0.0f, m_attackingEnemyTimer - clampedDt);
+        }
+        if (m_gameState) m_prevPlayerHp = m_gameState->player.health.current;
+
         // Boss 出场动画计时：View 侧检测 Boss 首次出现
         if (m_gameState) {
             bool bossVisible = false;
@@ -87,11 +108,18 @@ GameWidget::GameWidget(QWidget* parent)
 void GameWidget::set_game_state(const GameState* state) noexcept
 {
     if (m_gameState && state && m_gameState->phase != state->phase) {
-        if (state->phase == GamePhase::Title) {
+        // 从 GameOver / Win 回到 Playing 时重置音效和 Boss 标记
+        if (state->phase == GamePhase::Playing &&
+            (m_gameState->phase == GamePhase::GameOver ||
+             m_gameState->phase == GamePhase::Win ||
+             m_gameState->phase == GamePhase::Title)) {
             m_bossSeen = false;
             m_bossIntroAnimTimer = 99.0f;
             m_gameOverSounded = false;
             m_winSounded = false;
+            m_attackingEnemyId = 0;
+            m_attackingEnemyTimer = 0.0f;
+            m_prevPlayerHp = 100;
         }
     }
     m_gameState = state;
@@ -735,7 +763,19 @@ void GameWidget::drawCharacterBody(QPainter& p, const ActorState& actor,
                QPointF(bodyW * 0.3f, bodyTop + bodyH * 0.3f));
 
     // ---- 手臂 ----
-    if (actionState == ActorActionState::LightAttack || actionState == ActorActionState::HeavyAttack) {
+    const bool isEnemyAttacking = (actor.team == Team::Enemy &&
+        actor.id == m_attackingEnemyId && m_attackingEnemyTimer > 0.0f);
+
+    if (isEnemyAttacking) {
+        // 敌人攻击姿态：单手前伸
+        const float extend = armW * 2.2f;
+        p.fillRect(QRectF(bodyW * 0.1f, bodyTop + bodyH * 0.1f, extend, armH * 0.45f), skinColor);
+        p.fillRect(QRectF(bodyW * 0.1f + extend - 4.0f * m_scaleX,
+                          bodyTop + bodyH * 0.1f - 3.0f * m_scaleY,
+                          9.0f * m_scaleX, armH * 0.45f + 6.0f * m_scaleY),
+                   skinColor.darker(120));
+        p.fillRect(QRectF(-bodyW * 0.5f, bodyTop + bodyH * 0.25f, armW, armH * 0.4f), skinColor);
+    } else if (actionState == ActorActionState::LightAttack || actionState == ActorActionState::HeavyAttack) {
         const float extend = (actionState == ActorActionState::HeavyAttack) ? armW * 3.0f : armW * 2.0f;
         p.fillRect(QRectF(bodyW * 0.2f, bodyTop + bodyH * 0.15f, extend, armH * 0.5f),
                    skinColor);
