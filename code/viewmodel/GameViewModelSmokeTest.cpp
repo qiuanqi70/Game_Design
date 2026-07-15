@@ -2,6 +2,43 @@
 
 #include <cassert>
 
+namespace {
+
+using alleyfist::viewmodel::EntityKind;
+using alleyfist::viewmodel::EntityList;
+using alleyfist::viewmodel::GameSimulation;
+using alleyfist::viewmodel::GameViewModel;
+
+void defeat_active_regular_enemies(EntityList& entities)
+{
+    for (auto& entity : entities) {
+        if (entity.kind != EntityKind::Player && entity.kind != EntityKind::Boss) {
+            entity.alive = false;
+        }
+    }
+}
+
+void complete_regular_waves(GameSimulation& simulation)
+{
+    for (int wave = 0; wave < 3; ++wave) {
+        auto& entities = const_cast<EntityList&>(simulation.entities());
+        defeat_active_regular_enemies(entities);
+        simulation.step(1.01f);
+    }
+}
+
+void complete_regular_waves(GameViewModel& viewModel)
+{
+    auto tick = viewModel.get_tick_command();
+    for (int wave = 0; wave < 3; ++wave) {
+        auto& entities = const_cast<EntityList&>(viewModel.entities());
+        defeat_active_regular_enemies(entities);
+        tick(1.01f, 0u);
+    }
+}
+
+} // namespace
+
 int main()
 {
     using namespace alleyfist;
@@ -11,25 +48,19 @@ int main()
         GameSimulation sim;
         sim.start();
 
-        for (auto& entity : const_cast<EntityList&>(sim.entities())) {
-            if (entity.kind != EntityKind::Player) {
-                entity.alive = false;
-            }
-        }
-
+        complete_regular_waves(sim);
+        sim.player_move(5000.0f, 0.0f);
         auto& player = const_cast<EntityState&>(sim.entities()[0]);
-        player.pos.x = 2350.0f;
+        assert(player.pos.x == 2350.0f);
 
-        for (int i = 0; i < 100; ++i) {
-            sim.step(0.016f);
-        }
+        sim.step(1.60f);
 
         assert(!sim.boss_spawned());
         assert(sim.encounter_state().phase == EncounterPhase::Intro);
 
-        for (int i = 0; i < 80; ++i) {
-            sim.step(0.016f);
-        }
+        sim.player_move(-5000.0f, 0.0f);
+        assert(player.pos.x == 2180.0f);
+        sim.step(1.21f);
 
         assert(sim.boss_spawned());
         assert(sim.encounter_state().kind == EncounterKind::Boss);
@@ -217,10 +248,46 @@ int main()
         GameSimulation sim;
         sim.start();
 
-        auto& player = const_cast<EntityState&>(sim.entities()[0]);
+        auto& entities = const_cast<EntityList&>(sim.entities());
         sim.player_move(5000.0f, 0.0f);
-        assert(player.pos.x <= 3000.0f);
-        assert(player.pos.x >= 0.0f);
+        assert(entities.front().pos.x == 760.0f);
+
+        entities.front().pos.x = 2350.0f;
+        sim.step(3.0f);
+        assert(!sim.boss_spawned());
+        sim.player_move(0.0f, 0.0f);
+        assert(entities.front().pos.x == 760.0f);
+
+        defeat_active_regular_enemies(entities);
+        sim.step(0.99f);
+        sim.player_move(5000.0f, 0.0f);
+        assert(entities.front().pos.x == 760.0f);
+        assert(sim.encounter_state().phase == EncounterPhase::Intro);
+
+        sim.step(0.02f);
+        sim.player_move(5000.0f, 0.0f);
+        assert(entities.front().pos.x == 1540.0f);
+        assert(sim.encounter_state().currentWave == 2u);
+
+        defeat_active_regular_enemies(entities);
+        sim.step(1.01f);
+        sim.player_move(5000.0f, 0.0f);
+        assert(entities.front().pos.x == 2260.0f);
+        assert(sim.encounter_state().currentWave == 3u);
+
+        defeat_active_regular_enemies(entities);
+        sim.step(0.99f);
+        sim.player_move(5000.0f, 0.0f);
+        assert(entities.front().pos.x == 2260.0f);
+
+        sim.step(0.02f);
+        sim.player_move(5000.0f, 0.0f);
+        assert(entities.front().pos.x == 2350.0f);
+        assert(sim.encounter_state().phase == EncounterPhase::Cleared);
+
+        sim.reset();
+        sim.player_move(5000.0f, 0.0f);
+        assert(sim.entities().front().pos.x == 760.0f);
     }
 
     {
@@ -377,10 +444,8 @@ int main()
         GameViewModel viewModel;
         viewModel.get_confirm_command()();
 
+        complete_regular_waves(viewModel);
         auto& entities = const_cast<EntityList&>(viewModel.entities());
-        for (std::size_t i = 1; i < entities.size(); ++i) {
-            entities[i].alive = false;
-        }
         entities.front().pos.x = 2350.0f;
         viewModel.get_tick_command()(2.81f, 0u);
 

@@ -18,3 +18,23 @@ target_link_libraries(alleyfist_view
 if(WIN32)
     target_link_libraries(alleyfist_view PRIVATE winmm)
 endif()
+
+if(BUILD_TESTING)
+    add_executable(alleyfist_view_smoke_test
+        ViewSmokeTest.cpp
+    )
+
+    target_link_libraries(alleyfist_view_smoke_test
+        PRIVATE
+            alleyfist_view
+            Qt6::Test
+    )
+    qt_import_plugins(alleyfist_view_smoke_test
+        INCLUDE Qt6::QOffscreenIntegrationPlugin
+    )
+
+    add_test(NAME alleyfist_view_smoke_test COMMAND alleyfist_view_smoke_test)
+    set_tests_properties(alleyfist_view_smoke_test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+endif()

@@ -12,8 +12,15 @@ constexpr float kStreetTop = 300.0f;
 constexpr float kStreetBottom = 500.0f;
 constexpr float kBossTriggerX = 2350.0f;
 constexpr float kBossSpawnOffsetX = 260.0f;
+constexpr float kBossArenaLeft = 2180.0f;
+constexpr float kBossArenaRight = 2920.0f;
 constexpr int kBossHealth = 140;
 constexpr float kEncounterIntroSeconds = 2.8f;
+constexpr float kWaveTransitionSeconds = 1.0f;
+constexpr std::uint32_t kWaveCount = 3;
+constexpr std::array<float, kWaveCount> kWaveRightGateX = {
+    760.0f, 1540.0f, 2260.0f
+};
 constexpr float kMeleeAttackDuration = 0.36f;
 constexpr float kMeleeAttackHitTime = 0.17f;
 constexpr float kMeleeAttackCooldown = 0.9f;
@@ -135,6 +142,7 @@ void GameSimulation::populate_initial_state()
     m_bossSpawned = false;
     m_bossDefeated = false;
     m_bossVictoryReady = false;
+    m_bossIntroStarted = false;
     m_nextId = 1;
     m_nextProjectileId = 1;
     m_nextPickupId = 1;
@@ -143,6 +151,7 @@ void GameSimulation::populate_initial_state()
     m_playerEnergy = 100.0f;
     m_encounter = {};
     m_currentWave = 0;
+    m_wavePhase = WavePhase::Fighting;
     m_waveTransitionTimer = 0.0f;
 
     EntityState player;
@@ -162,7 +171,7 @@ void GameSimulation::populate_initial_state()
 
 void GameSimulation::spawn_wave_enemies(std::uint32_t waveIndex)
 {
-    if (waveIndex > 2) return;
+    if (waveIndex >= kWaveCount) return;
 
     constexpr std::array<std::array<EntityKind, 4>, 3> kWaveEnemies = {{
         {EntityKind::Patroller, EntityKind::Patroller, EntityKind::Patroller, EntityKind::Patroller},
@@ -172,8 +181,8 @@ void GameSimulation::spawn_wave_enemies(std::uint32_t waveIndex)
 
     constexpr std::array<std::array<float, 4>, 3> kWaveEnemyX = {{
         {320.0f, 420.0f, 520.0f, 620.0f},
-        {350.0f, 450.0f, 550.0f, 650.0f},
-        {380.0f, 480.0f, 580.0f, 680.0f}
+        {1100.0f, 1200.0f, 1300.0f, 1400.0f},
+        {1880.0f, 1980.0f, 2080.0f, 2180.0f}
     }};
 
     constexpr std::array<std::array<float, 4>, 3> kWaveEnemyY = {{
@@ -222,31 +231,73 @@ void GameSimulation::spawn_wave_enemies(std::uint32_t waveIndex)
     }
 }
 
+std::uint32_t GameSimulation::alive_regular_enemy_count() const noexcept
+{
+    return static_cast<std::uint32_t>(std::count_if(
+        m_entities.begin(), m_entities.end(), [](const EntityState& entity) {
+            return entity.alive && entity.kind != EntityKind::Player &&
+                   entity.kind != EntityKind::Boss;
+        }));
+}
+
+bool GameSimulation::regular_waves_cleared() const noexcept
+{
+    return m_wavePhase == WavePhase::Complete;
+}
+
+GameSimulation::MovementBounds GameSimulation::player_movement_bounds() const noexcept
+{
+    if (m_bossSpawned || m_bossDefeated) {
+        return {kBossArenaLeft, kBossArenaRight};
+    }
+    if (m_bossIntroStarted) {
+        return {kBossArenaLeft, kBossTriggerX};
+    }
+    if (regular_waves_cleared()) {
+        return {0.0f, kBossTriggerX};
+    }
+
+    const auto waveIndex = std::min<std::size_t>(m_currentWave,
+                                                 kWaveRightGateX.size() - 1u);
+    return {0.0f, kWaveRightGateX[waveIndex]};
+}
+
 void GameSimulation::update_wave_progression(float dt)
 {
-    if (m_bossSpawned || m_bossDefeated || m_entities.empty()) {
+    if (m_bossSpawned || m_bossDefeated || m_bossIntroStarted ||
+        m_wavePhase == WavePhase::Complete || m_entities.empty()) {
         return;
     }
 
     const auto& player = m_entities.front();
-    if (!player.alive || player.pos.x >= kBossTriggerX) {
+    if (!player.alive) {
         return;
     }
 
-    std::uint32_t aliveEnemyCount = 0;
-    for (std::size_t i = 1; i < m_entities.size(); ++i) {
-        if (m_entities[i].alive && m_entities[i].kind != EntityKind::Player) {
-            ++aliveEnemyCount;
+    if (m_wavePhase == WavePhase::Fighting) {
+        if (alive_regular_enemy_count() > 0) {
+            return;
         }
+        m_wavePhase = WavePhase::Transition;
+        m_waveTransitionTimer = 0.0f;
     }
 
-    if (aliveEnemyCount == 0 && m_currentWave < 2) {
-        m_waveTransitionTimer += dt;
-        if (m_waveTransitionTimer >= 1.0f) {
-            m_currentWave++;
-            m_waveTransitionTimer = 0.0f;
-            spawn_wave_enemies(m_currentWave);
-        }
+    if (m_wavePhase != WavePhase::Transition) {
+        return;
+    }
+
+    m_waveTransitionTimer += std::max(0.0f, dt);
+    if (m_waveTransitionTimer < kWaveTransitionSeconds) {
+        return;
+    }
+
+    m_waveTransitionTimer = 0.0f;
+    if (m_currentWave + 1u < kWaveCount) {
+        ++m_currentWave;
+        spawn_wave_enemies(m_currentWave);
+        m_wavePhase = WavePhase::Fighting;
+    } else {
+        m_wavePhase = WavePhase::Complete;
     }
 }
 
@@ -280,16 +331,18 @@ void GameSimulation::update_encounter_state(float dt)
         return;
     }
 
-    std::uint32_t remainingEnemies = 0;
-    for (std::size_t i = 1; i < m_entities.size(); ++i) {
-        if (m_entities[i].alive) {
-            ++remainingEnemies;
-        }
-    }
+    const std::uint32_t remainingEnemies = alive_regular_enemy_count();
 
     const auto& player = m_entities.front();
-    if (player.alive && player.pos.x >= kBossTriggerX) {
-        m_encounterTimer += dt;
+    if (!m_bossIntroStarted && regular_waves_cleared() && player.alive &&
+        player.pos.x >= kBossTriggerX) {
+        m_bossIntroStarted = true;
+        m_encounterTimer = 0.0f;
+    }
+
+    if (m_bossIntroStarted) {
+        m_encounterTimer = std::min(kEncounterIntroSeconds,
+                                    m_encounterTimer + std::max(0.0f, dt));
         m_encounter.kind = EncounterKind::Boss;
         m_encounter.phase = EncounterPhase::Intro;
         m_encounter.currentWave = 1;
@@ -299,28 +352,23 @@ void GameSimulation::update_encounter_state(float dt)
         return;
     }
 
-    if (remainingEnemies == 0) {
-        if (m_currentWave < 2 && m_waveTransitionTimer > 0.0f) {
-            m_encounter.kind = EncounterKind::EnemyWave;
-            m_encounter.phase = EncounterPhase::Intro;
-            m_encounter.currentWave = m_currentWave + 2;
-            m_encounter.totalWaves = 3;
-            m_encounter.remainingEnemies = 0;
-            m_encounter.introProgress = std::clamp(m_waveTransitionTimer / 1.0f, 0.0f, 1.0f);
-        } else {
-            m_encounter.kind = EncounterKind::EnemyWave;
-            m_encounter.phase = EncounterPhase::Cleared;
-            m_encounter.currentWave = m_currentWave + 1;
-            m_encounter.totalWaves = 3;
-            m_encounter.remainingEnemies = 0;
-            m_encounter.introProgress = 1.0f;
-        }
+    m_encounter.kind = EncounterKind::EnemyWave;
+    m_encounter.totalWaves = kWaveCount;
+    m_encounter.remainingEnemies = remainingEnemies;
+
+    if (m_wavePhase == WavePhase::Transition) {
+        m_encounter.phase = EncounterPhase::Intro;
+        m_encounter.currentWave = std::min(m_currentWave + 2u, kWaveCount);
+        m_encounter.introProgress = std::clamp(
+            m_waveTransitionTimer / kWaveTransitionSeconds, 0.0f, 1.0f);
+    } else if (m_wavePhase == WavePhase::Complete) {
+        m_encounter.phase = EncounterPhase::Cleared;
+        m_encounter.currentWave = kWaveCount;
+        m_encounter.introProgress = 1.0f;
     } else {
         m_encounter.kind = EncounterKind::EnemyWave;
         m_encounter.phase = EncounterPhase::Fighting;
         m_encounter.currentWave = m_currentWave + 1;
-        m_encounter.totalWaves = 3;
-        m_encounter.remainingEnemies = remainingEnemies;
         m_encounter.introProgress = 1.0f;
     }
 }
@@ -631,7 +679,10 @@ void GameSimulation::player_move(float dx, float dy) noexcept
 {
     if (m_entities.empty()) return;
     auto& p = m_entities[0];
-    p.pos.x = std::clamp(p.pos.x + dx, 0.0f, kWorldWidth);
+    if (!p.alive) return;
+
+    const auto bounds = player_movement_bounds();
+    p.pos.x = std::clamp(p.pos.x + dx, bounds.minimumX, bounds.maximumX);
     p.pos.laneY = std::clamp(p.pos.laneY + dy, kStreetTop, kStreetBottom);
 }
 
@@ -652,6 +703,7 @@ void GameSimulation::player_attack() noexcept
     }
 
     update_boss_state();
+    update_wave_progression(0.0f);
     update_encounter_state(0.0f);
 }
 
@@ -667,7 +719,7 @@ void GameSimulation::spawn_boss_if_needed()
     }
 
     const auto& player = m_entities.front();
-    if (!player.alive || player.pos.x < kBossTriggerX) {
+    if (!player.alive || !m_bossIntroStarted || !regular_waves_cleared()) {
         return;
     }
 
@@ -682,7 +734,8 @@ void GameSimulation::spawn_boss_if_needed()
     boss.behaviorState = EnemyBehaviorState::Patrol;
     boss.hp = kBossHealth;
     boss.maxHp = kBossHealth;
-    boss.pos.x = std::min(kWorldWidth - 80.0f, player.pos.x + kBossSpawnOffsetX);
+    boss.pos.x = std::min(kWorldWidth - 80.0f,
+                          kBossTriggerX + kBossSpawnOffsetX);
     boss.pos.laneY = std::clamp(player.pos.laneY, kStreetTop, kStreetBottom);
     boss.alive = true;
     m_entities.push_back(boss);

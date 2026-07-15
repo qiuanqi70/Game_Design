@@ -6,6 +6,9 @@ target_include_directories(alleyfist_common
 target_compile_features(alleyfist_common INTERFACE cxx_std_17)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui)
+if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+endif()
 qt_standard_project_setup()
 
 # 先添加子目录，让 library target 可用

@@ -30,7 +30,15 @@ if(BUILD_TESTING)
     target_link_libraries(alleyfist_app_smoke_test
         PRIVATE
             alleyfist_app
+            alleyfist_view
+            Qt6::Test
+    )
+    qt_import_plugins(alleyfist_app_smoke_test
+        INCLUDE Qt6::QOffscreenIntegrationPlugin
     )
 
     add_test(NAME alleyfist_app_smoke_test COMMAND alleyfist_app_smoke_test)
+    set_tests_properties(alleyfist_app_smoke_test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
 endif()

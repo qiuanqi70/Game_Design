@@ -41,6 +41,17 @@ public:
     void reset() noexcept;
 
 private:
+    enum class WavePhase {
+        Fighting,
+        Transition,
+        Complete
+    };
+
+    struct MovementBounds {
+        float minimumX = 0.0f;
+        float maximumX = 0.0f;
+    };
+
     std::vector<std::function<void(float)>> m_tickListeners;
     EntityList m_entities;
     std::vector<ProjectileVm> m_projectiles;
@@ -51,6 +62,7 @@ private:
     bool m_bossSpawned = false;
     bool m_bossDefeated = false;
     bool m_bossVictoryReady = false;
+    bool m_bossIntroStarted = false;
     int m_nextId = 1;
     std::uint32_t m_nextProjectileId = 1;
     std::uint32_t m_nextPickupId = 1;
@@ -59,6 +71,7 @@ private:
     float m_playerEnergy = 100.0f;
     EncounterState m_encounter;
     std::uint32_t m_currentWave = 0;
+    WavePhase m_wavePhase = WavePhase::Fighting;
     float m_waveTransitionTimer = 0.0f;
 
     void notify_tick(float dt);
@@ -66,6 +79,9 @@ private:
     void update_encounter_state(float dt);
     void update_wave_progression(float dt);
     void spawn_wave_enemies(std::uint32_t waveIndex);
+    std::uint32_t alive_regular_enemy_count() const noexcept;
+    bool regular_waves_cleared() const noexcept;
+    MovementBounds player_movement_bounds() const noexcept;
     void simulate_ai(float dt);
     void update_death_presentations(float dt) noexcept;
     void update_projectiles(float dt);
