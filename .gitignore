@@ -1,6 +1,7 @@
 build/
 build-*/
 cmake-build-*/
+.DS_Store
 CMakeFiles/
 CMakeCache.txt
 compile_commands.json
@@ -12,4 +13,6 @@ vcpkg_installed/
 *.out
 *.app/
 *.dSYM/
+code/Assets/界面图/Coupon by craftpix.pdf.*
+code/Assets/界面图/*.url
 plane
