@@ -24,6 +24,7 @@
 namespace alleyfist {
 namespace {
 
+// 视觉测试使用两档固定分辨率，并限制像素比较区域以定位具体 UI 元素。
 const QSize kFullSize{960, 540};
 const QSize kHalfSize{480, 270};
 const QRect kActorRegion{340, 260, 280, 190};
@@ -34,6 +35,7 @@ const QRect kTitleBannerRegion{190, 35, 580, 180};
 const QRect kTitleButtonRegion{310, 375, 340, 85};
 const QRect kWaveRegion{300, 490, 360, 45};
 
+// 为 MainWindow 转发测试中的每条命令通道分配稳定计数下标。
 enum class CommandChannel : std::size_t {
     Left,
     Right,
@@ -49,6 +51,7 @@ enum class CommandChannel : std::size_t {
     Count
 };
 
+// 构造可选自动重复标记的键盘事件，直接发送给被测 QWidget。
 void send_key_event(QWidget& target, QEvent::Type type, int key,
                     bool autoRepeat = false)
 {
@@ -56,18 +59,21 @@ void send_key_event(QWidget& target, QEvent::Type type, int key,
     QCoreApplication::sendEvent(&target, &event);
 }
 
+// 模拟一次完整按键，适合只在按下边沿触发的动作命令。
 void click_key(QWidget& target, int key)
 {
     send_key_event(target, QEvent::KeyPress, key);
     send_key_event(target, QEvent::KeyRelease, key);
 }
 
+// 处理已投递的刷新事件，保证事件计数和离屏截图已经更新。
 void drain_events()
 {
     QCoreApplication::sendPostedEvents(nullptr, QEvent::UpdateRequest);
     QCoreApplication::processEvents();
 }
 
+// 将控件按指定尺寸渲染到内存图片，供像素级视觉断言使用。
 QImage render_widget(GameWidget& widget, const QSize& size = kFullSize)
 {
     widget.resize(size);
@@ -77,6 +83,7 @@ QImage render_widget(GameWidget& widget, const QSize& size = kFullSize)
     return image;
 }
 
+// 统计指定区域内两张图片的不同像素，判断目标元素是否被绘制或改变。
 int changed_pixel_count(const QImage& lhs, const QImage& rhs,
                         const QRect& requestedRegion)
 {
@@ -91,6 +98,7 @@ int changed_pixel_count(const QImage& lhs, const QImage& rhs,
     return changed;
 }
 
+// 创建指定类型、动作、阵营和素材变体的标准角色测试数据。
 ActorState make_actor(std::uint32_t id, ActorKind kind,
                       ActorActionState action, Team team = Team::Enemy,
                       ActorVisualVariant variant = ActorVisualVariant::Default)
@@ -110,6 +118,7 @@ ActorState make_actor(std::uint32_t id, ActorKind kind,
     return actor;
 }
 
+// 创建 Playing 阶段的最小状态，默认隐藏玩家以获得干净渲染基线。
 GameState make_base_state()
 {
     GameState state;
@@ -124,6 +133,7 @@ GameState make_base_state()
     return state;
 }
 
+// 创建包含玩家、敌人、HUD 和结果数据的完整状态，供窗口和覆盖层测试使用。
 GameState make_rich_state()
 {
     GameState state = make_base_state();
@@ -140,11 +150,13 @@ GameState make_rich_state()
     return state;
 }
 
+// 同时统计实际 Paint 和 UpdateRequest，验证通知或动画确实触发重绘。
 class WidgetEventCounter final : public QObject {
 public:
     int paintCount = 0;
     int updateRequestCount = 0;
 
+    // 在触发待测行为前清零两类事件计数。
     void reset() noexcept
     {
         paintCount = 0;
@@ -152,6 +164,7 @@ public:
     }
 
 protected:
+    // 被动记录绘制与刷新请求，不改变 QWidget 的事件处理结果。
     bool eventFilter(QObject* watched, QEvent* event) override
     {
         if (event->type() == QEvent::Paint) ++paintCount;
@@ -166,6 +179,7 @@ class ViewTest final : public QObject {
     Q_OBJECT
 
 private slots:
+    // 测试夹具初始化：切到空临时目录并显式加载静态 View 库中的 qrc 资源。
     void initTestCase()
     {
         m_originalWorkingDirectory = QDir::currentPath();
@@ -174,11 +188,12 @@ private slots:
         QVERIFY(QDir::setCurrent(m_temporaryDirectory->path()));
         QVERIFY(QDir().mkpath(QStringLiteral("assets/sfx")));
 
-        // AssetCatalog explicitly initializes resources owned by the static View library.
+        // AssetCatalog 的构造会初始化静态 View 库拥有的资源集合。
         m_assets = std::make_unique<view::AssetCatalog>();
         QVERIFY(!m_assets->stageTileset.isNull());
     }
 
+    // 测试结束后释放素材并恢复原工作目录，避免影响其他测试程序。
     void cleanupTestCase()
     {
         m_assets.reset();
@@ -186,6 +201,7 @@ private slots:
         m_temporaryDirectory.reset();
     }
 
+    // 测试同一方向的 WASD/方向键别名，直到最后一个实体键释放才发送停止边沿。
     void inputStateTracksAliasesUntilTheLastPhysicalKeyIsReleased()
     {
         view::InputState input;
@@ -203,6 +219,7 @@ private slots:
         for (const bool directionActive : active) QVERIFY(!directionActive);
     }
 
+    // 测试相反方向可同时保持，clear_movement 会原子返回并清除全部活动方向。
     void inputStateKeepsOppositeDirectionsIndependentAndClearsAtomically()
     {
         view::InputState input;
@@ -222,6 +239,7 @@ private slots:
         QVERIFY(input.press_movement(Direction::Left, Qt::Key_A));
     }
 
+    // 测试非法方向被拒绝，动作长按不重复触发，释放或清理后可再次触发。
     void inputStateRejectsInvalidDirectionsAndDeduplicatesActions()
     {
         view::InputState input;
@@ -241,6 +259,7 @@ private slots:
         QVERIFY(input.press_action(Qt::Key_J));
     }
 
+    // 测试 GameWidget 将别名键合并为一个方向状态，同时独立保留相反方向。
     void widgetPreservesAliasAndOppositeDirectionEdges()
     {
         GameWidget widget;
@@ -264,6 +283,7 @@ private slots:
         QCOMPARE(right, std::vector<bool>({true, false}));
     }
 
+    // 测试 GameWidget 忽略系统自动重复和重复按下，只转发真实输入边沿。
     void widgetRejectsAutoRepeatAndDeduplicatesActions()
     {
         GameWidget widget;
@@ -294,6 +314,7 @@ private slots:
         QCOMPARE(primaryCalls, 2);
     }
 
+    // 测试失去焦点或隐藏控件时释放移动状态，并清空动作去重状态。
     void focusOutAndHideReleaseMovementAndActionState()
     {
         GameWidget focusWidget;
@@ -347,6 +368,7 @@ private slots:
         hideWidget.hide();
     }
 
+    // 测试 MainWindow 向 GameWidget 转发状态、全部命令、通知和计时器生命周期。
     void mainWindowForwardsPropertyEveryCommandAndNotification()
     {
         MainWindow window;
@@ -449,6 +471,7 @@ private slots:
         window.set_game_state(nullptr);
     }
 
+    // 测试 GameWidget 仅在显示期间启动 tick，隐藏后停止且帧号单调递增。
     void timerLifecycleStartsOnShowAndStopsOnHide()
     {
         GameWidget widget;
@@ -472,6 +495,7 @@ private slots:
         QCOMPARE(ticks, stoppedTicks);
     }
 
+    // 为持续重绘测试提供所有带动画或覆盖层的非 Playing 阶段。
     void overlayPhasesKeepRepainting_data()
     {
         QTest::addColumn<int>("phase");
@@ -481,6 +505,7 @@ private slots:
         QTest::newRow("win") << static_cast<int>(GamePhase::Win);
     }
 
+    // 测试标题、暂停、失败和胜利阶段在没有外部通知时仍持续刷新动画。
     void overlayPhasesKeepRepainting()
     {
         QFETCH(int, phase);
@@ -498,6 +523,7 @@ private slots:
         widget.removeEventFilter(&counter);
     }
 
+    // 枚举角色、敌人、Boss、场景、HUD、界面和投射物等关键 qrc 图片。
     void qrcImagesExistAndDecode_data()
     {
         QTest::addColumn<QString>("path");
@@ -516,6 +542,7 @@ private slots:
             << QStringLiteral(":/art/远程型敌人2（机器人）/Ball1.png");
     }
 
+    // 测试每个关键 qrc 路径都存在、可读取，并能解码为有效 QPixmap。
     void qrcImagesExistAndDecode()
     {
         QFETCH(QString, path);
@@ -530,6 +557,7 @@ private slots:
         QVERIFY(pixmap.height() > 0);
     }
 
+    // 测试像素字体已被打包进 qrc，且资源内容非空。
     void qrcFontExists()
     {
         QFile font(QStringLiteral(
@@ -539,6 +567,7 @@ private slots:
         QVERIFY(font.size() > 0);
     }
 
+    // 测试各游戏阶段只需修改 GameState，就会在预期屏幕区域绘制不同覆盖层。
     void phaseOverlaysChangeTheirExpectedRegions()
     {
         GameState state = make_rich_state();
@@ -566,6 +595,7 @@ private slots:
         QVERIFY(changed_pixel_count(gameOver, win, kResultBannerRegion) > 50);
     }
 
+    // 为角色种类渲染测试提供玩家、四类普通敌人、远程变体和 Boss 数据行。
     void actorKindsRenderInsideTheActorRegion_data()
     {
         QTest::addColumn<int>("kind");
@@ -610,6 +640,7 @@ private slots:
             << static_cast<int>(ActorVisualVariant::Default);
     }
 
+    // 测试每种角色/素材变体都能在角色目标区域产生可见绘制结果。
     void actorKindsRenderInsideTheActorRegion()
     {
         QFETCH(int, kind);
@@ -632,6 +663,7 @@ private slots:
                  "actor kind did not alter its target region");
     }
 
+    // 枚举 ActorActionState 的全部动作，确保数据驱动测试没有遗漏分支。
     void actorActionsRenderInsideTheActorRegion_data()
     {
         QTest::addColumn<int>("action");
@@ -653,6 +685,7 @@ private slots:
         }
     }
 
+    // 测试每种角色动作（含受击和死亡）都能在角色区域被渲染。
     void actorActionsRenderInsideTheActorRegion()
     {
         QFETCH(int, action);
@@ -673,6 +706,7 @@ private slots:
                  "actor action did not render in its target region");
     }
 
+    // 测试投射物可见、阵营改变颜色，并为机器人远程敌人选用专属素材。
     void projectileKindAndTeamAffectTheTargetRegion()
     {
         GameState state = make_base_state();
@@ -701,6 +735,7 @@ private slots:
         QVERIFY(changed_pixel_count(enemy, robot, kObjectRegion) > 4);
     }
 
+    // 测试生命和能量补给都可见，并具有可区分的渲染结果。
     void pickupKindsAffectTheTargetRegion()
     {
         GameState state = make_base_state();
@@ -722,6 +757,7 @@ private slots:
         QVERIFY(changed_pixel_count(health, energy, kObjectRegion) > 10);
     }
 
+    // 测试波次编号/总数会更新 HUD，Boss Intro 进度会改变中央演出。
     void encounterUsesWaveNumbersAndBossIntroProgress()
     {
         GameState state = make_base_state();
@@ -753,6 +789,7 @@ private slots:
                                     kCenterOverlayRegion) > 500);
     }
 
+    // 测试缺少对应精灵图的角色动作会退回程序化绘制，而不是完全不可见。
     void missingActorArtUsesTheProceduralFallback()
     {
         ActorState unsupported = make_actor(
@@ -772,6 +809,7 @@ private slots:
         QVERIFY(changed_pixel_count(baseline, fallback, kActorRegion) > 20);
     }
 
+    // 测试非法逻辑视口、异常资源条和越界进度值不会破坏全尺寸/半尺寸布局。
     void invalidViewportFallsBackAndKeepsCriticalLayoutStable()
     {
         GameState state = make_base_state();
@@ -821,6 +859,7 @@ private:
 
 int main(int argc, char** argv)
 {
+    // 离屏平台让 QWidget 渲染测试可以在没有桌面窗口系统的环境中执行。
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
         qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
     }

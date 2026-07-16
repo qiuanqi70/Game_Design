@@ -24,29 +24,34 @@
 namespace alleyfist {
 namespace {
 
+// 应用集成测试统一使用固定画布，并只比较与当前行为相关的屏幕区域。
 const QSize kRenderSize{960, 540};
 const QRect kPlayerRegion{0, 250, 230, 230};
 const QRect kEnergyBarRegion{40, 40, 165, 17};
 const QRect kOverlayRegion{200, 110, 560, 330};
 
+// 直接向控件发送键盘事件，绕过真实键盘以便离屏自动化测试。
 void send_key_event(QWidget& target, QEvent::Type type, int key)
 {
     QKeyEvent event(type, key, Qt::NoModifier);
     QCoreApplication::sendEvent(&target, &event);
 }
 
+// 模拟一次完整按键，适用于攻击、暂停、确认和重置等离散命令。
 void click_key(QWidget& target, int key)
 {
     send_key_event(target, QEvent::KeyPress, key);
     send_key_event(target, QEvent::KeyRelease, key);
 }
 
+// 清空 Qt 已投递的刷新事件，保证随后的截图反映最新状态。
 void drain_updates()
 {
     QCoreApplication::sendPostedEvents(nullptr, QEvent::UpdateRequest);
     QCoreApplication::processEvents();
 }
 
+// 将 GameWidget 绘制到内存图片，供测试比较界面变化。
 QImage render_widget(GameWidget& widget)
 {
     widget.resize(kRenderSize);
@@ -56,11 +61,13 @@ QImage render_widget(GameWidget& widget)
     return image;
 }
 
+// 记录指定区域内变化的像素数量及其最小包围盒。
 struct ImageDifference {
     int changedPixels = 0;
     QRect bounds;
 };
 
+// 比较两帧图像，用于判断命令是否造成预期位置上的可见变化。
 ImageDifference image_difference(const QImage& before, const QImage& after,
                                  const QRect& requestedRegion)
 {
@@ -92,17 +99,20 @@ ImageDifference image_difference(const QImage& before, const QImage& after,
     return result;
 }
 
+// 只需数量、不关心变化位置时使用的简化图像比较接口。
 int changed_pixel_count(const QImage& before, const QImage& after,
                         const QRect& region)
 {
     return image_difference(before, after, region).changedPixels;
 }
 
+// 统计 ViewModel 通知最终触发了多少次窗口刷新请求。
 class UpdateRequestCounter final : public QObject {
 public:
     int count = 0;
 
 protected:
+    // 只观察刷新请求，不拦截事件的正常分发。
     bool eventFilter(QObject* watched, QEvent* event) override
     {
         if (event->type() == QEvent::UpdateRequest) ++count;
@@ -110,6 +120,7 @@ protected:
     }
 };
 
+// 保存动作执行前后的画面，以比较动作造型和能量条变化。
 struct ActionCapture {
     QImage before;
     QImage after;
@@ -121,11 +132,13 @@ class AppTest final : public QObject {
     Q_OBJECT
 
 public:
+    // 复用真实应用实例，避免测试再创建第二个 QApplication。
     explicit AppTest(GameApplication& application)
         : m_application(application)
     {}
 
 private slots:
+    // 测试夹具初始化：确认组合根只创建一个 MainWindow，并取得其 GameWidget。
     void initTestCase()
     {
         const auto topLevelWidgets = QApplication::topLevelWidgets();
@@ -142,6 +155,7 @@ private slots:
         m_gameWidget->setRunning(false);
     }
 
+    // 每个用例后停止计时器、隐藏窗口并清理待处理刷新，避免用例相互影响。
     void cleanup()
     {
         if (m_gameWidget != nullptr) m_gameWidget->setRunning(false);
@@ -149,6 +163,7 @@ private slots:
         drain_updates();
     }
 
+    // 测试 QApplication 元数据以及 GameApplication 禁止复制和移动的所有权约束。
     void applicationMetadataIsConfigured()
     {
         QCOMPARE(QCoreApplication::instance(),
@@ -166,6 +181,7 @@ private slots:
         QVERIFY(!std::is_move_assignable_v<GameApplication>);
     }
 
+    // 测试组合根创建的 MainWindow/GameWidget 父子关系、标题、尺寸和焦点配置。
     void compositionRootCreatesTheViewObjectGraph()
     {
         QVERIFY(m_mainWindow != nullptr);
@@ -181,6 +197,7 @@ private slots:
         QCOMPARE(m_gameWidget->focusPolicy(), Qt::StrongFocus);
     }
 
+    // 测试“按键命令 -> ViewModel 状态变化 -> notification -> View 刷新”的完整绑定闭环。
     void propertyCommandAndNotificationFormACompleteLoop()
     {
         show_window_stopped();
@@ -203,6 +220,7 @@ private slots:
                  "the bound GameState did not change from Title to Playing");
     }
 
+    // 测试 WASD 四个绑定都能驱动模拟，并让玩家画面向对应方向移动。
     void fourDirectionBindingsMoveThePlayerInTheExpectedDirection()
     {
         show_window_stopped();
@@ -225,6 +243,7 @@ private slots:
                  "up/down commands are missing or crossed");
     }
 
+    // 测试轻击、重击和跳跃绑定会消耗能量，并呈现彼此不同的玩家动作。
     void actionBindingsProduceDistinctActionsAndEnergyCosts()
     {
         show_window_stopped();
@@ -255,6 +274,7 @@ private slots:
                  "heavy attack and jump render the same player action");
     }
 
+    // 测试暂停、确认恢复和重置绑定能进入相应阶段并恢复初始能量状态。
     void pauseConfirmAndResetBindingsRestoreStableStates()
     {
         show_window_stopped();
@@ -286,6 +306,7 @@ private slots:
         QCOMPARE(changed_pixel_count(playing, reset, kEnergyBarRegion), 0);
     }
 
+    // 测试 GameWidget 的真实计时器会持续发送 tick，使按住方向键的玩家移动。
     void timerTickDrivesTheBoundSimulation()
     {
         show_window_stopped();
@@ -307,6 +328,7 @@ private slots:
                  "the View timer did not advance the bound simulation");
     }
 
+    // 测试 GameApplication::run 会显示窗口，并原样返回 Qt 事件循环退出码。
     void runShowsTheWindowAndReturnsTheEventLoopCode()
     {
         m_mainWindow->hide();
@@ -324,6 +346,7 @@ private slots:
     }
 
 private:
+    // 显示测试窗口但停止自动 tick，为需要确定截图的用例建立稳定起点。
     void show_window_stopped()
     {
         m_mainWindow->resize(kRenderSize);
@@ -333,6 +356,7 @@ private:
         drain_updates();
     }
 
+    // 通过真实 R 键绑定把游戏恢复到 Playing 初始状态。
     void reset_to_playing()
     {
         m_gameWidget->setRunning(false);
@@ -340,6 +364,7 @@ private:
         drain_updates();
     }
 
+    // 在短时间真实 tick 中按住一个方向键，返回玩家区域的图像变化。
     ImageDifference observe_movement(int key)
     {
         reset_to_playing();
@@ -355,6 +380,7 @@ private:
         return image_difference(before, after, kPlayerRegion);
     }
 
+    // 从统一初始状态执行一个动作，并捕获动作前后的画面。
     ActionCapture capture_action(int key)
     {
         reset_to_playing();
@@ -376,10 +402,12 @@ private:
 
 int main(int argc, char** argv)
 {
+    // 强制使用离屏平台，使测试无需桌面显示环境也能创建和渲染 QWidget。
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
         qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
     }
 
+    // 使用空临时目录，验证应用不依赖工作目录中的外部资源文件。
     QTemporaryDir temporaryDirectory;
     if (!temporaryDirectory.isValid()) return 1;
 
@@ -390,6 +418,7 @@ int main(int argc, char** argv)
         return 3;
     }
 
+    // GameApplication 必须先于 AppTest 构造，并在恢复工作目录前销毁。
     int result = 0;
     {
         alleyfist::GameApplication application(argc, argv);
