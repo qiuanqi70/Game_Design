@@ -7,12 +7,25 @@
   },
   "configurePresets": [
     {
-      "name": "vcpkg",
-      "displayName": "Configure with vcpkg",
-      "description": "Use vcpkg manifest mode to install project dependencies such as Qt.",
+      "name": "vcpkg-debug",
+      "displayName": "Configure Debug with vcpkg",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build-debug",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTING": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "vcpkg-release",
+      "displayName": "Configure Release with vcpkg",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "OFF",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
@@ -20,8 +33,12 @@
   ],
   "buildPresets": [
     {
-      "name": "vcpkg",
-      "configurePreset": "vcpkg"
+      "name": "debug",
+      "configurePreset": "vcpkg-debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "vcpkg-release"
     }
   ]
 }

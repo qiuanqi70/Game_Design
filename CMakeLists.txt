@@ -12,3 +12,41 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(CTest)
 
 add_subdirectory(code)
+
+include(GNUInstallDirs)
+
+install(TARGETS AlleyFist
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    BUNDLE DESTINATION .
+)
+
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/assets/"
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/assets
+)
+
+if(WIN32)
+    qt_generate_deploy_app_script(
+        TARGET AlleyFist
+        OUTPUT_SCRIPT deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+    install(SCRIPT ${deploy_script})
+endif()
+
+set(CPACK_PACKAGE_NAME "AlleyFist")
+set(CPACK_PACKAGE_VENDOR "AlleyFist")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Alley Fist game")
+set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "AlleyFist")
+set(CPACK_PACKAGE_FILE_NAME
+    "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}")
+
+if(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+else()
+    set(CPACK_GENERATOR "TGZ")
+endif()
+
+include(CPack)
