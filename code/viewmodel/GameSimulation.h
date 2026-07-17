@@ -8,6 +8,11 @@
 
 namespace alleyfist::viewmodel {
 
+/// @brief ViewModel 内部的轻量规则模拟器。
+///
+/// 该类不依赖 Qt，也不暴露给 View。它负责玩家移动、攻击判定、敌人 AI、
+/// 波次推进、Boss 遭遇、投射物和拾取物等规则；GameViewModel 再把这些内部
+/// 类型映射成 Common 层 GameState，保证规则和绘制解耦。
 class GameSimulation {
 public:
     GameSimulation();
@@ -50,6 +55,7 @@ private:
         Complete
     };
 
+    // 用于限制玩家在当前波次或 Boss 场景中的横向可移动范围。
     struct MovementBounds {
         float minimumX = 0.0f;
         float maximumX = 0.0f;
@@ -89,17 +95,22 @@ private:
     PlayerActionType m_activePlayerAction = PlayerActionType::None;
     bool m_attackHitApplied = false;
 
+    // 初始化 / 玩家输入与玩家状态
     void populate_initial_state();
     void update_player_state(float dt) noexcept;
     void move_player(float dt) noexcept;
     bool try_spend_energy(float cost) noexcept;
     void resolve_player_attack(PlayerActionType action) noexcept;
+
+    // 波次、遭遇与边界控制
     void update_encounter_state(float dt);
     void update_wave_progression(float dt);
     void spawn_wave_enemies(std::uint32_t waveIndex);
     std::uint32_t alive_regular_enemy_count() const noexcept;
     bool regular_waves_cleared() const noexcept;
     MovementBounds player_movement_bounds() const noexcept;
+
+    // 敌人行为树入口和各敌人类型的具体行为
     void simulate_ai(float dt);
     void update_patroller(EntityState& enemy, EntityState& player, float dt);
     void update_ambusher(EntityState& enemy, EntityState& player, float dt);
@@ -108,6 +119,8 @@ private:
     void update_boss(EntityState& enemy, EntityState& player, float dt);
     void hit_player_once(EntityState& enemy, EntityState& player,
                          int damage, alleyfist::ImpactLevel impact);
+
+    // 战斗结果、临时对象和奖励
     void process_enemy_deaths();
     void update_death_presentations(float dt) noexcept;
     void update_projectiles(float dt);

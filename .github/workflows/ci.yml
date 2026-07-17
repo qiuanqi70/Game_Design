@@ -1,31 +1,42 @@
-name: CI Build
+name: CMake CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
-  schedule:
-    - cron: '0 2 * * *'  # 每天凌晨 2 点自动跑
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    runs-on: windows-latest
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+
+    env:
+      QT_QPA_PLATFORM: offscreen
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.8.*'
-          arch: 'win64_mingw'
-          tools: 'tools_mingw1310'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            qt6-base-dev \
+            qt6-base-dev-tools \
+            qt6-multimedia-dev \
+            libgl1-mesa-dev
 
-      - name: Configure
-        run: cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+      - name: Configure CMake
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build --config Release --parallel
 
-      - name: Run smoke test
-        run: ./build/code/alleyfist_app_smoke_test.exe
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure

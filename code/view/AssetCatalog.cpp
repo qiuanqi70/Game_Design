@@ -20,6 +20,7 @@ AssetCatalog::AssetCatalog()
 {
     ensureArtResourcesInitialized();
 
+    // 所有资源通过 Qt resource 访问，打包后不依赖运行目录中的相对图片路径。
     const auto clip = [](const char* path, int frames, float fps,
                          bool looping = false) {
         return SpriteClip{QPixmap(path), frames, fps, looping};
@@ -154,6 +155,7 @@ AssetCatalog::AssetCatalog()
 
 const ActorArtSet* AssetCatalog::actor_art_set(const ActorState& actor) const noexcept
 {
+    // 由 Common 的显示状态选择素材集，View 不需要知道 Simulation 的 EntityKind。
     if (actor.team == Team::Player) return &playerArt;
 
     switch (actor.kind) {
@@ -175,6 +177,7 @@ const SpriteClip* AssetCatalog::actor_clip(const ActorState& actor) const noexce
     const auto* art = actor_art_set(actor);
     if (art == nullptr) return nullptr;
 
+    // 动作状态和具体 spritesheet 的对应关系集中在这里，便于替换素材。
     switch (actor.actionState) {
     case ActorActionState::Idle:         return &art->idle;
     case ActorActionState::Walk:         return &art->walk;

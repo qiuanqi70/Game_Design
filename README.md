@@ -69,6 +69,8 @@ Windows 多配置环境中的可执行文件可能位于 `build/code/Debug/Alley
 
 根 CMake 通过 `include(CTest)` 提供 `BUILD_TESTING` 开关，默认开启。测试目标统一定义在 `code/tests/CMakeLists.txt`；关闭测试时不会查找 Qt Test，也不会生成任何测试程序。
 
+每个测试用例的具体场景和断言见 [`code/tests/README.md`](code/tests/README.md)。
+
 配置、构建并运行全部测试：
 
 ```bash

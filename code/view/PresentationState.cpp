@@ -14,6 +14,7 @@ float PresentationState::player_health_ratio(const GameState& state) noexcept
 
 void PresentationState::synchronize(const GameState& state)
 {
+    // 新绑定或重置时把表现层完全对齐到当前规则快照。
     m_initialized = true;
     m_displayHealthRatio = player_health_ratio(state);
     m_screenShakeTimer = 0.0f;
@@ -59,6 +60,7 @@ std::vector<SoundCue> PresentationState::advance(const GameState* state, float d
                                 m_observedGamePhase == GamePhase::GameOver ||
                                 m_observedGamePhase == GamePhase::Win);
     const bool stateRestarted = state->elapsedSeconds < m_observedGameElapsed;
+    // 通过 phase 或 elapsed 回退识别新一局，避免沿用上一局的动画和特效。
     if (startingRound || stateRestarted) reset_round(*state);
 
     if (state->phase != m_observedGamePhase) {
@@ -77,6 +79,7 @@ std::vector<SoundCue> PresentationState::advance(const GameState* state, float d
     m_observedEncounterPhase = encounter.phase;
 
     if (state->player.impactRevision != m_lastPlayerImpactRevision) {
+        // impactRevision 是规则层给表现层的“一次性事件版本号”。
         m_lastPlayerImpactRevision = state->player.impactRevision;
         if (state->player.lastImpact != ImpactLevel::None) {
             m_screenShakeTimer = state->player.lastImpact == ImpactLevel::Heavy
@@ -104,6 +107,7 @@ std::vector<SoundCue> PresentationState::advance(const GameState* state, float d
     m_observedGameElapsed = state->elapsedSeconds;
 
     const float targetHealth = player_health_ratio(*state);
+    // 血条显示值做缓动，真实血量仍以 GameState 为准。
     m_displayHealthRatio += (targetHealth - m_displayHealthRatio) * dt * 4.0f;
 
     update_actor_animation(state->player, dt);

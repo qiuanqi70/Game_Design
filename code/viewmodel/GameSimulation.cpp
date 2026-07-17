@@ -99,6 +99,8 @@ void GameSimulation::step(float deltaSeconds)
         return;
     }
 
+    // 固定顺序推进一帧：先处理玩家，再推进关卡和 AI，最后清理临时对象。
+    // 这样同一帧内的输入、攻击命中、敌人死亡和拾取物生成有稳定结果。
     m_elapsedSeconds += deltaSeconds;
     update_player_state(deltaSeconds);
     move_player(deltaSeconds);
@@ -120,6 +122,7 @@ void GameSimulation::step(float deltaSeconds)
 
 void GameSimulation::populate_initial_state()
 {
+    // reset 和构造共用这一处初始化，避免初始状态在多个函数里分叉。
     m_entities.clear();
     m_projectiles.clear();
     m_pickups.clear();
@@ -182,6 +185,7 @@ void GameSimulation::update_player_state(float dt) noexcept
     }
 
     if (m_jumpActive) {
+        // 跳跃只改变 z 轴高度，不改变 laneY；绘制深度仍由脚下车道决定。
         m_jumpElapsed += dt;
         if (m_jumpElapsed >= kJumpSeconds) {
             m_jumpActive = false;
@@ -196,6 +200,7 @@ void GameSimulation::update_player_state(float dt) noexcept
     }
 
     if (m_attackTimer > 0.0f) {
+        // 攻击有前摇和命中帧，避免按键瞬间立刻造成伤害。
         m_attackElapsed += dt;
         if (!m_attackHitApplied) {
             const auto spec = player_attack_spec(m_activePlayerAction);
@@ -233,6 +238,7 @@ void GameSimulation::move_player(float dt) noexcept
     }
 
     const auto bounds = player_movement_bounds();
+    // 横向边界由当前波次/Boss 场景决定，纵向始终限制在街道可走区域。
     player.pos.x = std::clamp(player.pos.x + dx * dt,
                               bounds.minimumX, bounds.maximumX);
     player.pos.laneY = std::clamp(player.pos.laneY + dy * dt,
@@ -276,6 +282,7 @@ bool GameSimulation::request_player_action(PlayerActionType action) noexcept
     }
 
     if (action == PlayerActionType::Jump) {
+        // 跳跃和攻击都消耗能量；能量不足时只触发 exhausted warning。
         if (m_jumpActive || !try_spend_energy(kJumpEnergyCost)) {
             return false;
         }
@@ -346,6 +353,7 @@ void GameSimulation::resolve_player_attack(PlayerActionType action) noexcept
         const float bossRangeBonusY = enemy.kind == EntityKind::Boss ? 10.0f : 0.0f;
         if (overlaps(enemy, player, spec.rangeX + bossRangeBonusX,
                      spec.rangeY + bossRangeBonusY, rangeZ)) {
+            // 一次攻击只命中一个目标，保持街机格斗的单次打击手感。
             apply_damage(enemy, spec.damage, spec.impact);
             break;
         }
@@ -449,6 +457,7 @@ void GameSimulation::update_wave_progression(float dt)
         if (alive_regular_enemy_count() > 0) {
             return;
         }
+        // 清完一波后给 View 一个短暂的过场时间，再刷下一波。
         m_wavePhase = WavePhase::Transition;
         m_waveTransitionTimer = 0.0f;
     }
@@ -474,6 +483,7 @@ void GameSimulation::update_wave_progression(float dt)
 
 void GameSimulation::update_encounter_state(float dt)
 {
+    // EncounterState 是给 View 显示波次/Boss 入场用的轻量状态机。
     if (m_bossDefeated) {
         m_encounter.kind = m_bossSpawned ? EncounterKind::Boss : EncounterKind::EnemyWave;
         m_encounter.phase = EncounterPhase::Cleared;
@@ -575,6 +585,7 @@ void GameSimulation::simulate_ai(float dt)
             }
 
             switch (enemy.kind) {
+            // 各敌人的具体策略放在独立函数，避免主循环变成一长串条件判断。
             case EntityKind::Patroller:
                 update_patroller(enemy, player, dt);
                 break;
@@ -788,6 +799,7 @@ void GameSimulation::process_enemy_deaths()
         }
 
         if (enemy.alive) {
+            // 死亡后保留短暂展示时间，View 可以播放死亡动画。
             enemy.alive = false;
             enemy.deathTimer = kEnemyDeathDisplaySeconds;
         }
@@ -838,6 +850,7 @@ void GameSimulation::update_projectiles(float dt)
         if (std::abs(projectile.position.x - player.pos.x) < 30.0f &&
             std::abs(projectile.position.laneY - player.pos.laneY) < 24.0f &&
             std::abs(projectile.position.z - player.pos.z) < kContactRangeZ) {
+            // 投射物只由敌人产生，因此这里直接对玩家做命中判定。
             apply_damage(player, 8, ImpactLevel::Heavy);
             projectile.active = false;
             ++it;
@@ -912,6 +925,7 @@ void GameSimulation::spawn_boss_if_needed()
         return;
     }
 
+    // Boss 等入场动画结束后再真正加入实体列表，避免提前被攻击。
     EntityState boss;
     boss.id = m_nextId++;
     boss.kind = EntityKind::Boss;
