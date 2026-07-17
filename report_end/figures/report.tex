@@ -165,7 +165,135 @@ urlcolor=cyan
 
 该项目严格完整地按照MVVM架构开发（由于游戏场景中的核心数据（如实体状态、位置等）直接对应视图层的可绘制对象，无需进行二次业务模型转换，因此本架构合并了传统意义上的 Model 层，将其统一内聚于 ViewModel 层中。），在中期报告里有详细说明。
 \subsection{游戏运行效果}
-> 邱安琪负责
+相较于中期的第一次迭代版本，我们的最终版本做了界面美化，玩法升级，音效设计。下面分这几个部分展示游戏效果：
+\subsubsection{界面显示}
+\begin{figure}[H]
+% \subfigure 插入多图 计算好间距
+\centering    
+\subfigure[开始界面] {    
+\includegraphics[width=0.45\textwidth]{开始界面.png}  
+}     
+\subfigure[游戏地图] {     
+\includegraphics[width=0.45\textwidth]{游戏地图.png}     
+}    
+\subfigure[游戏暂停界面] {    
+\includegraphics[width=0.45\textwidth]{游戏暂停界面.png}  
+}   
+\subfigure[boss出现警告] {    
+\includegraphics[width=0.45\textwidth]{boss出现警告1.png}  
+}
+\subfigure[boss出现警告] {    
+\includegraphics[width=0.45\textwidth]{boss出现警告2.png}  
+}
+\subfigure[boss出现] {    
+\includegraphics[width=0.45\textwidth]{boss出现.png}  
+}
+\subfigure[游戏胜利] {    
+\includegraphics[width=0.45\textwidth]{游戏胜利.png}  
+}
+
+\subsubsection{玩法}
+\subsubsubsection{敌人种类}
+在游戏中，敌人主要分为冲撞型敌人、伏击类飞行敌人、远程型敌人、远程型敌人2（机器人）和Boss五种类型。每种类型的敌人都有不同的攻击方式和行为模式，增加了游戏的挑战性和趣味性。
+\subsection{表格示例}
+\begin{table}[H]
+  \centering
+  \caption{敌人类型}
+    \begin{tabular}{|c|c|}
+    \hline
+    敌人类型 & 特点\\
+    \hline
+    冲撞型敌人  &   \\
+    \hline
+    伏击类飞行敌人 &  \\
+    \hline
+    远程型敌人 &  \\
+    \hline
+    远程型敌人2（机器人） &  \\
+    \hline
+    Boss &  \\
+    \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+% \subfigure 插入多图 计算好间距
+\centering    
+\subfigure[冲撞型敌人] {    
+\includegraphics[width=0.45\textwidth]{../../code/view/Assets/冲撞型敌人/Attack.png}  
+}     
+\subfigure[伏击类飞行敌人] {     
+\includegraphics[width=0.45\textwidth]{../../code/view/Assets/伏击类飞行敌人/Attack.png}     
+}    
+\subfigure[远程型敌人] {    
+\includegraphics[width=0.45\textwidth]{../../code/view/Assets/远程型敌人/Attack.png}  
+}   
+\subfigure[远程型敌人2（机器人）] {    
+\includegraphics[width=0.45\textwidth]{../../code/view/Assets/远程型敌人2（机器人）/Attack.png}  
+}  
+\subfigure[Boss] {    
+\includegraphics[width=0.45\textwidth]{../../code/view/Assets/Boss/Attack1.png}  
+} 
+\subfigure[Boss] {    
+\includegraphics[width=0.45\textwidth]{../../code/view/Assets/Boss/Attack4.png}  
+} 
+\caption{敌人类型}  
+\end{figure}
+在游戏界面上的体现是这样的：
+\begin{figure}[H]
+% \subfigure 插入多图 计算好间距
+\centering    
+\subfigure[len-1] {    
+\includegraphics[width=0.45\textwidth]{1.png}  
+}     
+\subfigure[len-2] {     
+\includegraphics[width=0.45\textwidth]{2.png}     
+}    
+\caption{游戏界面体现}  
+      
+\end{figure}
+
+\subsubsubsection{玩家状态}
+玩家可以进行攻击，攻击分为
+\begin{figure}[H]
+% \subfigure 插入多图 计算好间距
+\centering    
+\subfigure[玩家被打] {    
+\includegraphics[width=0.45\textwidth]{玩家被打.png}  
+}     
+\subfigure[玩家攻击（脚踢）] {     
+\includegraphics[width=0.45\textwidth]{玩家攻击（脚踢）.png}     
+}    
+\subfigure[玩家攻击（手击）] {    
+\includegraphics[width=0.45\textwidth]{玩家攻击（手击）.png}  
+}   
+\subfigure[玩家空中脚踢] {    
+\includegraphics[width=0.45\textwidth]{玩家空中脚踢.png}  
+}   
+
+\caption{插入多图}  
+      
+\end{figure}
+
+\subsubsubsection{补给道具}
+在敌人死后会随机掉落血包，拾取后可用于恢复血量/恢复动作耗能
+\begin{figure}[H]
+% \subfigure 插入多图 计算好间距
+\centering    
+\subfigure[血包] {    
+\includegraphics[width=0.45\textwidth]{敌人死后掉血包.png}  
+}     
+\subfigure[能量包] {     
+\includegraphics[width=0.45\textwidth]{敌人死后掉能量包.png}     
+} 
+
+\caption{插入多图}  
+      
+\end{figure}
+
+
+\subsubsection{音效}
+> 负责的同学补充一下
 
 \subsection{开发工具尝试}
 \subsubsection{团队协作与版本管理工具}
@@ -194,6 +322,42 @@ urlcolor=cyan
 \subsection{个人总结：苏易文}
 
 \subsection{个人总结：邱安琪}
+
+本项目中我主要负责 ViewModel 层的设计与实现。在MVVM架构中ViewModel 层位于界面输入和游戏规则之间：一方面接收 View 传来的移动、跳跃、攻击、暂停、确认和重置等语义命令；另一方面驱动游戏模拟，并将规则层的内部状态转换为 View 可以安全读取的公共快照。由于游戏场景中的核心数据（如实体状态、位置等）直接对应视图层的可绘制对象，无需进行二次业务模型转换，因此本架构合并了传统意义上的 Model 层，将其统一内聚于 ViewModel 层中。所以我也负责了游戏模拟的板块。
+通过这部分工作，我对如何在 C++ 项目中划分游戏规则、状态同步有了更具体的认识。
+
+\subsubsection{遇到的挑战及应对策略}
+
+\begin{enumerate}
+  \item \textbf{遇到的挑战}
+
+    第一项挑战是确定 MVVM 中各层的边界。游戏实体既需要保存规则字段，又需要被绘制成角色、血条和动画，如果直接把内部实体暴露给 View，界面代码就会逐渐依赖 AI、冷却和碰撞细节；如果在 ViewModel 中维护一份完全独立的显示副本，又容易出现规则状态和显示状态不一致。
+
+    第二项挑战是处理连续时间中的离散事件。移动、能量恢复、跳跃高度、攻击命中、敌人受击、投射物和掉落物都依赖时间步，但命中帧、死亡展示结束和 Boss 入场又是离散事件。若没有固定且明确的更新顺序，就可能出现攻击重复命中、掉落物晚一帧生成、Boss 在入场动画完成前被攻击或胜利页面过早出现等问题。
+
+    第三项挑战是让不同敌人的行为既有差异又保持可维护性。巡逻、伏击、冲撞、远程攻击和 Boss 追踪都需要自己的计时器和触发条件，同时又共享受击、死亡、朝向和掉落逻辑。如果把所有逻辑堆在一个函数中，新增敌人或修改某一行为时很容易影响其他类型。
+
+    第四项挑战是处理跨层状态同步。公共 \texttt{GameState} 需要提供 View 绘制所需的尺寸、可见性、HUD、相机和动画状态，但这些信息不应反过来成为规则状态。尤其是死亡实体需要保留一段时间供 View 播放死亡表现，而 Boss 血条只应在 Boss 存活时显示，二者都不能简单地用“是否存在于实体数组”判断。
+
+  \item \textbf{应对策略}
+
+    针对第一项挑战，我把规则实体定义在 \texttt{SimulationTypes.h} 中，把绘制使用的 DTO 放在 Common 层，并通过 \texttt{sync\_state\_from\_simulation()} 集中完成一次映射。View 只能取得 \texttt{const GameState*}，不能修改模拟器内部容器；这样规则层和显示层之间只有明确的单向数据流。
+
+    针对第二项挑战，我把所有逐帧变化集中到 \texttt{GameSimulation::step(float dt)}，并固定更新顺序。攻击使用动作总时长、命中时间和 \texttt{attackHitApplied} 组合实现一次性命中；敌人攻击使用各自的攻击计时器和命中标志；死亡和 Boss 胜利使用独立的展示计时器。对于非法时间步，先用有限性和正数检查拒绝处理，保证模拟状态不会被异常输入破坏。
+
+    针对第三项挑战，我采用“公共前置处理加类型分发”的方式。\texttt{simulate\_ai()} 统一处理冷却、受击恢复和朝向，然后将具体行为交给 \texttt{update\_patroller()}、\texttt{update\_ambusher()}、\texttt{update\_charger()}、\texttt{update\_ranged\_enemy()} 和 \texttt{update\_boss()}。死亡处理和掉落生成集中在 \texttt{process\_enemy\_deaths()}，避免各个 AI 函数重复实现相同的收尾逻辑。
+
+    针对第四项挑战，我区分了“存活”“死亡展示中”和“死亡展示结束”三个概念。死亡实体的 \texttt{alive} 设为 false，但只要 \texttt{deathTimer} 大于零，ViewModel 仍把它作为可见角色放入快照；Boss 则通过 \texttt{boss\_victory\_ready()} 控制最终胜利切换。对于 HUD 和相机等派生数据，ViewModel 在同步阶段统一计算，View 不再自行推导规则结果。
+\end{enumerate}
+
+\subsubsection{反思与成长}
+这部分工作让我认识到，ViewModel 的价值重要的是建立稳定的输入、状态和通知边界。一个好的 ViewModel 应该让 View 只关心当前应该显示什么、用户发出了什么意图，而不需要知道状态为什么发生变化；同时也应该让规则模拟器可以脱离图形界面独立验证。
+
+我还认识到，游戏规则中的时间顺序本身就是领域知识。攻击命中帧、受击无敌时间、波次过渡、投射物飞行和死亡展示都不是普通的属性赋值，而是状态随时间变化的过程。将这些过程集中到可预测的模拟步中，比在多个回调中分别修改状态更容易推理、调试和测试。
+
+在代码实现上，我从最初关注单个功能是否能够运行，逐渐转向关注不变量是否始终成立。例如，实体列表的第一个元素始终是玩家；已经死亡的敌人不能继续移动或攻击；一次攻击最多结算一次命中；普通波次未完成时不能生成 Boss；无效 \texttt{dt} 不改变模拟状态。这些不变量为后续功能扩展和测试提供了判断标准。
+
+最后，ViewModel 层的实现也让我体会到，模块解耦并不意味着模块之间没有联系，而是要通过清晰的契约进行联系。\texttt{GameSimulation} 负责规则的真实性，\texttt{GameViewModel} 负责规则到界面的翻译，Common 层负责跨层共享的数据契约。
 
 \subsection{个人总结：陈棋隆}
 
