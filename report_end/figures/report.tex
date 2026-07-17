@@ -1,0 +1,204 @@
+%!TEX program = xelatex
+
+% \documentclass{article}
+\documentclass[a4paper]{article}
+\usepackage[margin=25mm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+
+\usepackage[UTF8]{ctex}
+\usepackage{indentfirst}
+\usepackage{lmodern}% http://ctan.org/pkg/lm
+\usepackage{setspace}
+\usepackage{verbatim}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{listings}
+\usepackage{relsize}
+\usepackage[usenames]{color}   
+\usepackage[table]{xcolor}
+\usepackage{array}
+\usepackage[rightcaption]{sidecap}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{url}
+\usepackage{graphicx}
+
+% 自己画图
+\usepackage{tikz}
+\usepackage{mathpazo}
+\usepackage{pgfplots}
+
+% 插入动画
+\usepackage{animate}
+\usepackage{caption}
+\usepackage{subfigure}
+
+
+% 解决目录红框问题
+% \hypersetup{
+% colorlinks=true,
+% linkcolor=black
+% }
+\hypersetup{
+colorlinks=true,       % false: boxed links; true: colored links
+linkcolor=red,          % color of internal links
+citecolor=blue,        % color of links to bibliography
+filecolor=magenta,      % color of file links
+urlcolor=cyan   
+}
+
+% 代码格式设置
+\lstset{
+         language = java, numbers=left, 
+         numberstyle=\tiny,keywordstyle=\color{blue!70},
+         commentstyle=\color{red!50!green!50!blue!50},frame=shadowbox,
+         rulesepcolor=\color{red!20!green!20!blue!20},basicstyle=\ttfamily,
+         breaklines=true,               % 自动换行
+         % breakatwhitespace=true,        % 只在空格处断行（更美观）
+         showstringspaces=false,
+         tabsize=4,
+         frame=single                   % 加边框
+}
+
+
+
+
+\newcommand{\myd}{\;\mathrm{d}} %自定义积分变量命令
+\renewcommand{\listtablename}{Tables} %改变listoftable的名字
+\renewcommand{\arraystretch}{1.8} %行间距相对原始间距的倍数
+% \setmonofont{Consolas}
+\renewcommand\refname{参考网站}
+% \setlength{\tabcolsep}{18pt} % 文本到单元格左右边框之间的距离
+% \setlength{\arrayrulewidth}{0.4mm} % 设置表格线宽度
+
+
+\setlength{\parindent}{2em} %控制首行缩进
+\addtolength{\parskip}{3pt} %\parskip 控制段落(paragraph)距离
+%\singlespacing % 设置单倍行距
+%\doublespacing % 设置双倍行距
+%\setstretch{1.25} % 设置行距为1.25
+\onehalfspacing % 1.5倍行距
+\graphicspath{{../pictures/}} % 指定图片所在文件夹
+%\newtheorem{definition}[定义]{section}
+%定制环境: {环境名}[编号延续]{显示名}[编号层次]
+
+%\begin{doublespacing} 特定行距环境 \end{doublespacing}
+
+% 让编号和小标题目录深度支持到第四级 (paragraph)
+\setcounter{secnumdepth}{5}
+\setcounter{tocdepth}{5}
+
+\begin{document}
+\begin{titlepage}
+% titlepage格式可以自己调
+        % \vspace*{-3cm}
+	
+	\begin{figure}[h]
+		\centering
+		\includegraphics[width=0.5\linewidth]{zjdx}
+	\end{figure}
+
+	\vspace*{0.5cm}
+	\begin{figure}[h]
+		\centering
+		\includegraphics[width=0.3\linewidth]{QSY}
+	\end{figure}
+	\vspace{-0.5cm}
+	\begin{center}
+		\Huge{\textbf{C++项目管理和工程实践}}\\
+		
+		\Huge{\textbf{验收总结报告}}
+	\end{center}
+	
+	\vspace*{0.5cm}
+
+
+	\vspace*{1cm}
+    \begin{center}
+            \Large 小组名称\ \ \underline{\makebox[220pt]{双截龙组}} \\ 
+            \vspace{0.3cm}
+            \quad \Large 成员 \ \quad \underline{\makebox[220pt]{苏易文，邱安琪 3240105004，陈棋隆}} \\ 
+            \vspace{0.3cm}
+            \Large 实验日期\ \ \underline{\makebox[220pt]{2026年 07 月 17 日}}\\
+            \vspace{0.3cm}
+            \Large 指导老师\ \ \underline{\makebox[220pt]{袁昕}}\\
+            
+
+             
+    \end{center}
+        
+    
+\end{titlepage}
+
+\newpage
+% \setcounter{tocdepth}{5}
+
+\clearpage \thispagestyle{empty} %清楚图片格式（取消掉编号）
+
+% 不想要可以注释掉
+\tableofcontents % 生成目录
+\thispagestyle{empty} 
+
+\newpage
+\pagenumbering{arabic}%重新开始标号,阿拉伯数字形式
+
+\section{成果展示}
+
+\subsection{项目简介}
+本实验仓库实现的是一款横版街机动作游戏，主题为“双截龙”。项目使用 C++17、Qt6、CMake 与 vcpkg 组织工程，当前代码已经形成了较清晰的 MVVM 分层：`common` 层提供跨层公共状态和通知工具，`viewmodel` 层负责游戏规则和状态推进，`view` 层负责 Qt 窗口、输入和绘制，`app` 层作为组合根管理生命周期以及属性、命令、通知三类绑定。
+
+从玩法目标看，玩家扮演一名格斗角色，在带有纵深的城市街道上从左向右推进。当前实现支持标题画面、移动、跳跃、轻攻击、重攻击、血量、精力、疲劳提示、普通敌人追击、Boss 触发、暂停、失败、胜利和重开等核心流程。普通敌人在初始阶段生成并主动靠近玩家；当玩家推进到关卡后段时，系统生成 Boss，击败 Boss 后进入胜利结算。
+\subsubsection{组内分工}
+
+本组以层次边界作为分工单位，每位成员既负责对应代码，也负责对应分报告：
+
+- 苏易文：负责 App/Common 层，主要内容包括生命周期、组合根、公共状态、通知工具和三类绑定。
+- 陈棋隆：负责 View 层，主要内容包括窗口、画布、输入、HUD 和覆盖层。
+- 邱安琪：负责 ViewModel 层，主要内容包括命令回调、状态推进、AI、战斗和胜负判定。
+
+该项目严格完整地按照MVVM架构开发（由于游戏场景中的核心数据（如实体状态、位置等）直接对应视图层的可绘制对象，无需进行二次业务模型转换，因此本架构合并了传统意义上的 Model 层，将其统一内聚于 ViewModel 层中。），在中期报告里有详细说明。
+\subsection{游戏运行效果}
+> 邱安琪负责
+
+\subsection{开发工具尝试}
+\subsubsection{团队协作与版本管理工具}
+为了体现组内协作过程，本项目在开发中持续使用 Git 和 GitHub 记录提交历史。三位成员围绕不同层次并行推进：Common/App 层先确定公共状态和绑定方式，View 层根据公共状态完成输入和绘制，ViewModel 层独立实现规则模拟和状态同步，最后通过主分支合并和冲突处理完成整合。
+
+> 最后加图片
+
+图中的 GitHub 账号与组员对应关系如下：`wys917` 对应苏易文，`qiuanqi70` 对应邱安琪，`odetta1` 对应陈棋隆。从 GitHub Contributors 页面可以看到三位成员均有提交记录，说明项目并不是由单人集中完成，而是按照分层职责持续推进。
+
+需要补充说明的是，上图中统计的提交数和增删行数不能等同于实际工作量，本次任务中我们小组全程保持顺畅的沟通，每个人都很负责的完成了自己的部分，并在有余力时对队友的工作提出建议或帮助，三人的工作量是一致的。
+
+> 最后加图片
+
+上图合并展示了项目的提交历史。可以看到仓库中存在多次围绕 `viewmodel`、`view`、`common` 和 `app` 的独立提交与分支合并，并不是在同一个大文件中串行修改，而是按照 MVVM 层次拆分任务，并持续进行解耦：把公共契约从具体规则中分离出来，让 View 和 ViewModel 可以围绕稳定的 `GameState`、命令回调和通知机制并行开发，最后再通过 merge 将各层成果整合到主分支。
+
+\subsubsection{单元测试}
+> 苏易文负责
+
+\subsubsection{持续集成}
+> 陈棋隆负责
+
+\section{学习回顾}
+> 要提炼核心收获与感悟，邱安琪负责
+
+> 个人总结包括：自身在项目中承担的角色，遇到的主要挑战及应对策略，最终获得的成长与深度反思
+\subsection{个人总结：苏易文}
+
+\subsection{个人总结：邱安琪}
+
+\subsection{个人总结：陈棋隆}
+
+\section{课程改进建议}
+> 每个人写一点，我最后再总结一下
+> 结合实际体验，提出对课程内容、组织形式或教学方法的具体优化建议，以助力未来学习体验的持续提升
+
+\end{document}
