@@ -7,6 +7,7 @@
 
 namespace alleyfist::viewmodel {
 
+// 内部规则层的实体分类，比 Common 的 ActorKind 更贴近 AI 行为。
 enum class EntityKind {
     Player,
     Patroller,
@@ -16,6 +17,7 @@ enum class EntityKind {
     Boss
 };
 
+// View 发来的动作语义会先落到这里，再由 GameSimulation 判断能否执行。
 enum class PlayerActionType {
     None,
     Jump,
@@ -23,6 +25,7 @@ enum class PlayerActionType {
     HeavyAttack
 };
 
+// 玩家行为状态用于映射成 Common::ActorActionState，供 View 播放正确动画。
 enum class PlayerBehaviorState {
     Idle,
     Walk,
@@ -34,6 +37,7 @@ enum class PlayerBehaviorState {
     Dead
 };
 
+// 敌人行为状态保留 AI 语义，再在 GameViewModel 中转换为显示状态。
 enum class EnemyBehaviorState {
     Idle,
     Patrol,
@@ -44,6 +48,7 @@ enum class EnemyBehaviorState {
     Hurt
 };
 
+// 投射物属于模拟规则状态，GameViewModel 会转换为 Common::ProjectileState。
 struct ProjectileVm {
     std::uint32_t id = 0;
     alleyfist::ActorVisualVariant visualVariant = alleyfist::ActorVisualVariant::Default;
@@ -56,6 +61,7 @@ struct ProjectileVm {
     bool active = true;
 };
 
+// 拾取物属于模拟规则状态，View 只看到转换后的 Common::PickupState。
 struct PickupVm {
     std::uint32_t id = 0;
     alleyfist::PickupKind kind = alleyfist::PickupKind::Health;
@@ -65,6 +71,7 @@ struct PickupVm {
 };
 
 // 仅 ViewModel 内部使用的实体状态，不属于共享的 Common 状态定义。
+// 这里保存规则需要的血量、冷却、AI 计时器等字段，避免污染 Common 层 DTO。
 struct EntityState {
     alleyfist::WorldPosition pos;
     EntityKind kind = EntityKind::Patroller;

@@ -13,13 +13,16 @@
 namespace alleyfist::viewmodel {
 namespace {
 
+// 模拟辅助函数统一使用 20 ms 固定步长，减少浮点和帧率差异造成的波动。
 constexpr float kStep = 0.02f;
 
+// 浮点状态不能直接判等，此函数用于位置、能量和时间断言。
 bool nearly_equal(float first, float second, float tolerance = 0.001f)
 {
     return std::abs(first - second) <= tolerance;
 }
 
+// 按稳定 ID 查找实体，供跨多帧测试重新取得可能已搬迁的 vector 元素。
 const EntityState* entity_by_id(const GameSimulation& simulation, int id)
 {
     const auto& entities = simulation.entities();
@@ -30,6 +33,7 @@ const EntityState* entity_by_id(const GameSimulation& simulation, int id)
     return found == entities.end() ? nullptr : &*found;
 }
 
+// 查找指定类型的第一个存活实体，用于选取当前波次的测试目标。
 const EntityState* first_alive_entity(const GameSimulation& simulation,
                                       EntityKind kind)
 {
@@ -41,6 +45,7 @@ const EntityState* first_alive_entity(const GameSimulation& simulation,
     return found == entities.end() ? nullptr : &*found;
 }
 
+// 统计当前存活的普通敌人，不把玩家和 Boss 计入波次清理条件。
 std::uint32_t alive_regular_enemy_count(const GameSimulation& simulation)
 {
     return static_cast<std::uint32_t>(std::count_if(
@@ -51,6 +56,7 @@ std::uint32_t alive_regular_enemy_count(const GameSimulation& simulation)
         }));
 }
 
+// 推进模拟直到条件成立或达到步数上限，避免测试无限等待状态转换。
 template <typename Predicate>
 bool step_until(GameSimulation& simulation, Predicate predicate,
                 int maximumSteps, float dt = kStep)
@@ -67,6 +73,7 @@ bool step_until(GameSimulation& simulation, Predicate predicate,
     return false;
 }
 
+// 按固定小步长推进指定时长，用于验证计时器、恢复和动作结束行为。
 void step_for(GameSimulation& simulation, float seconds, float dt = kStep)
 {
     float remaining = seconds;
@@ -77,6 +84,7 @@ void step_for(GameSimulation& simulation, float seconds, float dt = kStep)
     }
 }
 
+// 根据目标偏移设置四方向输入；进入容差范围后不再继续移动。
 void set_movement_towards(GameSimulation& simulation, float dx, float dy,
                           float toleranceX = 2.0f,
                           float toleranceY = 2.0f)
@@ -87,6 +95,7 @@ void set_movement_towards(GameSimulation& simulation, float dx, float dy,
     simulation.set_move_down(dy > toleranceY);
 }
 
+// 驱动玩家到指定世界坐标，供拾取物和关卡位置相关测试复用。
 bool move_player_to(GameSimulation& simulation, float targetX, float targetY,
                     float toleranceX = 3.0f, float toleranceY = 3.0f,
                     int maximumSteps = 2000)
@@ -110,6 +119,7 @@ bool move_player_to(GameSimulation& simulation, float targetX, float targetY,
     return false;
 }
 
+// 驱动玩家进入目标实体的交互范围，供近战、受击和 AI 测试复用。
 bool move_near_entity(GameSimulation& simulation, int entityId,
                       float rangeX = 24.0f, float rangeY = 12.0f,
                       int maximumSteps = 2500)
@@ -138,6 +148,7 @@ bool move_near_entity(GameSimulation& simulation, int entityId,
     return false;
 }
 
+// 把玩家放到可命中敌人但不会立即拾取掉落物的位置。
 bool move_to_safe_attack_edge(GameSimulation& simulation, int entityId,
                               int maximumSteps = 2500)
 {
@@ -169,6 +180,7 @@ bool move_to_safe_attack_edge(GameSimulation& simulation, int entityId,
     return false;
 }
 
+// 只通过正常移动和轻攻击击败实体，不直接修改生命值。
 bool defeat_entity(GameSimulation& simulation, int entityId,
                    int maximumSteps = 5000,
                    bool keepPickupOutOfReach = false)
@@ -198,6 +210,7 @@ bool defeat_entity(GameSimulation& simulation, int entityId,
     return false;
 }
 
+// 按远程、冲锋、伏击、巡逻的顺序选目标，降低清理波次时受到的伤害。
 const EntityState* preferred_regular_target(const GameSimulation& simulation)
 {
     constexpr EntityKind priority[] = {
@@ -214,6 +227,7 @@ const EntityState* preferred_regular_target(const GameSimulation& simulation)
     return nullptr;
 }
 
+// 击败当前波次全部普通敌人，供波次和 Boss 流程测试搭建前置状态。
 bool defeat_current_regular_wave(GameSimulation& simulation)
 {
     for (int enemy = 0; enemy < 8; ++enemy) {
@@ -229,6 +243,7 @@ bool defeat_current_regular_wave(GameSimulation& simulation)
     return alive_regular_enemy_count(simulation) == 0;
 }
 
+// 等待指定波次真正生成敌人，而不只检查波次编号是否改变。
 bool wait_for_wave(GameSimulation& simulation, std::uint32_t wave)
 {
     return step_until(
@@ -240,6 +255,7 @@ bool wait_for_wave(GameSimulation& simulation, std::uint32_t wave)
         150);
 }
 
+// 通过合法战斗依次清理前置波次，进入目标普通波次。
 bool reach_wave(GameSimulation& simulation, std::uint32_t wave)
 {
     for (std::uint32_t currentWave = 1; currentWave < wave; ++currentWave) {
@@ -252,6 +268,7 @@ bool reach_wave(GameSimulation& simulation, std::uint32_t wave)
            alive_regular_enemy_count(simulation) > 0;
 }
 
+// 清理第二波其他敌人并调整站位，构造只受一个远程敌人影响的场景。
 bool prepare_isolated_ranged_enemy(GameSimulation& simulation, int& rangedId)
 {
     if (!reach_wave(simulation, 2)) {
@@ -307,6 +324,7 @@ bool prepare_isolated_ranged_enemy(GameSimulation& simulation, int& rangedId)
         300);
 }
 
+// 记录当前最大投射物 ID，用于区分随后新发射的投射物。
 std::uint32_t maximum_projectile_id(const GameSimulation& simulation)
 {
     std::uint32_t maximum = 0;
@@ -316,6 +334,7 @@ std::uint32_t maximum_projectile_id(const GameSimulation& simulation)
     return maximum;
 }
 
+// 查找基准 ID 之后生成的投射物。
 const ProjectileVm* projectile_after(const GameSimulation& simulation,
                                      std::uint32_t previousMaximum)
 {
@@ -328,6 +347,7 @@ const ProjectileVm* projectile_after(const GameSimulation& simulation,
     return found == projectiles.end() ? nullptr : &*found;
 }
 
+// 推进模拟直到远程敌人生成新投射物，并返回其稳定 ID。
 bool wait_for_new_projectile(GameSimulation& simulation,
                              std::uint32_t previousMaximum,
                              std::uint32_t& projectileId)
@@ -345,6 +365,7 @@ bool wait_for_new_projectile(GameSimulation& simulation,
     return true;
 }
 
+// 判断指定投射物是否仍在模拟中，用于观察命中或过期移除。
 bool projectile_exists(const GameSimulation& simulation, std::uint32_t id)
 {
     return std::any_of(
@@ -358,6 +379,7 @@ class ViewModelTest final : public QObject {
     Q_OBJECT
 
 private slots:
+    // 测试 Simulation 的初始实体/资源、非法 dt 防御，以及 reset 的完整恢复。
     void simulationInitialStateResetAndInvalidDelta()
     {
         GameSimulation simulation;
@@ -395,6 +417,7 @@ private slots:
         QVERIFY(simulation.player_behavior_state() == PlayerBehaviorState::Idle);
     }
 
+    // 测试 ViewModel 生命周期命令、阶段切换、状态同步和通知订阅/移除。
     void viewModelLifecycleCommandsAndNotifications()
     {
         GameViewModel viewModel;
@@ -454,6 +477,7 @@ private slots:
         viewModel.remove_notification(cookie);
     }
 
+    // 测试 ViewModel 将轻击、重击、跳跃和空中攻击映射到公共状态与 HUD。
     void viewModelMapsActionCommandsAndHudState()
     {
         GameViewModel viewModel;
@@ -485,6 +509,7 @@ private slots:
         QVERIFY(state->hud.playerEnergy.current < 82);
     }
 
+    // 测试四方向位移、相反输入抵消，以及未清波时地图门禁限制。
     void movementDirectionsOppositesAndWaveGate()
     {
         GameSimulation simulation;
@@ -531,6 +556,7 @@ private slots:
         QVERIFY(nearly_equal(simulation.entities().front().pos.x, 760.0f));
     }
 
+    // 测试轻重攻击各自的耗能、命中帧、伤害、冲击等级和单次命中约束。
     void lightAndHeavyAttacksUseDistinctHitFrames()
     {
         GameSimulation lightSimulation;
@@ -591,6 +617,7 @@ private slots:
                  heavyRevision);
     }
 
+    // 测试玩家受击期间动作被中断和拒绝，并在硬直结束后重新接受动作。
     void playerHurtStateRejectsAndInterruptsActions()
     {
         GameSimulation simulation;
@@ -627,6 +654,7 @@ private slots:
         QVERIFY(simulation.request_player_action(PlayerActionType::Jump));
     }
 
+    // 测试连续重击触发精疲力竭、低能量时拒绝动作，以及恢复阈值后的解锁。
     void energyExhaustionAndRecovery()
     {
         GameSimulation simulation;
@@ -649,6 +677,7 @@ private slots:
             PlayerActionType::HeavyAttack));
     }
 
+    // 测试跳跃独占高度变化、可转为空中攻击，并最终落地回到 Idle。
     void jumpOwnsHeightAndSupportsAirAttack()
     {
         GameSimulation simulation;
@@ -679,6 +708,7 @@ private slots:
         QVERIFY(simulation.player_behavior_state() == PlayerBehaviorState::Idle);
     }
 
+    // 测试巡逻近战、伏击、冲锋、远程攻击等 AI 状态均可到达并能发射投射物。
     void enemyBehaviorStatesAndRangedProjectileAreReachable()
     {
         GameSimulation simulation;
@@ -757,6 +787,7 @@ private slots:
                 ActorVisualVariant::RangedGunner);
     }
 
+    // 测试远程投射物命中地面玩家后扣血、增加受击修订并标记重击效果。
     void projectileHitsGroundedPlayer()
     {
         GameSimulation simulation;
@@ -789,6 +820,7 @@ private slots:
         QVERIFY(simulation.entities().front().lastImpact == ImpactLevel::Heavy);
     }
 
+    // 测试投射物发射后立即跳跃可以避开按地面轨迹瞄准的攻击。
     void jumpAtProjectileLaunchAvoidsGroundTrajectory()
     {
         GameSimulation simulation;
@@ -818,6 +850,7 @@ private slots:
                  initialRevision);
     }
 
+    // 测试巡逻敌人掉生命补给、远程敌人掉能量补给，以及补给可被拾取移除。
     void defeatedEnemiesDropCollectiblePickups()
     {
         GameSimulation healthSimulation;
@@ -857,6 +890,7 @@ private slots:
             }));
     }
 
+    // 测试三波门禁、远程敌人变体、Boss 开场/战斗和胜利就绪的完整关卡流程。
     void wavesGatesBossEncounterAndVictory()
     {
         GameSimulation simulation;
@@ -966,6 +1000,7 @@ private slots:
 
 int main(int argc, char** argv)
 {
+    // ViewModel 测试不创建界面，只用 QCoreApplication 驱动 QtTest。
     QCoreApplication application(argc, argv);
     alleyfist::viewmodel::ViewModelTest test;
     return QTest::qExec(&test, argc, argv);

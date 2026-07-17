@@ -9,6 +9,8 @@ namespace alleyfist::viewmodel {
 
 namespace {
 
+// 下面几个转换函数是 ViewModel 的“翻译层”：
+// Simulation 保留规则语义，Common::GameState 保留显示语义。
 ActorKind to_actor_kind(EntityKind kind)
 {
     switch (kind) {
@@ -93,6 +95,7 @@ const GameState* GameViewModel::get_game_state() const noexcept
 
 std::function<void(float, std::uint64_t)> GameViewModel::get_tick_command()
 {
+    // frameIndex 由 View 维护用于定时器节拍；当前规则只需要 delta time。
     return [this](float dt, std::uint64_t) {
         tick(dt);
     };
@@ -188,6 +191,8 @@ void GameViewModel::tick(float dt)
 
 void GameViewModel::sync_state_from_simulation()
 {
+    // 这里是 VM 的核心职责：把内部规则状态整理成稳定的 Common DTO。
+    // View 只消费 m_state，因此敌人 AI、冷却、波次计时等内部字段不会泄漏出去。
     const float worldWidth = m_sim->world_width();
     const float streetTop = m_sim->street_top();
     const float streetBottom = m_sim->street_bottom();
@@ -203,6 +208,7 @@ void GameViewModel::sync_state_from_simulation()
 
     const auto& player = entities.front();
     if (!player.alive || m_sim->boss_victory_ready()) {
+        // 终局后立刻清空输入，避免玩家在 GameOver/Win 后继续积累移动状态。
         m_sim->clear_movement_input();
     }
     m_state.player.id = static_cast<std::uint32_t>(player.id);
@@ -262,6 +268,7 @@ void GameViewModel::sync_state_from_simulation()
         actor.lastImpact = entity.lastImpact;
 
         if (isBoss && entity.alive) {
+            // Boss 血条是 HUD 的特殊显示，不需要 View 再去遍历敌人判断。
             m_state.hud.showBossHealth = true;
             m_state.hud.bossHealth = actor.health;
         }
@@ -290,6 +297,7 @@ void GameViewModel::sync_state_from_simulation()
         state.id = pickup.id;
         state.kind = pickup.kind;
         state.position = pickup.position;
+        // 拾取物的上下浮动是纯表现效果，放在 VM 快照里供 View 直接绘制。
         state.position.z += std::sin(
             m_state.elapsedSeconds * 2.2f +
             static_cast<float>(pickup.id) * 0.6f) * 8.0f;
@@ -309,6 +317,7 @@ void GameViewModel::sync_state_from_simulation()
                                       m_state.player.position.x / worldWidth,
                                       0.0f, 1.0f)
                                 : 0.0f;
+    // 镜头跟随玩家但保持在地图范围内，View 只做 world->screen 转换。
     m_state.map.cameraX = std::clamp(
         m_state.player.position.x - m_state.map.viewportWidth * 0.42f,
         0.0f,
@@ -336,6 +345,7 @@ std::function<void(bool)> GameViewModel::make_move_command(MoveInput input)
         if (pressed && !is_gameplay_active()) {
             return;
         }
+        // 方向输入是持续状态，按下和释放都必须同步给模拟器。
         switch (input) {
         case MoveInput::Left:
             m_sim->set_move_left(pressed);
@@ -361,6 +371,7 @@ std::function<void()> GameViewModel::make_action_command(PlayerActionType action
         if (!is_gameplay_active()) {
             return;
         }
+        // 动作请求可能因为能量不足、受击或攻击中被拒绝；模拟器负责判定。
         m_sim->request_player_action(action);
         sync_state_from_simulation();
         notify_state_changed();

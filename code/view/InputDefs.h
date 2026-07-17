@@ -29,6 +29,7 @@ inline constexpr std::size_t kMovementDirectionCount =
 /// This keeps aliases such as A and Left active until both keys are released.
 class InputState {
 public:
+    /// 记录一次方向键按下。返回 true 表示该方向从未按下变为按下。
     bool press_movement(MovementDirection direction, int physicalKey)
     {
         const auto directionIndex = index(direction);
@@ -39,6 +40,7 @@ public:
         return keys.size() == 1;
     }
 
+    /// 记录一次方向键释放。返回 true 表示该方向已经没有任何物理键保持按下。
     bool release_movement(MovementDirection direction, int physicalKey)
     {
         const auto directionIndex = index(direction);
@@ -49,6 +51,7 @@ public:
         return true;
     }
 
+    /// 动作键只需要防止自动重复触发，释放时不向 ViewModel 发送持续状态。
     bool press_action(int physicalKey)
     {
         return m_actionKeys.insert(physicalKey).second;

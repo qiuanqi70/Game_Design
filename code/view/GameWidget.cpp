@@ -94,6 +94,7 @@ GameWidget::GameWidget(QWidget* parent)
         const float dt = static_cast<float>(m_elapsed.restart()) / 1000.0f;
         const float clampedDt = std::min(dt, 0.1f);
         ++m_frameIndex;
+        // 每帧先驱动 ViewModel，再推进表现层，最后请求重绘。
         if (m_tickCommand) m_tickCommand(clampedDt, m_frameIndex);
         playSoundCues(m_presentation.advance(m_gameState, clampedDt));
         update();
@@ -365,7 +366,8 @@ void GameWidget::paintEvent(QPaintEvent* /*event*/)
         drawList.push_back({pickup.position.laneY, &pickup});
     }
 
-    // Ground lane controls occlusion; jumping must not change world depth.
+    // 统一 depth sort：同一街道里越靠下越遮挡前面的对象。
+    // 注意跳跃只改变 z，不改变 laneY，否则角色跳起来会错误地改变遮挡顺序。
     std::stable_sort(drawList.begin(), drawList.end(),
                      [](const RenderItem& lhs, const RenderItem& rhs) {
                          return lhs.depth < rhs.depth;
@@ -824,6 +826,7 @@ bool GameWidget::drawActorSprite(QPainter& p, const ActorState& actor)
     p.save();
     p.setRenderHint(QPainter::SmoothPixmapTransform, false);
     const bool flipHorizontally = actor.facing != art->sourceFacing;
+    // 素材只需要保存一个朝向，另一方向绘制时镜像即可。
     if (flipHorizontally) {
         p.scale(-1.0f, 1.0f);
     }

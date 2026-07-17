@@ -15,10 +15,16 @@ enum class SoundCue {
     Win
 };
 
-/// Owns transient presentation-only state observed from the read-only GameState.
+/// @brief View 层的临时表现状态。
+///
+/// 这些状态不属于游戏规则，例如血条缓动、屏幕震动、拾取飘字、音效触发和
+/// 动画计时。它们都由只读 GameState 推导出来，因此不会反向影响 ViewModel。
 class PresentationState {
 public:
+    /// 新绑定 GameState 或重开局时调用，重置所有表现时钟。
     void synchronize(const GameState& state);
+
+    /// 每帧推进表现层计时，并返回本帧应播放的一次性音效。
     std::vector<SoundCue> advance(const GameState* state, float dt);
 
     float elapsed() const noexcept { return m_elapsed; }
@@ -31,6 +37,7 @@ public:
                                   float fallbackElapsed) const noexcept;
 
 private:
+    // 每个 actor 独立计时；动作或受击版本变化时从第 0 帧重新播放。
     struct AnimationClock {
         ActorActionState state = ActorActionState::Idle;
         std::uint32_t impactRevision = 0;

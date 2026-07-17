@@ -69,6 +69,8 @@ Windows 多配置环境中的可执行文件可能位于 `build/code/Debug/Alley
 
 根 CMake 通过 `include(CTest)` 提供 `BUILD_TESTING` 开关，默认开启。测试目标统一定义在 `code/tests/CMakeLists.txt`；关闭测试时不会查找 Qt Test，也不会生成任何测试程序。
 
+每个测试用例的具体场景和断言见 [`code/tests/README.md`](code/tests/README.md)。
+
 配置、构建并运行全部测试：
 
 ```bash
@@ -121,3 +123,30 @@ GameWidget 输入 -> command -> GameViewModel -> GameSimulation -> GameState
 ```
 
 测试强调规则边界、输入映射、跨层绑定、生命周期和绘制稳定性；展示动画等只影响画面的状态保留在 View 内，不反向污染规则层。
+### 持续集成
+
+项目提供两层 CI，本地和云端独立运行。
+
+**本地日常构建 `ci_build.sh`**
+
+```bash
+# 拉取最新代码 → 检查 Qt 工具链 → 编译 Release
+bash ci_build.sh
+
+# 编译完成后自动启动游戏运行 5 秒
+bash ci_build.sh --run
+```
+
+流程：git pull → 验证 Qt/MinGW/Ninja 可用 → cmake configure → cmake build → 可选运行。日志输出到 `ci_build.log`。
+
+通过 Windows 任务计划程序可设为每天定时执行：程序填 `C:\Program Files\Git\bin\bash.exe`，参数填 `/d/mytools/c++_project/Game_Design/ci_build.sh --run`，起始于项目根目录。
+
+**GitHub Actions 云端 CI `.github/workflows/ci.yml`**
+
+每次 push、PR 以及每天凌晨 2 点自动触发：
+
+- 使用 `jurplel/install-qt-action` 自动安装 Qt 6.8 + MinGW 工具链
+- cmake configure + build（Release）
+- 运行 `alleyfist_app_smoke_test` 验证绑定链路完整
+
+推送到 GitHub 仓库即自动生效，无需额外配置。
