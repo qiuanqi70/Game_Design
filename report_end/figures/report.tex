@@ -14,17 +14,15 @@
 \usepackage{amsmath}
 \usepackage{amsthm}
 \usepackage{graphicx}
-\usepackage{subfigure}
+\usepackage{subfig}
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{multirow}
 \usepackage{multicol}
 \usepackage{listings}
-\usepackage{relsize}
 \usepackage[usenames]{color}   
 \usepackage[table]{xcolor}
 \usepackage{array}
-\usepackage[rightcaption]{sidecap}
 \usepackage{hyperref}
 \usepackage{float}
 \usepackage{url}
@@ -32,13 +30,12 @@
 
 % 自己画图
 \usepackage{tikz}
-\usepackage{mathpazo}
 \usepackage{pgfplots}
 
 % 插入动画
 \usepackage{animate}
 \usepackage{caption}
-\usepackage{subfigure}
+\let\subfigure\subfloat
 
 
 % 解决目录红框问题
@@ -85,7 +82,7 @@ urlcolor=cyan
 %\doublespacing % 设置双倍行距
 %\setstretch{1.25} % 设置行距为1.25
 \onehalfspacing % 1.5倍行距
-\graphicspath{{../pictures/}} % 指定图片所在文件夹
+\graphicspath{{../picture/}{./}} % 指定图片所在文件夹
 %\newtheorem{definition}[定义]{section}
 %定制环境: {环境名}[编号延续]{显示名}[编号层次]
 
@@ -94,6 +91,7 @@ urlcolor=cyan
 % 让编号和小标题目录深度支持到第四级 (paragraph)
 \setcounter{secnumdepth}{5}
 \setcounter{tocdepth}{5}
+\newcommand{\subsubsubsection}[1]{\paragraph{#1}\mbox{}\\}
 
 \begin{document}
 \begin{titlepage}
@@ -122,16 +120,14 @@ urlcolor=cyan
 
 	\vspace*{1cm}
     \begin{center}
-            \Large 小组名称\ \ \underline{\makebox[220pt]{双截龙组}} \\ 
-            \vspace{0.3cm}
-            \quad \Large 成员 \ \quad \underline{\makebox[220pt]{苏易文，邱安琪 3240105004，陈棋隆}} \\ 
-            \vspace{0.3cm}
-            \Large 实验日期\ \ \underline{\makebox[220pt]{2026年 07 月 17 日}}\\
-            \vspace{0.3cm}
-            \Large 指导老师\ \ \underline{\makebox[220pt]{袁昕}}\\
-            
-
-             
+        \begin{tabular}{r@{\quad}l}
+            \Large 小组名称 & \Large \underline{\makebox[260pt]{双截龙组}} \\[0.3cm]
+            \Large 成员 & \Large \underline{\makebox[260pt]{苏易文 3240103466}} \\[0.2cm]
+            & \Large \underline{\makebox[260pt]{邱安琪 3240105004}} \\[0.2cm]
+            & \Large \underline{\makebox[260pt]{陈棋隆 3240103461}} \\[0.3cm]
+            \Large 实验日期 & \Large \underline{\makebox[260pt]{2026年 07 月 17 日}} \\[0.3cm]
+            \Large 指导老师 & \Large \underline{\makebox[260pt]{袁昕}} \\
+        \end{tabular}
     \end{center}
         
     
@@ -159,9 +155,11 @@ urlcolor=cyan
 
 本组以层次边界作为分工单位，每位成员既负责对应代码，也负责对应分报告：
 
-- 苏易文：负责 App/Common 层，主要内容包括生命周期、组合根、公共状态、通知工具和三类绑定。
-- 陈棋隆：负责 View 层，主要内容包括窗口、画布、输入、HUD 和覆盖层。
-- 邱安琪：负责 ViewModel 层，主要内容包括命令回调、状态推进、AI、战斗和胜负判定。
+\begin{itemize}
+  \item 苏易文：负责 App/Common 层，主要内容包括生命周期、组合根、公共状态、通知工具和三类绑定。
+  \item 陈棋隆：负责 View 层，主要内容包括窗口、画布、输入、HUD 和覆盖层。
+  \item 邱安琪：负责 ViewModel 层，主要内容包括命令回调、状态推进、AI、战斗和胜负判定。
+\end{itemize}
 
 该项目严格完整地按照MVVM架构开发（由于游戏场景中的核心数据（如实体状态、位置等）直接对应视图层的可绘制对象，无需进行二次业务模型转换，因此本架构合并了传统意义上的 Model 层，将其统一内聚于 ViewModel 层中。），在中期报告里有详细说明。
 \subsection{游戏运行效果}
@@ -172,25 +170,27 @@ urlcolor=cyan
 \centering    
 \subfigure[开始界面] {    
 \includegraphics[width=0.45\textwidth]{开始界面.png}  
-}     
+}\hfill
 \subfigure[游戏地图] {     
 \includegraphics[width=0.45\textwidth]{游戏地图.png}     
-}    
+}\\[0.5em]
 \subfigure[游戏暂停界面] {    
 \includegraphics[width=0.45\textwidth]{游戏暂停界面.png}  
-}   
+}\hfill
 \subfigure[boss出现警告] {    
 \includegraphics[width=0.45\textwidth]{boss出现警告1.png}  
-}
+}\\[0.5em]
 \subfigure[boss出现警告] {    
 \includegraphics[width=0.45\textwidth]{boss出现警告2.png}  
-}
+}\hfill
 \subfigure[boss出现] {    
 \includegraphics[width=0.45\textwidth]{boss出现.png}  
-}
+}\\[0.5em]
 \subfigure[游戏胜利] {    
 \includegraphics[width=0.45\textwidth]{游戏胜利.png}  
 }
+\caption{游戏运行界面展示}
+\end{figure}
 
 \subsubsection{玩法}
 \subsubsubsection{敌人种类}
@@ -199,21 +199,21 @@ urlcolor=cyan
 \begin{table}[H]
   \centering
   \caption{敌人类型}
-    \begin{tabular}{|c|c|}
+    \begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}m{0.24\textwidth}|X|}
     \hline
     敌人类型 & 特点\\
     \hline
-    冲撞型敌人  &   \\
+    冲撞型敌人  & 主要通过贴近和冲撞给玩家制造正面压力，需要玩家及时拉开距离或在攻击间隙反击。 \\
     \hline
-    伏击类飞行敌人 &  \\
+    伏击类飞行敌人 & 具有飞行和伏击特征，会从非常规位置接近玩家，迫使玩家注意纵向走位和空中威胁。 \\
     \hline
-    远程型敌人 &  \\
+    远程型敌人 & 与玩家保持一定距离并发射投射物，玩家需要通过移动或跳跃躲避后再接近攻击。 \\
     \hline
-    远程型敌人2（机器人） &  \\
+    远程型敌人2（机器人） & 作为后续波次的远程变体出现，投射物表现更明显，进一步提高战斗节奏和躲避压力。 \\
     \hline
-    Boss &  \\
+    Boss & 血量最高，拥有多段攻击和冲锋行为，是关卡最终挑战；击败后触发胜利结算流程。 \\
     \hline
-    \end{tabular}
+    \end{tabularx}
 \end{table}
 
 \begin{figure}[H]
@@ -221,19 +221,19 @@ urlcolor=cyan
 \centering    
 \subfigure[冲撞型敌人] {    
 \includegraphics[width=0.45\textwidth]{../../code/view/Assets/冲撞型敌人/Attack.png}  
-}     
+}\hfill
 \subfigure[伏击类飞行敌人] {     
-\includegraphics[width=0.45\textwidth]{../../code/view/Assets/伏击类飞行敌人/Attack.png}     
-}    
+\includegraphics[width=0.45\textwidth]{../../code/view/Assets/伏击型飞行敌人/Attack.png}
+}\\[0.5em]
 \subfigure[远程型敌人] {    
 \includegraphics[width=0.45\textwidth]{../../code/view/Assets/远程型敌人/Attack.png}  
-}   
+}\hfill
 \subfigure[远程型敌人2（机器人）] {    
 \includegraphics[width=0.45\textwidth]{../../code/view/Assets/远程型敌人2（机器人）/Attack.png}  
-}  
+}\\[0.5em]
 \subfigure[Boss] {    
 \includegraphics[width=0.45\textwidth]{../../code/view/Assets/Boss/Attack1.png}  
-} 
+}\hfill
 \subfigure[Boss] {    
 \includegraphics[width=0.45\textwidth]{../../code/view/Assets/Boss/Attack4.png}  
 } 
@@ -245,7 +245,7 @@ urlcolor=cyan
 \centering    
 \subfigure[len-1] {    
 \includegraphics[width=0.45\textwidth]{1.png}  
-}     
+}\hfill
 \subfigure[len-2] {     
 \includegraphics[width=0.45\textwidth]{2.png}     
 }    
@@ -260,13 +260,13 @@ urlcolor=cyan
 \centering    
 \subfigure[玩家被打] {    
 \includegraphics[width=0.45\textwidth]{玩家被打.png}  
-}     
+}\hfill
 \subfigure[玩家攻击（脚踢）] {     
 \includegraphics[width=0.45\textwidth]{玩家攻击（脚踢）.png}     
-}    
+}\\[0.5em]
 \subfigure[玩家攻击（手击）] {    
 \includegraphics[width=0.45\textwidth]{玩家攻击（手击）.png}  
-}   
+}\hfill
 \subfigure[玩家空中脚踢] {    
 \includegraphics[width=0.45\textwidth]{玩家空中脚踢.png}  
 }   
@@ -282,7 +282,7 @@ urlcolor=cyan
 \centering    
 \subfigure[血包] {    
 \includegraphics[width=0.45\textwidth]{敌人死后掉血包.png}  
-}     
+}\hfill
 \subfigure[能量包] {     
 \includegraphics[width=0.45\textwidth]{敌人死后掉能量包.png}     
 } 
@@ -299,18 +299,56 @@ urlcolor=cyan
 \subsubsection{团队协作与版本管理工具}
 为了体现组内协作过程，本项目在开发中持续使用 Git 和 GitHub 记录提交历史。三位成员围绕不同层次并行推进：Common/App 层先确定公共状态和绑定方式，View 层根据公共状态完成输入和绘制，ViewModel 层独立实现规则模拟和状态同步，最后通过主分支合并和冲突处理完成整合。
 
-> 最后加图片
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{github贡献.png}
+  \caption{GitHub Contributors 贡献记录}
+\end{figure}
 
-图中的 GitHub 账号与组员对应关系如下：`wys917` 对应苏易文，`qiuanqi70` 对应邱安琪，`odetta1` 对应陈棋隆。从 GitHub Contributors 页面可以看到三位成员均有提交记录，说明项目并不是由单人集中完成，而是按照分层职责持续推进。
+图中的 GitHub 账号与组员对应关系如下：\texttt{wys917} 对应苏易文，\texttt{qiuanqi70} 对应邱安琪，\texttt{odetta1} 对应陈棋隆。从 GitHub Contributors 页面可以看到三位成员均有提交记录，说明项目并不是由单人集中完成，而是按照分层职责持续推进。
 
 需要补充说明的是，上图中统计的提交数和增删行数不能等同于实际工作量，本次任务中我们小组全程保持顺畅的沟通，每个人都很负责的完成了自己的部分，并在有余力时对队友的工作提出建议或帮助，三人的工作量是一致的。
 
-> 最后加图片
+\begin{figure}[H]
+  \centering
+  \subfigure[提交日志 1]{
+    \includegraphics[width=0.46\textwidth]{git提交日志1.png}
+  }\hfill
+  \subfigure[提交日志 2]{
+    \includegraphics[width=0.46\textwidth]{git提交日志2.png}
+  }\\[0.5em]
+  \subfigure[提交日志 3]{
+    \includegraphics[width=0.46\textwidth]{git提交日志3.png}
+  }
+  \caption{Git 提交历史记录}
+\end{figure}
 
-上图合并展示了项目的提交历史。可以看到仓库中存在多次围绕 `viewmodel`、`view`、`common` 和 `app` 的独立提交与分支合并，并不是在同一个大文件中串行修改，而是按照 MVVM 层次拆分任务，并持续进行解耦：把公共契约从具体规则中分离出来，让 View 和 ViewModel 可以围绕稳定的 `GameState`、命令回调和通知机制并行开发，最后再通过 merge 将各层成果整合到主分支。
+上图合并展示了项目的提交历史。可以看到仓库中存在多次围绕 \texttt{viewmodel}、\texttt{view}、\texttt{common} 和 \texttt{app} 的独立提交与分支合并，并不是在同一个大文件中串行修改，而是按照 MVVM 层次拆分任务，并持续进行解耦：把公共契约从具体规则中分离出来，让 View 和 ViewModel 可以围绕稳定的 \texttt{GameState}、命令回调和通知机制并行开发，最后再通过 merge 将各层成果整合到主分支。
 
 \subsubsection{单元测试}
-> 苏易文负责
+本项目在最终迭代中补充了自动化测试，测试框架采用 Qt Test，并通过 CTest 统一注册和运行。由于项目采用 MVVM 分层，测试也按照层次边界拆分为三个可独立执行的测试程序：
+
+\begin{itemize}
+  \item \texttt{alleyfist\_viewmodel\_test}：验证规则模拟和 ViewModel 状态映射。
+  \item \texttt{alleyfist\_view\_test}：验证输入处理、资源加载和界面渲染。
+  \item \texttt{alleyfist\_app\_test}：验证应用组合根和跨层绑定闭环。
+\end{itemize}
+
+这样的组织方式可以让规则层、界面层和应用组合根分别暴露问题，避免所有错误都集中到启动游戏后才被发现。
+
+ViewModel 测试主要验证游戏规则和公共状态同步。测试用例覆盖了初始状态、重置、非法时间步处理、移动方向互斥、攻击命中帧、能量消耗和恢复、跳跃与空中攻击、受击硬直、敌人 AI、投射物碰撞、补给掉落、波次门禁、Boss 入场以及胜利判定等流程。测试中没有直接修改模拟器内部字段，而是通过移动、攻击和逐帧推进来搭建场景，例如击败敌人必须通过正常轻攻击完成，进入 Boss 区域也必须先清理普通波次。这样做可以保证测试验证的是玩家真实游玩路径，而不是人为构造出来的内部状态。
+
+View 测试主要验证输入处理、资源加载和离屏渲染。输入部分检查了 WASD 与方向键别名、相反方向同时按下、自动重复按键过滤、焦点丢失和窗口隐藏时的按键释放逻辑，保证玩家操作不会因为键盘事件细节出现卡键或重复触发。资源部分检查了关键 qrc 图片和像素字体是否存在并能正常解码。渲染部分使用 \texttt{QWidget::render()} 将界面绘制到 \texttt{QImage}，再比较特定区域的像素变化，用于验证标题、暂停、失败、胜利、角色、投射物、补给和波次提示等元素确实被绘制出来。由于不同平台的字体和抗锯齿可能略有差异，测试只比较目标区域是否发生足够变化，而不是要求整张截图逐像素完全一致。
+
+App 测试则验证 View、ViewModel 和应用组合根之间的完整绑定。测试确认 \texttt{GameApplication} 会创建唯一的 \texttt{MainWindow} 和 \texttt{GameWidget}，并检查窗口标题、最小尺寸、父子关系和焦点策略。随后通过真实键盘事件触发确认、暂停、重置、移动和攻击命令，比较命令执行前后的离屏画面和 HUD 变化，验证“输入命令 \(\rightarrow\) ViewModel 状态变化 \(\rightarrow\) notification 通知 \(\rightarrow\) View 刷新”这一闭环能够正常工作。计时器相关测试还会确认窗口显示后 tick 能持续推进模拟，窗口隐藏后 tick 会停止，避免后台继续更新造成状态漂移。
+
+三个测试程序都被写入 \texttt{code/tests/CMakeLists.txt}，并通过 \texttt{add\_test} 注册到 CTest。其中 View 和 App 测试使用 \texttt{QT\_QPA\_PLATFORM=offscreen}，因此在没有图形显示器的 CI 环境中也能创建 QWidget 并完成渲染断言。实际运行时可以使用下面的命令统一执行：
+
+\begin{verbatim}
+ctest --test-dir build --output-on-failure
+\end{verbatim}
+
+本地验证结果显示，三个测试程序均能通过。通过这些测试，我们不仅检查了单个函数是否返回正确值，也覆盖了游戏中最容易出现回归的问题，例如攻击重复命中、能量不足仍可行动、波次门禁失效、Boss 提前生成、资源路径缺失以及窗口通知没有触发重绘等。后续如果继续扩展敌人类型或增加新 UI，也可以沿用现有测试结构，把新规则加入 ViewModel 测试，把新显示状态加入 View 的离屏渲染测试。
 
 \subsubsection{持续集成}
 > 陈棋隆负责
@@ -320,6 +358,42 @@ urlcolor=cyan
 
 > 个人总结包括：自身在项目中承担的角色，遇到的主要挑战及应对策略，最终获得的成长与深度反思
 \subsection{个人总结：苏易文}
+
+本项目中我主要负责 App/Common 层的设计与实现，具体包括公共类型、游戏状态快照、通知工具、应用组合根、生命周期管理，以及 View 和 ViewModel 之间 properties、commands、notification 三类绑定。相比直接实现某个可见玩法，这一部分更像是为其他层搭建协作边界：Common 层需要提供稳定的公共语言，App 层需要把各个对象正确组装起来，并保证程序入口、窗口、规则层和通知机制之间能够形成清晰的调用链。
+
+通过这部分工作，我对 MVVM 架构中的“公共契约”有了更具体的认识。公共层并不是把所有看起来会被多个模块用到的东西都放进去，而是要谨慎判断哪些数据真正需要跨层共享，哪些细节应该留在各自模块内部。如果 Common 层过大，View 和 ViewModel 就会被迫知道太多彼此的实现细节；如果 App 层没有集中管理对象关系，绑定问题又会分散到多个文件中，后续联调和排错都会变得困难。
+
+\subsubsection{遇到的挑战及应对策略}
+
+\begin{enumerate}
+  \item \textbf{遇到的挑战}
+
+    第一项挑战是控制 Common 层的职责范围。开发初期，我曾经倾向于把输入动作、状态快照、Tick、绑定接口等内容都抽象进 Common 层。这样看起来结构完整，但实际联调时会发现，过早定义过多公共接口会限制 View 和 ViewModel 的实现方式，也会让公共层变成各层细节的集合。
+
+    第二项挑战是区分“给 View 显示的状态”和“ViewModel 内部规则状态”。View 需要知道玩家位置、血量、动作状态、敌人列表、镜头位置和 HUD 数据，但不应该知道敌人追踪速度、Boss 触发阈值、攻击命中范围、跳跃计时等规则细节。如果公共状态设计得过细，View 层就会逐渐依赖规则实现；如果公共状态设计得过少，View 又不得不自己推导显示结果。
+
+    第三项挑战是管理 App 层的组合关系。项目中同时存在 Qt 应用对象、主窗口、游戏控件和 ViewModel 等对象，如果它们的创建和绑定散落在不同位置，程序虽然也能运行，但一旦出现命令没有触发、状态没有刷新、窗口生命周期异常等问题，就很难快速定位原因。
+
+    第四项挑战是多人协作中的接口稳定性。View 层和 ViewModel 层同学都依赖 Common/App 提供的边界，如果我频繁修改公共字段、命名或绑定方式，就会给其他成员带来额外适配成本。因此公共接口不能只从自己实现方便出发，还要考虑它是否足够稳定、是否暴露了不必要的内部细节。
+
+  \item \textbf{应对策略}
+
+    针对第一项挑战，我逐步收敛 Common 层内容，只保留真正跨层共享且相对稳定的部分：基础值类型放在 \texttt{types.h}，只读显示状态放在 \texttt{game\_state.h}，轻量通知工具放在 \texttt{notification.h}。输入命令不再被 Common 层统一规定，而是由 ViewModel 通过 \texttt{std::function} 暴露，App 层负责注入给 View。这样 Common 层保持克制，各层之间的依赖也更清楚。
+
+    针对第二项挑战，我把 \texttt{GameState} 定位为“显示快照”，而不是规则对象本身。它只描述 View 绘制需要知道的信息，例如角色可见性、位置、血量、能量、阶段、结果和 HUD 状态；攻击判定、敌人 AI、波次推进等规则仍留在 ViewModel 内部。这样 View 可以稳定读取状态并完成绘制，而不会因为规则参数调整频繁改动。
+
+    针对第三项挑战，我把对象创建和绑定集中到 \texttt{GameApplication} 中。程序入口 \texttt{main.cpp} 只需要创建应用对象并调用 \texttt{run()}，具体的 Qt 应用、主窗口和 ViewModel 都由 App 层统一管理。所有 properties、commands 和 notification 绑定集中在组合根中完成，调试时只需要沿着这一处绑定关系检查，结构比把连接逻辑分散到各个模块更容易维护。
+
+    针对第四项挑战，我在修改公共接口前会先判断它是否真的属于跨层契约，是否可以用更小的数据结构表达，是否会迫使其他层知道不该知道的细节。后期联调时，我也尽量保持 \texttt{GameState} 和通知机制稳定，只在确实需要新增显示信息时才扩展字段，减少对队友代码的影响。
+\end{enumerate}
+
+\subsubsection{反思与成长}
+
+这次工作让我认识到，架构分层不是把代码机械地分进不同文件夹，而是让每一层只看到自己应该看到的东西。Common 层的价值在于提供稳定的公共语言，而不是替其他层做决定；App 层的价值在于集中完成对象组装和绑定，而不是把业务逻辑塞进程序入口。
+
+我也更理解了接口设计中的克制。一个字段一旦进入公共状态，就会成为其他层可以依赖的契约；一个命令一旦被暴露出去，就会影响 View 的输入组织方式。因此写公共代码时不能只考虑当前功能是否能跑通，还要考虑后续功能扩展时这个接口是否仍然合理。相比实现一个局部功能，维护跨层边界更需要提前思考和反复权衡。
+
+此外，App/Common 层的实现让我对多人协作有了更真实的体会。公共接口稳定后，View 层可以专心处理输入和绘制，ViewModel 层可以专心推进规则模拟；反过来，如果公共边界不清楚，大家的代码就会互相牵连。后续继续完善项目时，我会更加重视公共契约的简洁性、组合根的集中性，以及跨层依赖的可解释性。
 
 \subsection{个人总结：邱安琪}
 
