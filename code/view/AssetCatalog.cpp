@@ -1,7 +1,7 @@
 #include "AssetCatalog.h"
 
 #include <QFontDatabase>
-#include <QtResource>
+#include <QResource>
 
 #include <cstddef>
 
