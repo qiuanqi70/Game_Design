@@ -1,0 +1,27 @@
+\contentsline {section}{\numberline {1}成果展示}{1}{section.1}%
+\contentsline {subsection}{\numberline {1.1}项目简介}{1}{subsection.1.1}%
+\contentsline {subsubsection}{\numberline {1.1.1}组内分工}{1}{subsubsection.1.1.1}%
+\contentsline {subsection}{\numberline {1.2}游戏运行效果}{1}{subsection.1.2}%
+\contentsline {subsubsection}{\numberline {1.2.1}界面显示}{2}{subsubsection.1.2.1}%
+\contentsline {subsubsection}{\numberline {1.2.2}玩法}{3}{subsubsection.1.2.2}%
+\contentsline {paragraph}{\numberline {1.2.2.1}敌人种类}{3}{paragraph.1.2.2.1}%
+\contentsline {subsection}{\numberline {1.3}表格示例}{3}{subsection.1.3}%
+\contentsline {paragraph}{\numberline {1.3.0.1}玩家状态}{4}{paragraph.1.3.0.1}%
+\contentsline {paragraph}{\numberline {1.3.0.2}补给道具}{4}{paragraph.1.3.0.2}%
+\contentsline {subsubsection}{\numberline {1.3.1}音效}{5}{subsubsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.4}开发工具尝试}{6}{subsection.1.4}%
+\contentsline {subsubsection}{\numberline {1.4.1}团队协作与版本管理工具}{6}{subsubsection.1.4.1}%
+\contentsline {subsubsection}{\numberline {1.4.2}单元测试}{8}{subsubsection.1.4.2}%
+\contentsline {subsubsection}{\numberline {1.4.3}持续集成}{9}{subsubsection.1.4.3}%
+\contentsline {subsubsection}{\numberline {1.4.4}代码格式化工具 clang-format}{9}{subsubsection.1.4.4}%
+\contentsline {section}{\numberline {2}学习回顾}{9}{section.2}%
+\contentsline {subsection}{\numberline {2.1}个人总结：苏易文}{10}{subsection.2.1}%
+\contentsline {subsubsection}{\numberline {2.1.1}遇到的挑战及应对策略}{10}{subsubsection.2.1.1}%
+\contentsline {subsubsection}{\numberline {2.1.2}反思与成长}{11}{subsubsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.2}个人总结：邱安琪}{11}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}遇到的挑战及应对策略}{11}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}反思与成长}{12}{subsubsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.3}个人总结：陈棋隆}{13}{subsection.2.3}%
+\contentsline {subsubsection}{\numberline {2.3.1}遇到的挑战及应对策略}{13}{subsubsection.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.3.2}反思与成长}{14}{subsubsection.2.3.2}%
+\contentsline {section}{\numberline {3}课程改进建议}{14}{section.3}%

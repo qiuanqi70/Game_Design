@@ -46,10 +46,7 @@ public:
     void setRunning(bool running);
 
     /// Tick 回调：定时器通过此回调直接发给绑定器，不经过 Qt signal。
-    void set_tick_command(std::function<void(float, std::uint64_t)> command)
-    {
-        m_tickCommand = std::move(command);
-    }
+    void set_tick_command(std::function<void(float, std::uint64_t)> command) { m_tickCommand = std::move(command); }
 
     void set_move_left_command(std::function<void(bool)> command) { m_moveLeftCommand = std::move(command); }
     void set_move_right_command(std::function<void(bool)> command) { m_moveRightCommand = std::move(command); }
@@ -83,16 +80,13 @@ private:
     void drawForeground(QPainter& p);
     void drawActor(QPainter& p, const ActorState& actor);
     bool drawActorSprite(QPainter& p, const ActorState& actor);
-    void drawCharacterBody(QPainter& p, const ActorState& actor,
-                           QColor bodyColor);
+    void drawCharacterBody(QPainter& p, const ActorState& actor, QColor bodyColor);
     void drawHealthBar(QPainter& p, const ActorState& actor);
     void drawHUD(QPainter& p);
     void drawOverlay(QPainter& p);
     void drawEncounterOverlay(QPainter& p);
     void drawInterfacePanel(QPainter& p, const QRectF& rect) const;
-    void drawInterfaceButton(QPainter& p, const QRectF& rect,
-                             const std::array<QPixmap, 6>& art,
-                             bool bright) const;
+    void drawInterfaceButton(QPainter& p, const QRectF& rect, const std::array<QPixmap, 6>& art, bool bright) const;
     void drawProjectile(QPainter& p, const ProjectileState& proj);
     void drawPickup(QPainter& p, const PickupState& pickup);
     void drawParticles(QPainter& p);
@@ -110,8 +104,7 @@ private:
     static std::size_t hudFrameIndex(float elapsed);
     bool hasActorArt(const ActorState& actor) const;
     float actorSpriteWidth(const ActorState& actor) const;
-    void drawBar(QPainter& p, float x, float y, float w, float h,
-                 float ratio, QColor fillColor);
+    void drawBar(QPainter& p, float x, float y, float w, float h, float ratio, QColor fillColor);
 
     struct ViewportMetrics {
         float width = 960.0f;

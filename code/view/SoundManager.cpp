@@ -7,8 +7,8 @@
 #include <QStringList>
 
 #ifdef Q_OS_WIN
-#include <windows.h>
 #include <mmsystem.h>
+#include <windows.h>
 #endif
 
 namespace alleyfist {
@@ -16,8 +16,7 @@ namespace alleyfist {
 std::string SoundManager::s_assetPath;
 std::unordered_map<std::string, std::string> SoundManager::s_pathCache;
 
-void SoundManager::init(const std::string& assetsPath)
-{
+void SoundManager::init(const std::string& assetsPath) {
     QString resolvedPath = QDir::cleanPath(QString::fromStdString(assetsPath));
     const QFileInfo requestedPath(resolvedPath);
     if (requestedPath.isRelative()) {
@@ -33,8 +32,7 @@ void SoundManager::init(const std::string& assetsPath)
     s_pathCache.clear();
 }
 
-void SoundManager::play(const std::string& name)
-{
+void SoundManager::play(const std::string& name) {
     auto it = s_pathCache.find(name);
     if (it == s_pathCache.end()) {
         const QDir assetDirectory(QString::fromStdString(s_assetPath));
@@ -50,8 +48,7 @@ void SoundManager::play(const std::string& name)
     const QString path = QString::fromStdString(it->second);
 
 #ifdef Q_OS_WIN
-    PlaySoundW(reinterpret_cast<LPCWSTR>(path.utf16()), nullptr,
-               SND_ASYNC | SND_FILENAME | SND_NODEFAULT | SND_NOSTOP);
+    PlaySoundW(reinterpret_cast<LPCWSTR>(path.utf16()), nullptr, SND_ASYNC | SND_FILENAME | SND_NODEFAULT | SND_NOSTOP);
 #elif defined(Q_OS_MACOS)
     QProcess::startDetached("/usr/bin/afplay", QStringList{path});
 #else

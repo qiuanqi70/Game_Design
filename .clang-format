@@ -1,0 +1,17 @@
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 120
+PointerAlignment: Left
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+SortIncludes: true
+IncludeBlocks: Preserve
+AccessModifierOffset: -4
+NamespaceIndentation: None
+FixNamespaceComments: true
+SpacesBeforeTrailingComments: 1
+AlignTrailingComments: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: true
+BinPackParameters: true

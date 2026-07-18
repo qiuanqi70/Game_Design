@@ -293,7 +293,34 @@ urlcolor=cyan
 
 
 \subsubsection{音效}
-> 负责的同学补充一下
+
+游戏在八个关键事件上通过 Windows \texttt{PlaySound} API 实现异步音效播放，所有音频文件均为 WAV 格式，存放在仓库 \texttt{assets/sfx/} 目录下：
+
+\begin{table}[H]
+  \centering
+  \caption{游戏音效文件列表}
+  \begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}m{0.28\textwidth}|>{\centering\arraybackslash}m{0.24\textwidth}|X|}
+    \hline
+    文件名 & 大小 & 触发时机 \\
+    \hline
+    \texttt{hit\_light.wav} & 212 KB & 玩家轻攻击（J/Z）命中判定通过时播放 \\
+    \hline
+    \texttt{hit\_heavy.wav} & 194 KB & 玩家重攻击（K/X）命中判定通过时播放 \\
+    \hline
+    \texttt{player\_hurt.wav} & 306 KB & 玩家受到敌人近战或投射物伤害时播放 \\
+    \hline
+    \texttt{jump.wav} & 306 KB & 玩家按 Space 跳跃且能量检查通过时播放 \\
+    \hline
+    \texttt{boss\_intro.wav} & 711 KB & Boss 首次出现在敌人列表中时播放 \\
+    \hline
+    \texttt{gameover.wav} & 122 KB & 玩家生命归零、阶段切换到 GameOver 时播放 \\
+    \hline
+    \texttt{win.wav} & 1760 KB & Boss 被击败、阶段切换到 Win 时播放 \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+音效管理器 \texttt{SoundManager} 封装 \texttt{PlaySound}，启动时初始化 \texttt{assets/sfx/} 路径，后续调用 \texttt{play(name)} 即可以异步模式播放，不阻塞游戏循环。文件不存在时静默跳过，确保音频缺失不影响程序运行。攻击音效仅在动作被 ViewModel 接受（通过能量变化和动作状态变化双重判断）后才触发，避免按键即响而实际未出招的情况。
 
 \subsection{开发工具尝试}
 \subsubsection{团队协作与版本管理工具}
@@ -351,7 +378,32 @@ ctest --test-dir build --output-on-failure
 本地验证结果显示，三个测试程序均能通过。通过这些测试，我们不仅检查了单个函数是否返回正确值，也覆盖了游戏中最容易出现回归的问题，例如攻击重复命中、能量不足仍可行动、波次门禁失效、Boss 提前生成、资源路径缺失以及窗口通知没有触发重绘等。后续如果继续扩展敌人类型或增加新 UI，也可以沿用现有测试结构，把新规则加入 ViewModel 测试，把新显示状态加入 View 的离屏渲染测试。
 
 \subsubsection{持续集成}
-> 陈棋隆负责
+
+项目配置了 GitHub Actions 自动化构建流水线（\texttt{.github/workflows/ci.yml}），在每次 push、pull request 以及每天凌晨 2 点自动触发。CI 环境使用 Ubuntu 24.04，通过 \texttt{apt-get} 安装 Qt6、CMake 和 Ninja，自动完成配置、编译和测试全部流程。View 和 App 测试通过 \texttt{QT\_QPA\_PLATFORM=offscreen} 在无桌面环境中完成离屏渲染验证。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{github_action.png}
+  \caption{GitHub Actions 自动化构建与测试运行结果}
+\end{figure}
+
+同时项目也提供了本地 CI 脚本 \texttt{ci\_build.sh}，依次执行 git pull、Qt 工具链检查、CMake 配置与编译，可通过 Windows 任务计划程序设为每天定时执行。
+
+\subsubsection{代码格式化工具 clang-format}
+
+为了统一团队代码风格、减少因缩进和换行差异产生的合并冲突，本项目引入了 \texttt{clang-format} 作为自动化代码格式化工具。
+
+clang-format 是 LLVM 项目提供的 C/C++ 代码格式化器，能够根据配置文件自动调整代码的缩进宽度、大括号位置、换行策略、空格规则和头文件排序等。项目根目录下的 \texttt{.clang-format} 配置文件基于 Google 风格调整而来，将缩进宽度设为 4 空格、行宽限制 120 字符、指针对齐方式为靠左等。
+
+使用方式灵活，可以手动格式化整个项目：
+
+\begin{verbatim}
+find code -name "*.cpp" -o -name "*.h" | xargs clang-format -i
+\end{verbatim}
+
+也可以在 VS Code 中安装 Clang-Format 插件，设置保存时自动格式化，基本不需要额外操作。Qt Creator 本身也支持基于 clang-format 的格式化。
+
+使用 clang-format 后，团队成员不需要在代码风格上刻意保持一致——每个人按自己习惯编写，提交前由格式化工具统一处理。代码评审时也可以减少大量“这里少了一个空格”之类的低价值讨论。
 
 \section{学习回顾}
 > 要提炼核心收获与感悟，邱安琪负责
@@ -435,8 +487,47 @@ ctest --test-dir build --output-on-failure
 
 \subsection{个人总结：陈棋隆}
 
+本项目中我主要负责 View 层的设计与实现，包括 \texttt{MainWindow}、\texttt{GameWidget}、\texttt{InputDefs.h}、\texttt{SoundManager} 以及相关的离屏渲染测试。View 层的职责是把 ViewModel 暴露的只读 \texttt{GameState} 转化为玩家可见的画面，并把键盘输入翻译成语义命令发送给 ViewModel，同时不持有任何游戏规则状态。
+
+通过这部分工作，我对 MVVM 架构中 View 层的边界有了更清晰的理解：View 可以自由使用 Qt 的窗口、定时器、键盘事件和 \texttt{QPainter} 完成界面工作，但不能判断规则对错，不能修改游戏内部状态，也不能包含任何 ViewModel 头文件。
+
+\subsubsection{遇到的挑战及应对策略}
+
+\begin{enumerate}
+  \item \textbf{遇到的挑战}
+
+    第一项挑战是从 Qt 信号驱动到 \texttt{std::function} 回调注入的模式迁移。最初版本使用 Qt 的 \texttt{signal}/\texttt{slot} 机制做跨层绑定，View 发出 \texttt{commandGenerated} 和 \texttt{tickRequested} 信号，再由绑定器用 \texttt{connect} 桥接到 ViewModel。这种方案使得 \texttt{GameCommand} 结构体需要在 Common 层定义，把输入层概念带入公共契约，且绑定路径依赖 Qt 信号机制。在老师建议下，我们将绑定方式改为 \texttt{std::function} 回调注入——ViewModel 返回闭包，App 层在组合根中注入 View，按键和定时器直接调用 \texttt{std::function}，不再经过 Qt 信号中间层。
+
+    第二项挑战是在没有外部图片素材的条件下用纯几何图形绘制全部游戏画面。玩家、小怪、Boss、建筑、街道、HUD 血条、GO 提示和四个覆盖层（标题、暂停、失败、胜利）全部使用 \texttt{QPainter} 的矩形、圆形和线条组合完成。挑战在于用有限的几何元素组合出可辨识的角色形象和场景氛围，同时保证在不同窗口尺寸下缩放一致。
+
+    第三项挑战是在不依赖 ViewModel 变更的情况下实现丰富的视觉反馈。Boss 出场动画（黑幕收缩、WARNING 闪烁、名称飞入）、屏幕震动、血量延迟衰减、命中闪白、受击粒子、Idle 呼吸动画、敌人攻击姿态等效果全部在 View 层内部通过追踪 \texttt{GameState} 中已有字段的变化来实现。例如 Boss 出场通过检测敌人列表中首次出现 \texttt{ActorKind::Boss} 触发，屏幕震动通过追踪 \texttt{player.impactRevision} 的变化触发，敌人攻击动画通过比较玩家血量变化来找最近的敌人并显示出拳姿态。
+
+    第四项挑战是音效系统的接入。项目使用 Windows 原生 \texttt{PlaySound} API，通过 \texttt{SoundManager} 封装为异步播放接口。音效触发时机需要精确判断——攻击音效仅在 ViewModel 接受动作后才播放（通过能量变化和动作状态双重校验），而非按键即响；Boss 出场和胜利音效需要正确处理游戏重开时的状态重置，避免重复播放或完全不播放。
+
+  \item \textbf{应对策略}
+
+    针对第一项挑战，我从 \texttt{GameWidget} 中删除了所有 \texttt{signals:} 声明，改为十一个 \texttt{std::function} setter 方法接收外部注入的回调。\texttt{MainWindow} 不再需要 \texttt{GameWidgetBinding} 中间类，\texttt{bind()} 方法直接完成 command setter 注入和 notification 回调注册。Common 层不再需要 \texttt{GameCommand} 结构体和 \texttt{InputAction} 枚举，层间耦合显著降低。
+
+    针对第二项挑战，我使用视差系数（0.3x）区分远景建筑和主场景；用不同配色（蓝/红/深红/紫/橙/绿）区分玩家和五种敌人；用 \texttt{QLinearGradient} 模拟夜空、标题文字和胜利文字的光影效果；用正弦函数驱动行走时腿部交替摆动和 Idle 呼吸微动。
+
+    针对第三项挑战，我建立了定时器 lambda 中的统一视觉状态更新流程。血量延迟条用 \texttt{m\_displayHealthRatio} 以 4x 速度追赶真实值；屏幕震动在检测到 \texttt{impactRevision} 变化时激活并按时间衰减；命中闪白和粒子仅在 \texttt{actionState == Hurt} 的瞬间显示；Boss 出场动画通过 \texttt{m\_bossWasInList} 标记检测敌人列表中 Boss 的出现和消失，自动触发出场/重置。
+
+    针对第四项挑战，\texttt{SoundManager} 在初始化时缓存音频文件路径，后续播放只需文件名查找。\texttt{PlaySound} 使用 \texttt{SND\_ASYNC | SND\_NODEFAULT} 标志异步播放，不阻塞游戏循环。CMake 中显式链接 \texttt{winmm} 库以支持 MinGW 编译器。
+\end{enumerate}
+
+\subsubsection{反思与成长}
+
+这次工作让我认识到，View 层的核心价值不仅在于“把东西画出来”，更在于用纯表现层的状态管理来丰富玩家体验，而不增加 ViewModel 的负担。Boss 出场动画、屏幕震动、血量延迟条这些效果全部在 View 内部实现，ViewModel 完全不需要知道它们的存在。这种“View 层自有表现状态”的思路让我理解了 MVVM 中 View 的独立性和创造力。
+
+我也更重视了 View 层内部的数据访问纪律。所有绘制方法通过 \texttt{game\_state()} 辅助函数统一获取只读快照引用，绝不绕过这个入口直接操作 \texttt{m\_gameState} 指针。添加新效果时，首先确认所需字段是否已经存在于 \texttt{GameState} 中，如果不存在则优先从已有字段推导，而不是要求 ViewModel 新增字段。这种自律让 View 层在快速迭代视觉效果的同时保持了架构边界不被破坏。
+
+此外，通过为 View 层补充离屏渲染测试，我认识到了测试对界面代码的价值。使用 \texttt{QWidget::render()} 输出到 \texttt{QImage} 并比较像素变化，可以在不启动完整游戏的情况下验证输入映射、状态绑定和绘制覆盖。这为后续素材替换和 UI 改动提供了回归保护。
+
 \section{课程改进建议}
-> 每个人写一点，我最后再总结一下
-> 结合实际体验，提出对课程内容、组织形式或教学方法的具体优化建议，以助力未来学习体验的持续提升
+
+\begin{itemize}
+  \item \textbf{适当增加课程时间。} 本项目从架构设计、分层实现、联调测试到报告撰写，时间非常紧张。特别是 MVVM 架构的理解和实践需要反复迭代才能掌握，建议在关键章节（如分层设计、测试驱动开发）适当延长课时，给学生更多动手重构和接受代码评审的机会，避免因为赶进度而牺牲代码质量。
+  \item \textbf{强化代码评审环节。} 建议在每次迭代交付时安排一次正式的组间代码评审，让不同小组互相审查对方的架构设计和代码风格，既能发现盲区，也能学习其他组的优秀实践。
+\end{itemize}
 
 \end{document}
